@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>StormView Radar</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #0a0a0f;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Hide Leaflet attribution initially, show on hover */
+        .leaflet-control-attribution {
+            background: rgba(0, 0, 0, 0.7) !important;
+            color: #888 !important;
+            font-size: 10px;
+            padding: 2px 8px !important;
+            border-radius: 4px 0 0 0;
+        }
+
+        .leaflet-control-attribution a {
+            color: #aaa !important;
+        }
+
+        /* Custom zoom controls */
+        .leaflet-control-zoom {
+            border: none !important;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5) !important;
+        }
+
+        .leaflet-control-zoom a {
+            background: rgba(20, 20, 30, 0.9) !important;
+            color: #fff !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            width: 36px !important;
+            height: 36px !important;
+            line-height: 36px !important;
+            font-size: 18px !important;
+        }
+
+        .leaflet-control-zoom a:hover {
+            background: rgba(40, 40, 60, 0.95) !important;
+        }
+
+        /* Top bar */
+        .top-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background: linear-gradient(180deg, rgba(10, 10, 20, 0.95) 0%, rgba(10, 10, 20, 0.8) 70%, transparent 100%);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #00d4ff 0%, #0099ff 50%, #0066cc 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .timestamp-display {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .timestamp-display.future {
+            background: rgba(0, 200, 255, 0.2);
+            border-color: rgba(0, 200, 255, 0.3);
+        }
+
+        .top-right-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        .control-btn.active {
+            background: rgba(0, 150, 255, 0.4);
+            border-color: rgba(0, 150, 255, 0.6);
+        }
+
+        /* Bottom playback controls */
+        .playback-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(0deg, rgba(10, 10, 20, 0.95) 0%, rgba(10, 10, 20, 0.85) 60%, transparent 100%);
+            padding: 20px 16px 24px;
+            z-index: 1000;
+        }
+
+        .timeline-container {
+            position: relative;
+            margin-bottom: 16px;
+            padding: 0 8px;
+        }
+
+        .timeline-track {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .timeline-progress {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            background: linear-gradient(90deg, #0099ff, #00d4ff);
+            border-radius: 2px;
+            transition: width 0.1s linear;
+        }
+
+        .timeline-scrubber {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            cursor: grab;
+            transition: transform 0.1s ease;
+        }
+
+        .timeline-scrubber:hover {
+            transform: translate(-50%, -50%) scale(1.2);
+        }
+
+        .timeline-scrubber:active {
+            cursor: grabbing;
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+
+        .frame-markers {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            padding: 0 4px;
+        }
+
+        .frame-marker {
+            width: 2px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 1px;
+        }
+
+        .frame-marker.future {
+            background: rgba(0, 200, 255, 0.5);
+        }
+
+        .playback-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .play-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0099ff 0%, #0066cc 100%);
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 20px rgba(0, 100, 255, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 25px rgba(0, 100, 255, 0.5);
+        }
+
+        .play-btn:active {
+            transform: scale(0.98);
+        }
+
+        .skip-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .skip-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .speed-btn {
+            padding: 8px 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .speed-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Radar legend */
+        .radar-legend {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 1000;
+            background: rgba(10, 10, 20, 0.85);
+            border-radius: 12px;
+            padding: 12px 10px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .legend-gradient {
+            width: 16px;
+            height: 200px;
+            border-radius: 4px;
+            background: linear-gradient(to bottom,
+                #ff00ff 0%,
+                #ff0000 15%,
+                #ff6600 25%,
+                #ffcc00 35%,
+                #ffff00 45%,
+                #00ff00 55%,
+                #00cc00 65%,
+                #0099ff 75%,
+                #0066cc 85%,
+                #004488 100%
+            );
+        }
+
+        .legend-labels {
+            position: absolute;
+            right: 32px;
+            top: 12px;
+            height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.7);
+            text-align: right;
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(10, 10, 20, 0.9);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #0099ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            margin-top: 16px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Settings panel */
+        .settings-panel {
+            position: absolute;
+            top: 70px;
+            right: 16px;
+            background: rgba(15, 15, 25, 0.95);
+            border-radius: 16px;
+            padding: 20px;
+            z-index: 1001;
+            min-width: 260px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            transform: translateX(calc(100% + 20px));
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .settings-panel.visible {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .settings-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .setting-label {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .setting-slider {
+            width: 100px;
+            height: 4px;
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .setting-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #0099ff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .toggle-switch.active {
+            background: #0099ff;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(22px);
+        }
+
+        /* Location button */
+        .location-btn {
+            position: absolute;
+            bottom: 160px;
+            right: 16px;
+            z-index: 1000;
+        }
+
+        /* Layer selector */
+        .layer-selector {
+            position: absolute;
+            left: 16px;
+            top: 70px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .layer-btn {
+            padding: 10px 16px;
+            background: rgba(15, 15, 25, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .layer-btn:hover {
+            background: rgba(30, 30, 50, 0.95);
+        }
+
+        .layer-btn.active {
+            background: rgba(0, 100, 200, 0.6);
+            border-color: rgba(0, 150, 255, 0.5);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            .radar-legend {
+                display: none;
+            }
+
+            .top-bar {
+                padding: 0 12px;
+            }
+
+            .logo {
+                font-size: 16px;
+            }
+
+            .timestamp-display {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+
+            .layer-selector {
+                left: 10px;
+                top: 64px;
+            }
+
+            .layer-btn {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+        }
+
+        /* Notification toast */
+        .toast {
+            position: absolute;
+            bottom: 240px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(15, 15, 25, 0.95);
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 14px;
+            z-index: 1002;
+            opacity: 0;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            white-space: nowrap;
+        }
+
+        .toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading radar data...</div>
+    </div>
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <div class="logo">
+            <div class="logo-icon">⛈</div>
+            <span>StormView</span>
+        </div>
+        <div class="timestamp-display" id="timestampDisplay">Loading...</div>
+        <div class="top-right-controls">
+            <button class="control-btn" id="settingsBtn" title="Settings">⚙</button>
+        </div>
+    </div>
+
+    <!-- Layer Selector -->
+    <div class="layer-selector">
+        <button class="layer-btn active" data-layer="reflectivity">Reflectivity</button>
+        <button class="layer-btn" data-layer="velocity">Velocity</button>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="settings-panel" id="settingsPanel">
+        <div class="settings-title">Settings</div>
+        <div class="setting-row">
+            <span class="setting-label">Radar Opacity</span>
+            <input type="range" class="setting-slider" id="opacitySlider" min="0.1" max="1" step="0.1" value="0.7">
+        </div>
+        <div class="setting-row">
+            <span class="setting-label">Smooth Animation</span>
+            <div class="toggle-switch active" id="smoothToggle"></div>
+        </div>
+        <div class="setting-row">
+            <span class="setting-label">Show Counties</span>
+            <div class="toggle-switch" id="countiesToggle"></div>
+        </div>
+        <div class="setting-row">
+            <span class="setting-label">Weather Alerts</span>
+            <div class="toggle-switch active" id="alertsToggle"></div>
+        </div>
+    </div>
+
+    <!-- Radar Legend -->
+    <div class="radar-legend">
+        <div class="legend-labels">
+            <span>75 dBZ</span>
+            <span>60</span>
+            <span>45</span>
+            <span>30</span>
+            <span>15</span>
+        </div>
+        <div class="legend-gradient"></div>
+    </div>
+
+    <!-- Location Button -->
+    <button class="control-btn location-btn" id="locationBtn" title="My Location">📍</button>
+
+    <!-- Playback Controls -->
+    <div class="playback-container">
+        <div class="timeline-container">
+            <div class="timeline-track" id="timelineTrack">
+                <div class="timeline-progress" id="timelineProgress"></div>
+                <div class="timeline-scrubber" id="timelineScrubber"></div>
+            </div>
+            <div class="frame-markers" id="frameMarkers"></div>
+        </div>
+        <div class="playback-controls">
+            <button class="speed-btn" id="speedBtn">1x</button>
+            <button class="skip-btn" id="skipBackBtn">⏮</button>
+            <button class="play-btn" id="playBtn">▶</button>
+            <button class="skip-btn" id="skipForwardBtn">⏭</button>
+            <button class="speed-btn" id="loopBtn">🔁</button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // ============================================
+        // StormView Radar - MyRadar-style weather app
+        // ============================================
+
+        class StormViewRadar {
+            constructor() {
+                this.map = null;
+                this.radarLayers = [];
+                this.currentFrame = 0;
+                this.totalFrames = 10;
+                this.isPlaying = false;
+                this.playInterval = null;
+                this.animationSpeed = 500; // ms between frames
+                this.speedMultiplier = 1;
+                this.loopEnabled = true;
+                this.radarOpacity = 0.7;
+                this.smoothAnimation = true;
+                this.timestamps = [];
+                this.alertsLayer = null;
+                this.countiesLayer = null;
+                this.currentLayer = 'reflectivity';
+                this.locationMarker = null;
+
+                this.init();
+            }
+
+            async init() {
+                this.initMap();
+                this.initControls();
+                await this.loadRadarData();
+                this.hideLoading();
+            }
+
+            initMap() {
+                // Initialize map centered on US
+                this.map = L.map('map', {
+                    center: [39.8283, -98.5795],
+                    zoom: 5,
+                    zoomControl: true,
+                    attributionControl: true
+                });
+
+                // Dark basemap - CartoDB Dark Matter (no API key needed)
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a> | Radar: <a href="https://mesonet.agron.iastate.edu/">IEM</a>',
+                    subdomains: 'abcd',
+                    maxZoom: 19
+                }).addTo(this.map);
+
+                // Move zoom control to bottom-left
+                this.map.zoomControl.setPosition('bottomleft');
+            }
+
+            async loadRadarData() {
+                // Clear existing radar layers
+                this.radarLayers.forEach(layer => {
+                    if (this.map.hasLayer(layer)) {
+                        this.map.removeLayer(layer);
+                    }
+                });
+                this.radarLayers = [];
+                this.timestamps = [];
+
+                // Generate timestamps for the last ~2 hours (every 10 minutes = 12 frames)
+                const now = new Date();
+                this.totalFrames = 12;
+
+                // Round down to nearest 5 minutes
+                now.setMinutes(Math.floor(now.getMinutes() / 5) * 5);
+                now.setSeconds(0);
+                now.setMilliseconds(0);
+
+                for (let i = this.totalFrames - 1; i >= 0; i--) {
+                    const frameTime = new Date(now.getTime() - (i * 10 * 60 * 1000));
+                    this.timestamps.push(frameTime);
+
+                    // Create WMS layer for each timestamp
+                    const layer = L.tileLayer.wms('https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi', {
+                        layers: 'nexrad-n0q-900913',
+                        format: 'image/png',
+                        transparent: true,
+                        opacity: 0,
+                        attribution: ''
+                    });
+
+                    this.radarLayers.push(layer);
+                    layer.addTo(this.map);
+                }
+
+                // Load weather alerts
+                await this.loadWeatherAlerts();
+
+                // Show the most recent frame
+                this.currentFrame = this.totalFrames - 1;
+                this.showFrame(this.currentFrame);
+                this.updateTimeline();
+                this.updateFrameMarkers();
+            }
+
+            async loadWeatherAlerts() {
+                try {
+                    // NWS Weather Alerts WMS layer
+                    this.alertsLayer = L.tileLayer.wms('https://mesonet.agron.iastate.edu/cgi-bin/wms/us/wwa.cgi', {
+                        layers: 'warnings_p,warnings_c',
+                        format: 'image/png',
+                        transparent: true,
+                        opacity: 0.6
+                    });
+
+                    if (document.getElementById('alertsToggle').classList.contains('active')) {
+                        this.alertsLayer.addTo(this.map);
+                    }
+                } catch (e) {
+                    console.log('Could not load weather alerts');
+                }
+            }
+
+            showFrame(index) {
+                this.radarLayers.forEach((layer, i) => {
+                    if (this.smoothAnimation) {
+                        // Smooth fade transition
+                        if (i === index) {
+                            layer.setOpacity(this.radarOpacity);
+                        } else {
+                            layer.setOpacity(0);
+                        }
+                    } else {
+                        layer.setOpacity(i === index ? this.radarOpacity : 0);
+                    }
+                });
+
+                this.currentFrame = index;
+                this.updateTimestamp();
+                this.updateTimeline();
+            }
+
+            updateTimestamp() {
+                const timestamp = this.timestamps[this.currentFrame];
+                if (timestamp) {
+                    const display = document.getElementById('timestampDisplay');
+                    const timeStr = timestamp.toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                    });
+                    const dateStr = timestamp.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                    display.textContent = `${dateStr} ${timeStr}`;
+                    display.classList.remove('future');
+                }
+            }
+
+            updateTimeline() {
+                const progress = ((this.currentFrame + 1) / this.totalFrames) * 100;
+                document.getElementById('timelineProgress').style.width = `${progress}%`;
+                document.getElementById('timelineScrubber').style.left = `${progress}%`;
+            }
+
+            updateFrameMarkers() {
+                const container = document.getElementById('frameMarkers');
+                container.innerHTML = '';
+                for (let i = 0; i < this.totalFrames; i++) {
+                    const marker = document.createElement('div');
+                    marker.className = 'frame-marker';
+                    container.appendChild(marker);
+                }
+            }
+
+            play() {
+                if (this.isPlaying) return;
+                this.isPlaying = true;
+                document.getElementById('playBtn').innerHTML = '⏸';
+
+                const effectiveSpeed = this.animationSpeed / this.speedMultiplier;
+
+                this.playInterval = setInterval(() => {
+                    let nextFrame = this.currentFrame + 1;
+                    if (nextFrame >= this.totalFrames) {
+                        if (this.loopEnabled) {
+                            nextFrame = 0;
+                        } else {
+                            this.pause();
+                            return;
+                        }
+                    }
+                    this.showFrame(nextFrame);
+                }, effectiveSpeed);
+            }
+
+            pause() {
+                this.isPlaying = false;
+                document.getElementById('playBtn').innerHTML = '▶';
+                if (this.playInterval) {
+                    clearInterval(this.playInterval);
+                    this.playInterval = null;
+                }
+            }
+
+            togglePlay() {
+                if (this.isPlaying) {
+                    this.pause();
+                } else {
+                    this.play();
+                }
+            }
+
+            skipBack() {
+                this.pause();
+                let newFrame = this.currentFrame - 1;
+                if (newFrame < 0) newFrame = this.totalFrames - 1;
+                this.showFrame(newFrame);
+            }
+
+            skipForward() {
+                this.pause();
+                let newFrame = this.currentFrame + 1;
+                if (newFrame >= this.totalFrames) newFrame = 0;
+                this.showFrame(newFrame);
+            }
+
+            cycleSpeed() {
+                const speeds = [0.5, 1, 1.5, 2];
+                const currentIndex = speeds.indexOf(this.speedMultiplier);
+                const nextIndex = (currentIndex + 1) % speeds.length;
+                this.speedMultiplier = speeds[nextIndex];
+                document.getElementById('speedBtn').textContent = `${this.speedMultiplier}x`;
+
+                // Restart animation with new speed if playing
+                if (this.isPlaying) {
+                    this.pause();
+                    this.play();
+                }
+
+                this.showToast(`Speed: ${this.speedMultiplier}x`);
+            }
+
+            toggleLoop() {
+                this.loopEnabled = !this.loopEnabled;
+                const btn = document.getElementById('loopBtn');
+                btn.style.opacity = this.loopEnabled ? 1 : 0.5;
+                this.showToast(this.loopEnabled ? 'Loop enabled' : 'Loop disabled');
+            }
+
+            setOpacity(value) {
+                this.radarOpacity = parseFloat(value);
+                this.showFrame(this.currentFrame);
+            }
+
+            toggleSmoothAnimation() {
+                this.smoothAnimation = !this.smoothAnimation;
+            }
+
+            toggleCounties() {
+                const toggle = document.getElementById('countiesToggle');
+                toggle.classList.toggle('active');
+
+                if (toggle.classList.contains('active')) {
+                    if (!this.countiesLayer) {
+                        this.countiesLayer = L.tileLayer.wms('https://mesonet.agron.iastate.edu/cgi-bin/wms/us/wwa.cgi', {
+                            layers: 'uscounties',
+                            format: 'image/png',
+                            transparent: true,
+                            opacity: 0.3
+                        });
+                    }
+                    this.countiesLayer.addTo(this.map);
+                } else if (this.countiesLayer) {
+                    this.map.removeLayer(this.countiesLayer);
+                }
+            }
+
+            toggleAlerts() {
+                const toggle = document.getElementById('alertsToggle');
+                toggle.classList.toggle('active');
+
+                if (toggle.classList.contains('active') && this.alertsLayer) {
+                    this.alertsLayer.addTo(this.map);
+                } else if (this.alertsLayer) {
+                    this.map.removeLayer(this.alertsLayer);
+                }
+            }
+
+            setLayer(layerType) {
+                this.currentLayer = layerType;
+                
+                // Update button states
+                document.querySelectorAll('.layer-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.layer === layerType);
+                });
+
+                // Reload radar with new product
+                const wasPlaying = this.isPlaying;
+                this.pause();
+
+                // Clear and reload
+                this.radarLayers.forEach(layer => {
+                    if (this.map.hasLayer(layer)) {
+                        this.map.removeLayer(layer);
+                    }
+                });
+                this.radarLayers = [];
+
+                const product = layerType === 'velocity' ? 'nexrad-n0u-900913' : 'nexrad-n0q-900913';
+                const wmsUrl = layerType === 'velocity' 
+                    ? 'https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0u.cgi'
+                    : 'https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi';
+
+                for (let i = 0; i < this.timestamps.length; i++) {
+                    const layer = L.tileLayer.wms(wmsUrl, {
+                        layers: product,
+                        format: 'image/png',
+                        transparent: true,
+                        opacity: 0,
+                        attribution: ''
+                    });
+                    this.radarLayers.push(layer);
+                    layer.addTo(this.map);
+                }
+
+                this.showFrame(this.currentFrame);
+                
+                if (wasPlaying) {
+                    this.play();
+                }
+
+                this.showToast(`Layer: ${layerType.charAt(0).toUpperCase() + layerType.slice(1)}`);
+            }
+
+            goToLocation() {
+                if (!navigator.geolocation) {
+                    this.showToast('Geolocation not supported');
+                    return;
+                }
+
+                this.showToast('Getting location...');
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        this.map.setView([latitude, longitude], 8);
+
+                        // Add/update location marker
+                        if (this.locationMarker) {
+                            this.locationMarker.setLatLng([latitude, longitude]);
+                        } else {
+                            this.locationMarker = L.circleMarker([latitude, longitude], {
+                                radius: 8,
+                                fillColor: '#0099ff',
+                                fillOpacity: 1,
+                                color: '#fff',
+                                weight: 3
+                            }).addTo(this.map);
+                        }
+
+                        this.showToast('Location found');
+                    },
+                    (error) => {
+                        this.showToast('Could not get location');
+                        console.error('Geolocation error:', error);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            }
+
+            initControls() {
+                // Play/Pause
+                document.getElementById('playBtn').addEventListener('click', () => this.togglePlay());
+
+                // Skip buttons
+                document.getElementById('skipBackBtn').addEventListener('click', () => this.skipBack());
+                document.getElementById('skipForwardBtn').addEventListener('click', () => this.skipForward());
+
+                // Speed control
+                document.getElementById('speedBtn').addEventListener('click', () => this.cycleSpeed());
+
+                // Loop toggle
+                document.getElementById('loopBtn').addEventListener('click', () => this.toggleLoop());
+
+                // Timeline scrubbing
+                const timeline = document.getElementById('timelineTrack');
+                let isDragging = false;
+
+                const handleTimelineInteraction = (e) => {
+                    const rect = timeline.getBoundingClientRect();
+                    const x = (e.clientX || e.touches[0].clientX) - rect.left;
+                    const percent = Math.max(0, Math.min(1, x / rect.width));
+                    const frame = Math.floor(percent * this.totalFrames);
+                    this.showFrame(Math.min(frame, this.totalFrames - 1));
+                };
+
+                timeline.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    this.pause();
+                    handleTimelineInteraction(e);
+                });
+
+                document.addEventListener('mousemove', (e) => {
+                    if (isDragging) handleTimelineInteraction(e);
+                });
+
+                document.addEventListener('mouseup', () => {
+                    isDragging = false;
+                });
+
+                // Touch support
+                timeline.addEventListener('touchstart', (e) => {
+                    isDragging = true;
+                    this.pause();
+                    handleTimelineInteraction(e);
+                });
+
+                timeline.addEventListener('touchmove', (e) => {
+                    if (isDragging) handleTimelineInteraction(e);
+                });
+
+                timeline.addEventListener('touchend', () => {
+                    isDragging = false;
+                });
+
+                // Settings panel
+                document.getElementById('settingsBtn').addEventListener('click', () => {
+                    document.getElementById('settingsPanel').classList.toggle('visible');
+                });
+
+                // Opacity slider
+                document.getElementById('opacitySlider').addEventListener('input', (e) => {
+                    this.setOpacity(e.target.value);
+                });
+
+                // Smooth animation toggle
+                document.getElementById('smoothToggle').addEventListener('click', (e) => {
+                    e.target.classList.toggle('active');
+                    this.toggleSmoothAnimation();
+                });
+
+                // Counties toggle
+                document.getElementById('countiesToggle').addEventListener('click', () => {
+                    this.toggleCounties();
+                });
+
+                // Alerts toggle
+                document.getElementById('alertsToggle').addEventListener('click', () => {
+                    this.toggleAlerts();
+                });
+
+                // Location button
+                document.getElementById('locationBtn').addEventListener('click', () => {
+                    this.goToLocation();
+                });
+
+                // Layer buttons
+                document.querySelectorAll('.layer-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        this.setLayer(btn.dataset.layer);
+                    });
+                });
+
+                // Keyboard shortcuts
+                document.addEventListener('keydown', (e) => {
+                    switch(e.key) {
+                        case ' ':
+                            e.preventDefault();
+                            this.togglePlay();
+                            break;
+                        case 'ArrowLeft':
+                            this.skipBack();
+                            break;
+                        case 'ArrowRight':
+                            this.skipForward();
+                            break;
+                    }
+                });
+
+                // Close settings when clicking outside
+                document.addEventListener('click', (e) => {
+                    const panel = document.getElementById('settingsPanel');
+                    const btn = document.getElementById('settingsBtn');
+                    if (!panel.contains(e.target) && !btn.contains(e.target)) {
+                        panel.classList.remove('visible');
+                    }
+                });
+
+                // Auto-refresh radar data every 5 minutes
+                setInterval(() => {
+                    if (!this.isPlaying) {
+                        this.loadRadarData();
+                    }
+                }, 5 * 60 * 1000);
+            }
+
+            hideLoading() {
+                document.getElementById('loadingOverlay').classList.add('hidden');
+            }
+
+            showToast(message) {
+                const toast = document.getElementById('toast');
+                toast.textContent = message;
+                toast.classList.add('visible');
+                setTimeout(() => {
+                    toast.classList.remove('visible');
+                }, 2000);
+            }
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', () => {
+            window.stormView = new StormViewRadar();
+        });
+    </script>
+</body>
+</html>
