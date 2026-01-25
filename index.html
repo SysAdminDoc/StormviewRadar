@@ -1189,7 +1189,9 @@
                     className: 'radar-layer',
                     updateWhenIdle: true,
                     updateWhenZooming: false,
-                    keepBuffer: 4
+                    keepBuffer: 4,
+                    maxNativeZoom: 12,  // RainViewer max tile zoom
+                    maxZoom: 19         // Scale up tiles for higher zooms
                 });
                 
                 // Wait for this layer to load before starting next
@@ -1312,7 +1314,9 @@
                 format: 'image/png',
                 transparent: true,
                 opacity: settings.opacity,
-                pane: 'radarPane'
+                pane: 'radarPane',
+                maxNativeZoom: 12,
+                maxZoom: 19
             });
             layer.addTo(map);
             frameLayers.push(layer);
@@ -1625,7 +1629,12 @@
             
             removeLayer(name);
             if (settings.layers[name]) {
-                layerRefs[name] = L.tileLayer(url, { opacity: 0.5, zIndex: 45 });
+                layerRefs[name] = L.tileLayer(url, { 
+                    opacity: 0.5, 
+                    zIndex: 45,
+                    maxNativeZoom: 12,
+                    maxZoom: 19
+                });
                 layerRefs[name].addTo(map);
             }
         }
