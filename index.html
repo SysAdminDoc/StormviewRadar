@@ -602,6 +602,32 @@
             z-index: 899; pointer-events: none;
         }
 
+        .tile-status {
+            position: absolute; top: 80px; right: 12px;
+            padding: 6px 12px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            font-size: 11px;
+            color: var(--text-muted);
+            z-index: 899;
+            display: none;
+            align-items: center;
+            gap: 6px;
+        }
+        .tile-status.show { display: flex; }
+        .tile-status .dot {
+            width: 6px; height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
         @media (max-width: 768px) {
             .sidebar { display: none; }
             .mobile-fab { display: grid; }
@@ -955,6 +981,27 @@
                 </div>
             </div>
             <div class="setting-section">
+                <div class="setting-section-title">Tile Caching</div>
+                <div class="setting-row">
+                    <div><div class="setting-label">Load Delay</div><div class="setting-hint">Slower = more reliable, faster = quicker cache</div></div>
+                    <div class="slider-row">
+                        <input type="range" class="slider" id="tileDelaySlider" min="30" max="200" step="10" value="80">
+                        <span class="slider-value" id="tileDelayValue">80ms</span>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <div><div class="setting-label">Refresh Delay</div><div class="setting-hint">Time between refresh requests</div></div>
+                    <div class="slider-row">
+                        <input type="range" class="slider" id="refreshDelaySlider" min="100" max="500" step="25" value="200">
+                        <span class="slider-value" id="refreshDelayValue">200ms</span>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <div><div class="setting-label">Background Caching</div><div class="setting-hint">Continuously cache tiles</div></div>
+                    <div class="toggle on" id="bgCacheToggle"></div>
+                </div>
+            </div>
+            <div class="setting-section">
                 <div class="setting-section-title">API Keys</div>
                 <div class="api-group">
                     <input type="text" class="api-input" id="owmKeyInput" placeholder="OpenWeatherMap API Key">
@@ -974,6 +1021,7 @@
     </div>
 
     <div class="toast" id="toast"></div>
+    <div class="tile-status" id="tileStatus"><span class="dot"></span><span id="tileStatusText">Caching tiles...</span></div>
     <div class="data-credit">Data: NWS, RainViewer, SPC, Census Bureau</div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1006,6 +1054,18 @@
         let framesTotal = 0;
         let framesReady = false;
         let loadAborted = false;
+        
+        // Tile preloading system
+        let tileQueue = [];
+        let tileQueueRunning = false;
+        let tilesLoaded = 0;
+        let tilesTotal = 0;
+        let preloadPhase = 'frames'; // 'frames', 'tiles', 'refresh'
+        const PRELOAD_ZOOMS = [4, 5, 6, 7, 8, 9, 10, 11, 12]; // Zoom levels to preload
+        
+        // Dynamic delay getters (use settings)
+        function getTileLoadDelay() { return settings.tileLoadDelay || 80; }
+        function getRefreshDelay() { return settings.refreshDelay || 200; }
         
         let frames = [];
         let currentFrame = 0;
@@ -1040,6 +1100,9 @@
             stateBorderWidth: 2,
             countyBorderWidth: 1,
             borderOpacity: 0.6,
+            tileLoadDelay: 80,
+            refreshDelay: 200,
+            bgCacheEnabled: true,
             layers: {
                 radar: true, alerts: true, spcOutlook: true, stormReports: true,
                 temp: false, wind: false, states: true, counties: true, labels: true
@@ -1101,6 +1164,7 @@
             
             // Reload frames when map view changes significantly
             map.on('zoomend', debounce(onMapViewChange, 500));
+            map.on('moveend', onMapMoveEnd);
         }
 
         function debounce(fn, delay) {
@@ -1249,12 +1313,211 @@
         function onAllFramesLoaded() {
             framesReady = true;
             hideLoadProgress();
-            toast('Radar ready - smooth playback enabled');
             
             // Set to most recent past frame
             currentFrame = lastPastFrame;
             showPreloadedFrame(currentFrame);
+            
+            // Start aggressive tile preloading for all zoom levels
+            toast('Preloading tiles for all zoom levels...');
+            setTimeout(() => startTilePreloading(), 500);
         }
+
+        // ==================== TILE PRELOADING SYSTEM ====================
+        
+        function startTilePreloading() {
+            if (!rainviewerData || !frames.length) return;
+            
+            preloadPhase = 'tiles';
+            tileQueue = [];
+            tilesLoaded = 0;
+            
+            // Get bounds to preload - use continental US if zoomed out, else current view
+            const mapBounds = map.getBounds();
+            const usBounds = L.latLngBounds([24, -125], [50, -66]); // Continental US
+            const bounds = map.getZoom() < 6 ? usBounds : mapBounds.pad(0.5);
+            
+            // Queue tiles for all zoom levels and all frames
+            for (const zoom of PRELOAD_ZOOMS) {
+                const tiles = getTilesForBounds(bounds, zoom);
+                for (const frame of frames) {
+                    for (const tile of tiles) {
+                        const url = buildTileUrl(frame, zoom, tile.x, tile.y);
+                        tileQueue.push(url);
+                    }
+                }
+            }
+            
+            tilesTotal = tileQueue.length;
+            console.log(`Queued ${tilesTotal} tiles for preloading`);
+            
+            showTileProgress();
+            processTileQueue();
+        }
+        
+        function getTilesForBounds(bounds, zoom) {
+            const tiles = [];
+            const min = latLngToTile(bounds.getSouthWest(), zoom);
+            const max = latLngToTile(bounds.getNorthEast(), zoom);
+            
+            // Limit tiles per zoom to avoid too many requests
+            const maxTilesPerZoom = 100;
+            let count = 0;
+            
+            for (let x = min.x; x <= max.x && count < maxTilesPerZoom; x++) {
+                for (let y = max.y; y <= min.y && count < maxTilesPerZoom; y++) {
+                    tiles.push({ x, y });
+                    count++;
+                }
+            }
+            return tiles;
+        }
+        
+        function latLngToTile(latlng, zoom) {
+            const lat = latlng.lat;
+            const lng = latlng.lng;
+            const n = Math.pow(2, zoom);
+            const x = Math.floor((lng + 180) / 360 * n);
+            const latRad = lat * Math.PI / 180;
+            const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+            return { x: Math.max(0, Math.min(n - 1, x)), y: Math.max(0, Math.min(n - 1, y)) };
+        }
+        
+        function buildTileUrl(frame, zoom, x, y) {
+            const color = settings.colorScheme;
+            const smooth = settings.smooth;
+            const snow = settings.snowColor;
+            return `${rainviewerData.host}${frame.path}/256/${zoom}/${x}/${y}/${color}/${smooth}_${snow}.png`;
+        }
+        
+        function processTileQueue() {
+            if (loadAborted || !tileQueue.length) {
+                tileQueueRunning = false;
+                if (preloadPhase === 'tiles') {
+                    hideTileProgress();
+                    toast('Tile preloading complete - starting refresh cycle');
+                    startContinuousRefresh();
+                } else if (preloadPhase === 'refresh') {
+                    // Briefly hide status when refresh cycle completes
+                    document.getElementById('tileStatusText').textContent = 'Cache ready';
+                    setTimeout(() => {
+                        if (tileQueue.length === 0) setTileStatusIdle();
+                    }, 2000);
+                }
+                return;
+            }
+            
+            tileQueueRunning = true;
+            const url = tileQueue.shift();
+            
+            const img = new Image();
+            img.onload = img.onerror = () => {
+                tilesLoaded++;
+                updateTileProgress();
+                
+                const delay = preloadPhase === 'refresh' ? getRefreshDelay() : getTileLoadDelay();
+                setTimeout(() => processTileQueue(), delay);
+            };
+            img.src = url;
+        }
+        
+        function startContinuousRefresh() {
+            if (loadAborted || !settings.bgCacheEnabled) return;
+            
+            preloadPhase = 'refresh';
+            
+            // Show status indicator
+            document.getElementById('tileStatus').classList.add('show');
+            
+            // Refresh tiles for current view and nearby zoom levels
+            const currentZoom = Math.round(map.getZoom());
+            const bounds = map.getBounds().pad(0.3);
+            const zoomsToRefresh = [
+                Math.max(4, currentZoom - 2),
+                Math.max(4, currentZoom - 1),
+                Math.min(12, currentZoom),
+                Math.min(12, currentZoom + 1),
+                Math.min(12, currentZoom + 2)
+            ].filter((v, i, a) => a.indexOf(v) === i); // unique values
+            
+            tileQueue = [];
+            
+            for (const zoom of zoomsToRefresh) {
+                const tiles = getTilesForBounds(bounds, zoom);
+                for (const frame of frames) {
+                    for (const tile of tiles) {
+                        const url = buildTileUrl(frame, zoom, tile.x, tile.y);
+                        tileQueue.push(url);
+                    }
+                }
+            }
+            
+            // Shuffle queue for more even coverage
+            shuffleArray(tileQueue);
+            
+            tilesTotal = tileQueue.length;
+            tilesLoaded = 0;
+            
+            console.log(`Refresh cycle: ${tilesTotal} tiles queued`);
+            
+            if (!tileQueueRunning && tileQueue.length > 0) {
+                processTileQueue();
+            }
+        }
+        
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+        
+        function showTileProgress() {
+            const el = document.getElementById('loadProgress');
+            el.querySelector('span').textContent = 'Preloading tiles...';
+            el.classList.add('show');
+            document.getElementById('tileStatus').classList.add('show');
+            document.getElementById('tileStatusText').textContent = 'Caching tiles...';
+        }
+        
+        function hideTileProgress() {
+            document.getElementById('loadProgress').classList.remove('show');
+        }
+        
+        function updateTileProgress() {
+            const pct = tilesTotal > 0 ? (tilesLoaded / tilesTotal * 100) : 0;
+            
+            if (preloadPhase === 'tiles') {
+                document.getElementById('loadProgressFill').style.width = pct + '%';
+                document.getElementById('loadProgressText').textContent = Math.round(pct) + '%';
+                document.getElementById('tileStatusText').textContent = `Caching: ${tilesLoaded}/${tilesTotal}`;
+            } else if (preloadPhase === 'refresh') {
+                document.getElementById('tileStatusText').textContent = `Refreshing: ${tilesLoaded}/${tilesTotal}`;
+            }
+        }
+        
+        function setTileStatusIdle() {
+            document.getElementById('tileStatus').classList.remove('show');
+        }
+        
+        // Restart refresh cycle when map moves
+        let refreshDebounceTimer = null;
+        function onMapMoveEnd() {
+            if (preloadPhase === 'refresh' && framesReady) {
+                clearTimeout(refreshDebounceTimer);
+                refreshDebounceTimer = setTimeout(() => {
+                    startContinuousRefresh();
+                }, 1000);
+            }
+        }
+        
+        // Periodically restart refresh cycle to keep tiles fresh
+        setInterval(() => {
+            if (framesReady && settings.bgCacheEnabled && preloadPhase === 'refresh' && tileQueue.length === 0) {
+                console.log('Restarting refresh cycle...');
+                startContinuousRefresh();
+            }
+        }, 30000); // Every 30 seconds
 
         function showPreloadedFrame(idx) {
             if (!frameLayers.length || idx < 0 || idx >= frameLayers.length) return;
@@ -1283,6 +1546,8 @@
 
         function clearAllFrameLayers() {
             loadAborted = true; // Stop any in-progress loading
+            tileQueue = []; // Clear tile queue
+            tileQueueRunning = false;
             frameLayers.forEach(layer => {
                 if (map.hasLayer(layer)) map.removeLayer(layer);
             });
@@ -1923,6 +2188,42 @@
                 settings.owmKey = document.getElementById('owmKeyInput').value.trim();
                 saveSettings();
                 toast('API key saved');
+            });
+
+            // Tile caching settings
+            const tileDelaySlider = document.getElementById('tileDelaySlider');
+            const tileDelayValue = document.getElementById('tileDelayValue');
+            tileDelaySlider.value = settings.tileLoadDelay;
+            tileDelayValue.textContent = settings.tileLoadDelay + 'ms';
+            tileDelaySlider.addEventListener('input', (e) => {
+                const val = parseInt(e.target.value);
+                tileDelayValue.textContent = val + 'ms';
+                settings.tileLoadDelay = val;
+                saveSettings();
+            });
+
+            const refreshDelaySlider = document.getElementById('refreshDelaySlider');
+            const refreshDelayValue = document.getElementById('refreshDelayValue');
+            refreshDelaySlider.value = settings.refreshDelay;
+            refreshDelayValue.textContent = settings.refreshDelay + 'ms';
+            refreshDelaySlider.addEventListener('input', (e) => {
+                const val = parseInt(e.target.value);
+                refreshDelayValue.textContent = val + 'ms';
+                settings.refreshDelay = val;
+                saveSettings();
+            });
+
+            const bgCacheToggle = document.getElementById('bgCacheToggle');
+            bgCacheToggle.classList.toggle('on', settings.bgCacheEnabled);
+            bgCacheToggle.addEventListener('click', () => {
+                settings.bgCacheEnabled = bgCacheToggle.classList.toggle('on');
+                saveSettings();
+                if (settings.bgCacheEnabled && framesReady) {
+                    startContinuousRefresh();
+                } else {
+                    tileQueue = [];
+                    setTileStatusIdle();
+                }
             });
 
             document.getElementById('exportBtn').addEventListener('click', exportSettings);
