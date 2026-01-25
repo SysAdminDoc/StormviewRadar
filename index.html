@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>StormView Pro - Enhanced</title>
+    <title>StormView Pro v2</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* ==================== CSS VARIABLES ==================== */
         :root {
             --glass-bg: rgba(15, 23, 42, 0.85);
             --glass-border: rgba(255, 255, 255, 0.1);
@@ -20,7 +19,6 @@
             --warning: #fbbf24;
             --danger: #f87171;
             --purple: #a78bfa;
-            --pink: #f472b6;
             --radius: 16px;
             --radius-sm: 10px;
         }
@@ -36,7 +34,6 @@
             --accent-glow: rgba(2, 132, 199, 0.3);
         }
 
-        /* ==================== RESET ==================== */
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
         
         html, body {
@@ -48,13 +45,13 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        #map {
-            position: absolute;
-            inset: 0;
-            z-index: 1;
-        }
+        #map { position: absolute; inset: 0; z-index: 1; }
 
-        /* Leaflet Overrides */
+        /* Smooth radar layer transitions - key for fluid animation */
+        .leaflet-tile-container { transition: opacity 0.2s ease-out !important; }
+        .radar-layer { transition: opacity 0.15s linear !important; }
+        .radar-layer .leaflet-tile { transition: opacity 0.1s linear !important; }
+
         .leaflet-control-attribution {
             background: var(--glass-bg) !important;
             backdrop-filter: blur(10px);
@@ -64,25 +61,16 @@
             border-radius: 8px 0 0 0 !important;
         }
         .leaflet-control-attribution a { color: var(--text-dim) !important; }
-        .leaflet-control-zoom {
-            border: none !important;
-            overflow: hidden;
-            border-radius: var(--radius-sm) !important;
-        }
+        .leaflet-control-zoom { border: none !important; overflow: hidden; border-radius: var(--radius-sm) !important; }
         .leaflet-control-zoom a {
             background: var(--glass-bg) !important;
             backdrop-filter: blur(12px);
             color: var(--text) !important;
             border: 1px solid var(--glass-border) !important;
-            width: 36px !important;
-            height: 36px !important;
-            line-height: 34px !important;
-            font-size: 18px !important;
+            width: 36px !important; height: 36px !important;
+            line-height: 34px !important; font-size: 18px !important;
         }
-        .leaflet-control-zoom a:hover {
-            background: var(--glass-hover) !important;
-            color: var(--accent) !important;
-        }
+        .leaflet-control-zoom a:hover { background: var(--glass-hover) !important; color: var(--accent) !important; }
         .leaflet-control-zoom-in { border-radius: var(--radius-sm) var(--radius-sm) 0 0 !important; }
         .leaflet-control-zoom-out { border-radius: 0 0 var(--radius-sm) var(--radius-sm) !important; }
 
@@ -97,7 +85,6 @@
         .leaflet-popup-tip { background: var(--glass-bg) !important; }
         .leaflet-popup-close-button { color: var(--text-dim) !important; font-size: 20px !important; }
 
-        /* ==================== GLASS EFFECT ==================== */
         .glass {
             background: var(--glass-bg);
             backdrop-filter: blur(16px);
@@ -106,7 +93,6 @@
             border-radius: var(--radius);
         }
 
-        /* ==================== HEADER ==================== */
         .header {
             position: absolute;
             top: 12px; left: 12px; right: 12px;
@@ -118,32 +104,18 @@
             z-index: 1000;
         }
 
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-weight: 700;
-            font-size: 18px;
-            white-space: nowrap;
-        }
+        .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; white-space: nowrap; }
         .logo-icon {
             width: 36px; height: 36px;
             background: linear-gradient(135deg, var(--accent), #818cf8);
             border-radius: 10px;
-            display: grid;
-            place-items: center;
+            display: grid; place-items: center;
         }
         .logo-icon svg { width: 22px; height: 22px; stroke: #fff; fill: none; }
 
-        /* Search */
-        .search-box {
-            flex: 1;
-            max-width: 300px;
-            position: relative;
-        }
+        .search-box { flex: 1; max-width: 300px; position: relative; }
         .search-input {
-            width: 100%;
-            height: 40px;
+            width: 100%; height: 40px;
             padding: 0 40px 0 42px;
             background: var(--glass-hover);
             border: 1px solid var(--glass-border);
@@ -155,42 +127,27 @@
         }
         .search-input::placeholder { color: var(--text-muted); }
         .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
-        .search-icon {
-            position: absolute;
-            left: 14px; top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-muted);
-        }
+        .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
         .search-icon svg { width: 18px; height: 18px; }
         .search-clear {
-            position: absolute;
-            right: 8px; top: 50%;
-            transform: translateY(-50%);
+            position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
             width: 26px; height: 26px;
             background: var(--glass-hover);
-            border: none;
-            border-radius: 50%;
+            border: none; border-radius: 50%;
             color: var(--text-dim);
             cursor: pointer;
-            display: none;
-            place-items: center;
+            display: none; place-items: center;
         }
         .search-clear.show { display: grid; }
         .search-clear svg { width: 14px; height: 14px; }
-
         .search-results {
-            position: absolute;
-            top: calc(100% + 6px);
-            left: 0; right: 0;
-            max-height: 280px;
-            overflow-y: auto;
-            display: none;
-            z-index: 100;
+            position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+            max-height: 280px; overflow-y: auto;
+            display: none; z-index: 100;
         }
         .search-results.open { display: block; }
         .search-item {
-            padding: 12px 14px;
-            cursor: pointer;
+            padding: 12px 14px; cursor: pointer;
             border-bottom: 1px solid var(--glass-border);
             transition: background 0.15s;
         }
@@ -199,26 +156,15 @@
         .search-item-name { font-size: 14px; margin-bottom: 2px; }
         .search-item-detail { font-size: 11px; color: var(--text-muted); }
 
-        /* Timestamp */
         .timestamp-box {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 16px;
-            margin-left: auto;
-            white-space: nowrap;
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 16px; margin-left: auto; white-space: nowrap;
         }
         .timestamp-box.forecast { background: rgba(56, 189, 248, 0.15); border-color: var(--accent); }
         .timestamp-icon svg { width: 18px; height: 18px; stroke: var(--text-dim); }
         .timestamp-text { font-size: 14px; font-weight: 600; }
-        .timestamp-tz {
-            font-size: 10px;
-            color: var(--text-muted);
-            cursor: pointer;
-            text-decoration: underline dotted;
-        }
+        .timestamp-tz { font-size: 10px; color: var(--text-muted); cursor: pointer; text-decoration: underline dotted; }
 
-        /* Header Buttons */
         .header-btns { display: flex; gap: 8px; }
         .icon-btn {
             width: 40px; height: 40px;
@@ -227,26 +173,19 @@
             border-radius: 10px;
             color: var(--text);
             cursor: pointer;
-            display: grid;
-            place-items: center;
+            display: grid; place-items: center;
             transition: all 0.15s;
         }
         .icon-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
         .icon-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
         .icon-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; }
 
-        /* ==================== SIDEBAR ==================== */
         .sidebar {
-            position: absolute;
-            top: 80px; left: 12px;
-            width: 240px;
-            max-height: calc(100% - 200px);
+            position: absolute; top: 80px; left: 12px;
+            width: 240px; max-height: calc(100% - 200px);
             overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            z-index: 900;
-            padding-bottom: 16px;
+            display: flex; flex-direction: column; gap: 10px;
+            z-index: 900; padding-bottom: 16px;
         }
         .sidebar::-webkit-scrollbar { width: 6px; }
         .sidebar::-webkit-scrollbar-track { background: transparent; }
@@ -254,27 +193,18 @@
 
         .panel-section { padding: 14px; }
         .panel-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 11px;
-            font-weight: 700;
+            display: flex; align-items: center; gap: 8px;
+            font-size: 11px; font-weight: 700;
             color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            text-transform: uppercase; letter-spacing: 0.5px;
             margin-bottom: 10px;
         }
         .panel-title svg { width: 14px; height: 14px; stroke: var(--text-muted); }
 
         .layer-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px;
-            border-radius: var(--radius-sm);
-            cursor: pointer;
-            transition: all 0.15s;
-            margin-bottom: 4px;
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px; border-radius: var(--radius-sm);
+            cursor: pointer; transition: all 0.15s; margin-bottom: 4px;
         }
         .layer-item:hover { background: var(--glass-hover); }
         .layer-item.active { background: rgba(56, 189, 248, 0.15); }
@@ -283,10 +213,8 @@
             width: 20px; height: 20px;
             border: 2px solid var(--text-muted);
             border-radius: 5px;
-            display: grid;
-            place-items: center;
-            flex-shrink: 0;
-            transition: all 0.15s;
+            display: grid; place-items: center;
+            flex-shrink: 0; transition: all 0.15s;
         }
         .layer-check svg { width: 12px; height: 12px; stroke: transparent; stroke-width: 3; }
         .layer-item.active .layer-check { background: var(--accent); border-color: var(--accent); }
@@ -296,76 +224,40 @@
         .layer-icon svg { width: 18px; height: 18px; }
         .layer-name { font-size: 13px; flex: 1; }
         .layer-badge {
-            font-size: 9px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: 700;
-            text-transform: uppercase;
+            font-size: 9px; padding: 2px 6px; border-radius: 4px;
+            font-weight: 700; text-transform: uppercase;
         }
         .layer-badge.api { background: var(--warning); color: #000; }
         .layer-badge.new { background: var(--success); color: #000; }
-        .layer-badge.beta { background: var(--purple); color: #fff; }
 
-        /* Panel Collapse */
         .panel-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            cursor: pointer;
-            user-select: none;
+            display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; user-select: none;
         }
-        .panel-header .chevron {
-            width: 16px; height: 16px;
-            stroke: var(--text-muted);
-            transition: transform 0.2s;
-        }
+        .panel-header .chevron { width: 16px; height: 16px; stroke: var(--text-muted); transition: transform 0.2s; }
         .panel-section.collapsed .chevron { transform: rotate(-90deg); }
         .panel-section.collapsed .panel-content { display: none; }
 
-        /* Layer Groups */
-        .layer-group-title {
-            font-size: 10px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin: 12px 0 6px 0;
-            padding-left: 4px;
-        }
-        .layer-group-title:first-child { margin-top: 0; }
-
-        /* ==================== LEGEND ==================== */
         .legend {
-            position: absolute;
-            right: 12px;
-            top: 50%;
+            position: absolute; right: 12px; top: 50%;
             transform: translateY(-50%);
-            padding: 12px;
-            z-index: 900;
+            padding: 12px; z-index: 900;
         }
         .legend-gradient {
-            width: 14px;
-            height: 160px;
-            border-radius: 4px;
+            width: 14px; height: 160px; border-radius: 4px;
             background: linear-gradient(to bottom,
                 #ff00ff 0%, #ff0000 15%, #ff6600 25%, #ffc800 35%,
                 #ffff00 45%, #7fff00 55%, #00c800 65%, #00b4ff 75%, #0064ff 85%, #000096 100%
             );
         }
         .legend-labels {
-            position: absolute;
-            right: 32px; top: 12px;
-            height: 160px;
-            display: flex;
-            flex-direction: column;
+            position: absolute; right: 32px; top: 12px;
+            height: 160px; display: flex; flex-direction: column;
             justify-content: space-between;
-            font-size: 10px;
-            color: var(--text-muted);
-            font-weight: 500;
-            text-align: right;
+            font-size: 10px; color: var(--text-muted);
+            font-weight: 500; text-align: right;
         }
 
-        /* ==================== PLAYBACK ==================== */
         .playback {
             position: absolute;
             bottom: 12px; left: 12px; right: 12px;
@@ -374,32 +266,23 @@
         }
 
         .timeline {
-            position: relative;
-            height: 10px;
+            position: relative; height: 10px;
             background: rgba(255,255,255,0.1);
-            border-radius: 5px;
-            margin-bottom: 16px;
-            cursor: pointer;
+            border-radius: 5px; margin-bottom: 16px; cursor: pointer;
         }
         .timeline-forecast {
-            position: absolute;
-            right: 0; top: 0;
-            height: 100%;
+            position: absolute; right: 0; top: 0; height: 100%;
             background: rgba(56, 189, 248, 0.2);
-            border-radius: 0 5px 5px 0;
-            pointer-events: none;
+            border-radius: 0 5px 5px 0; pointer-events: none;
         }
         .timeline-fill {
-            position: absolute;
-            left: 0; top: 0;
-            height: 100%;
+            position: absolute; left: 0; top: 0; height: 100%;
             background: linear-gradient(90deg, var(--accent), #a78bfa);
-            border-radius: 5px;
-            pointer-events: none;
+            border-radius: 5px; pointer-events: none;
+            transition: width 0.1s linear;
         }
         .timeline-thumb {
-            position: absolute;
-            top: 50%;
+            position: absolute; top: 50%;
             width: 20px; height: 20px;
             background: #fff;
             border: 3px solid var(--accent);
@@ -407,39 +290,31 @@
             transform: translate(-50%, -50%);
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
             pointer-events: none;
+            transition: left 0.1s linear;
         }
 
-        .controls {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-        }
+        .controls { display: flex; align-items: center; justify-content: center; gap: 12px; }
         .play-btn {
             width: 56px; height: 56px;
             background: linear-gradient(135deg, var(--accent), #818cf8);
-            border: none;
-            border-radius: 50%;
-            color: #fff;
-            cursor: pointer;
-            display: grid;
-            place-items: center;
+            border: none; border-radius: 50%;
+            color: #fff; cursor: pointer;
+            display: grid; place-items: center;
             box-shadow: 0 4px 20px var(--accent-glow);
             transition: transform 0.15s;
         }
         .play-btn:hover { transform: scale(1.05); }
         .play-btn:active { transform: scale(0.98); }
         .play-btn svg { width: 24px; height: 24px; fill: #fff; stroke: none; }
+        .play-btn.loading { opacity: 0.6; pointer-events: none; }
 
         .ctrl-btn {
             width: 44px; height: 44px;
             background: var(--glass-hover);
             border: 1px solid var(--glass-border);
             border-radius: 50%;
-            color: var(--text);
-            cursor: pointer;
-            display: grid;
-            place-items: center;
+            color: var(--text); cursor: pointer;
+            display: grid; place-items: center;
             transition: all 0.15s;
         }
         .ctrl-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -452,51 +327,70 @@
             border: 1px solid var(--glass-border);
             border-radius: 20px;
             color: var(--text);
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.15s;
+            font-size: 13px; font-weight: 700;
+            cursor: pointer; transition: all 0.15s;
         }
         .speed-pill:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-        /* ==================== MODAL ==================== */
+        /* Loading Progress */
+        .load-progress {
+            position: absolute;
+            bottom: 100px; left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            color: var(--text);
+            font-size: 14px;
+            z-index: 1001;
+            display: none;
+            align-items: center;
+            gap: 12px;
+        }
+        .load-progress.show { display: flex; }
+        .load-progress-bar {
+            width: 120px; height: 6px;
+            background: var(--glass-hover);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .load-progress-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 3px;
+            transition: width 0.2s;
+        }
+
         .modal-overlay {
-            position: fixed;
-            inset: 0;
+            position: fixed; inset: 0;
             background: rgba(0,0,0,0.6);
             backdrop-filter: blur(4px);
             z-index: 2000;
-            opacity: 0;
-            visibility: hidden;
+            opacity: 0; visibility: hidden;
             transition: all 0.2s;
         }
         .modal-overlay.open { opacity: 1; visibility: visible; }
 
         .modal {
-            position: fixed;
-            top: 50%; left: 50%;
+            position: fixed; top: 50%; left: 50%;
             transform: translate(-50%, -50%) scale(0.95);
-            width: 480px;
-            max-width: 95vw;
-            max-height: 85vh;
+            width: 480px; max-width: 95vw; max-height: 85vh;
             background: var(--glass-bg);
             backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
             border-radius: 20px;
             z-index: 2001;
-            opacity: 0;
-            visibility: hidden;
+            opacity: 0; visibility: hidden;
             transition: all 0.25s;
-            display: flex;
-            flex-direction: column;
+            display: flex; flex-direction: column;
             overflow: hidden;
         }
         .modal.open { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
 
         .modal-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            display: flex; align-items: center; justify-content: space-between;
             padding: 20px 24px;
             border-bottom: 1px solid var(--glass-border);
         }
@@ -504,36 +398,25 @@
         .modal-close {
             width: 36px; height: 36px;
             background: var(--glass-hover);
-            border: none;
-            border-radius: 10px;
-            color: var(--text);
-            cursor: pointer;
-            display: grid;
-            place-items: center;
+            border: none; border-radius: 10px;
+            color: var(--text); cursor: pointer;
+            display: grid; place-items: center;
         }
         .modal-close svg { width: 20px; height: 20px; }
 
-        .modal-body {
-            flex: 1;
-            overflow-y: auto;
-            padding: 24px;
-        }
+        .modal-body { flex: 1; overflow-y: auto; padding: 24px; }
 
         .setting-section { margin-bottom: 28px; }
         .setting-section:last-child { margin-bottom: 0; }
         .setting-section-title {
-            font-size: 11px;
-            font-weight: 700;
+            font-size: 11px; font-weight: 700;
             color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            text-transform: uppercase; letter-spacing: 0.5px;
             margin-bottom: 14px;
         }
 
         .setting-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            display: flex; align-items: center; justify-content: space-between;
             padding: 14px 0;
             border-bottom: 1px solid var(--glass-border);
         }
@@ -552,11 +435,9 @@
         }
         .toggle::after {
             content: '';
-            position: absolute;
-            top: 3px; left: 3px;
+            position: absolute; top: 3px; left: 3px;
             width: 20px; height: 20px;
-            background: #fff;
-            border-radius: 50%;
+            background: #fff; border-radius: 50%;
             transition: transform 0.2s;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
@@ -565,26 +446,20 @@
 
         .slider-row { display: flex; align-items: center; gap: 12px; }
         .slider {
-            flex: 1;
-            height: 6px;
+            flex: 1; height: 6px;
             -webkit-appearance: none;
             background: var(--glass-hover);
-            border-radius: 3px;
-            outline: none;
+            border-radius: 3px; outline: none;
         }
         .slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             width: 18px; height: 18px;
             background: var(--accent);
-            border-radius: 50%;
-            cursor: pointer;
+            border-radius: 50%; cursor: pointer;
         }
         .slider-value {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--accent);
-            min-width: 50px;
-            text-align: right;
+            font-size: 13px; font-weight: 600;
+            color: var(--accent); min-width: 50px; text-align: right;
         }
 
         select.dropdown {
@@ -594,15 +469,13 @@
             color: var(--text);
             padding: 8px 12px;
             font-size: 13px;
-            outline: none;
-            cursor: pointer;
+            outline: none; cursor: pointer;
         }
         select.dropdown option { background: #1e293b; }
 
         .api-group { margin-bottom: 12px; }
         .api-input {
-            width: 100%;
-            padding: 12px;
+            width: 100%; padding: 12px;
             background: var(--glass-hover);
             border: 1px solid var(--glass-border);
             border-radius: 10px;
@@ -613,30 +486,22 @@
         }
         .api-input:focus { border-color: var(--accent); }
         .api-link {
-            font-size: 12px;
-            color: var(--accent);
+            font-size: 12px; color: var(--accent);
             text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
+            display: inline-flex; align-items: center; gap: 4px;
         }
         .api-link svg { width: 12px; height: 12px; }
 
         .btn-row { display: flex; gap: 10px; }
         .btn {
-            flex: 1;
-            padding: 12px;
+            flex: 1; padding: 12px;
             background: var(--glass-hover);
             border: 1px solid var(--glass-border);
             border-radius: 10px;
             color: var(--text);
-            font-size: 13px;
-            font-weight: 600;
+            font-size: 13px; font-weight: 600;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
             transition: all 0.15s;
         }
         .btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -644,14 +509,11 @@
         .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
         .btn-primary:hover { background: #0ea5e9; }
 
-        /* ==================== MOBILE ==================== */
         .sheet-overlay {
-            position: fixed;
-            inset: 0;
+            position: fixed; inset: 0;
             background: rgba(0,0,0,0.5);
             z-index: 1100;
-            opacity: 0;
-            visibility: hidden;
+            opacity: 0; visibility: hidden;
             transition: all 0.3s;
         }
         .sheet-overlay.open { opacity: 1; visibility: visible; }
@@ -670,53 +532,21 @@
             transform: translateY(100%);
             transition: transform 0.3s ease;
             overflow: hidden;
-            display: flex;
-            flex-direction: column;
+            display: flex; flex-direction: column;
         }
         .bottom-sheet.open { transform: translateY(0); }
+        .sheet-handle { width: 40px; height: 4px; background: var(--text-muted); border-radius: 2px; margin: 12px auto; }
+        .sheet-content { flex: 1; overflow-y: auto; padding: 0 16px 24px; }
+        .sheet-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; text-align: center; }
 
-        .sheet-handle {
-            width: 40px; height: 4px;
-            background: var(--text-muted);
-            border-radius: 2px;
-            margin: 12px auto;
-        }
-        .sheet-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 0 16px 24px;
-        }
-        .sheet-title {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 16px;
-            text-align: center;
-        }
+        .mobile-fab { display: none; position: fixed; bottom: 140px; left: 12px; z-index: 1000; }
+        .loc-btn { position: absolute; bottom: 140px; right: 12px; z-index: 900; }
 
-        .mobile-fab {
-            display: none;
-            position: fixed;
-            bottom: 140px; left: 12px;
-            z-index: 1000;
-        }
-
-        /* Location Button */
-        .loc-btn {
-            position: absolute;
-            bottom: 140px;
-            right: 12px;
-            z-index: 900;
-        }
-
-        /* Loading */
         .loading-overlay {
-            position: fixed;
-            inset: 0;
+            position: fixed; inset: 0;
             background: #0f172a;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
             z-index: 9999;
             transition: opacity 0.5s, visibility 0.5s;
         }
@@ -731,11 +561,8 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .loading-text { margin-top: 16px; color: var(--text-dim); }
 
-        /* Toast */
         .toast {
-            position: fixed;
-            bottom: 100px;
-            left: 50%;
+            position: fixed; bottom: 100px; left: 50%;
             transform: translateX(-50%) translateY(100px);
             padding: 12px 24px;
             background: var(--glass-bg);
@@ -751,16 +578,13 @@
         .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
         .toast.error { border-color: var(--danger); color: var(--danger); }
 
-        /* Popup Styles */
         .alert-popup h4 { margin-bottom: 8px; }
         .alert-popup p { font-size: 13px; line-height: 1.5; margin-bottom: 8px; }
         .alert-popup .meta { font-size: 11px; color: var(--text-muted); }
         .alert-badge {
             display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 700;
+            padding: 3px 8px; border-radius: 4px;
+            font-size: 11px; font-weight: 700;
             text-transform: uppercase;
         }
         .alert-badge.warn { background: var(--danger); color: #fff; }
@@ -772,29 +596,12 @@
         .spc-popup .risk { font-weight: 600; margin-bottom: 8px; }
         .spc-popup .meta { font-size: 11px; color: var(--text-muted); }
 
-        .report-popup h4 { margin-bottom: 4px; font-size: 14px; }
-        .report-popup .details { font-size: 12px; margin-bottom: 6px; }
-        .report-popup .meta { font-size: 11px; color: var(--text-muted); }
-
-        .gauge-popup .level { font-weight: 700; font-size: 18px; margin: 8px 0; }
-        .gauge-popup .level.action { color: var(--warning); }
-        .gauge-popup .level.minor { color: #fde047; }
-        .gauge-popup .level.moderate { color: #fb923c; }
-        .gauge-popup .level.major { color: var(--danger); }
-        .gauge-popup .status { font-size: 12px; color: var(--text-dim); }
-
-        /* Data attribution */
         .data-credit {
-            position: absolute;
-            bottom: 4px;
-            left: 4px;
-            font-size: 9px;
-            color: var(--text-muted);
-            z-index: 899;
-            pointer-events: none;
+            position: absolute; bottom: 4px; left: 4px;
+            font-size: 9px; color: var(--text-muted);
+            z-index: 899; pointer-events: none;
         }
 
-        /* ==================== RESPONSIVE ==================== */
         @media (max-width: 768px) {
             .sidebar { display: none; }
             .mobile-fab { display: grid; }
@@ -878,15 +685,11 @@
         </div>
     </header>
 
-    <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
-        <!-- Radar Source -->
         <div class="panel-section glass">
             <div class="panel-header">
                 <div class="panel-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/></svg>
                     Radar Source
                 </div>
                 <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -896,11 +699,6 @@
                     <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
                     <span class="layer-name">RainViewer</span>
                 </div>
-                <div class="layer-item" data-source="owm">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <span class="layer-name">OpenWeatherMap</span>
-                    <span class="layer-badge api">API</span>
-                </div>
                 <div class="layer-item" data-source="mrms">
                     <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
                     <span class="layer-name">MRMS (Iowa State)</span>
@@ -909,13 +707,10 @@
             </div>
         </div>
 
-        <!-- Weather Overlays -->
         <div class="panel-section glass">
             <div class="panel-header">
                 <div class="panel-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/></svg>
                     Weather Overlays
                 </div>
                 <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -926,11 +721,6 @@
                     <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 14v6M8 14v6M12 16v6"/></svg></div>
                     <span class="layer-name">Radar</span>
                 </div>
-                <div class="layer-item" data-layer="satellite">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></div>
-                    <span class="layer-name">Satellite IR</span>
-                </div>
                 <div class="layer-item active" data-layer="alerts">
                     <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
                     <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg></div>
@@ -940,34 +730,11 @@
                     <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
                     <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
                     <span class="layer-name">SPC Outlook</span>
-                    <span class="layer-badge new">NEW</span>
                 </div>
                 <div class="layer-item" data-layer="stormReports">
                     <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
                     <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>
                     <span class="layer-name">Storm Reports</span>
-                    <span class="layer-badge new">NEW</span>
-                </div>
-                <div class="layer-item" data-layer="mesoscale">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
-                    <span class="layer-name">Mesoscale Disc.</span>
-                </div>
-                <div class="layer-item" data-layer="riverGauges">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg></div>
-                    <span class="layer-name">River Gauges</span>
-                    <span class="layer-badge new">NEW</span>
-                </div>
-                <div class="layer-item" data-layer="tropicalTracks">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#f472b6" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></div>
-                    <span class="layer-name">Tropical Tracks</span>
-                </div>
-                <div class="layer-item" data-layer="snow">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2"><line x1="2" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="22"/><path d="m20 16-4-4 4-4M4 8l4 4-4 4M16 4l-4 4-4-4M8 20l4-4 4 4"/></svg></div>
-                    <span class="layer-name">Snow Depth</span>
                 </div>
                 <div class="layer-item" data-layer="temp">
                     <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
@@ -984,14 +751,10 @@
             </div>
         </div>
 
-        <!-- Boundaries & Reference -->
         <div class="panel-section glass">
             <div class="panel-header">
                 <div class="panel-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                        <path d="M3 9h18M9 21V9"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
                     Boundaries
                 </div>
                 <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -1007,11 +770,6 @@
                     <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
                     <span class="layer-name">County Borders</span>
                 </div>
-                <div class="layer-item" data-layer="nwsZones">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/></svg></div>
-                    <span class="layer-name">NWS Zones</span>
-                </div>
                 <div class="layer-item" data-layer="labels">
                     <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
                     <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></div>
@@ -1020,56 +778,16 @@
             </div>
         </div>
 
-        <!-- Infrastructure -->
         <div class="panel-section glass">
             <div class="panel-header">
                 <div class="panel-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
-                        <path d="M2 12h20"/>
-                    </svg>
-                    Infrastructure
-                </div>
-                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
-            <div class="panel-content">
-                <div class="layer-item" data-layer="highways">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M5 9l-3 0M5 15l-3 0M19 9l3 0M19 15l3 0M5 3l0 18M19 3l0 18"/></svg></div>
-                    <span class="layer-name">Interstates</span>
-                </div>
-                <div class="layer-item" data-layer="airports">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg></div>
-                    <span class="layer-name">Airports</span>
-                </div>
-                <div class="layer-item" data-layer="nexrad">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg></div>
-                    <span class="layer-name">NEXRAD Sites</span>
-                </div>
-                <div class="layer-item" data-layer="stations">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="4"/></svg></div>
-                    <span class="layer-name">Weather Stations</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Base Map -->
-        <div class="panel-section glass">
-            <div class="panel-header">
-                <div class="panel-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" x2="8" y1="2" y2="18"/><line x1="16" x2="16" y1="6" y2="22"/>
-                    </svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" x2="8" y1="2" y2="18"/><line x1="16" x2="16" y1="6" y2="22"/></svg>
                     Base Map
                 </div>
                 <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
             <div class="panel-content">
-                <div class="layer-item active" data-basemap="dark">
+                <div class="layer-item" data-basemap="dark">
                     <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
                     <span class="layer-name">Dark</span>
                 </div>
@@ -1081,7 +799,7 @@
                     <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
                     <span class="layer-name">Dark (No Labels)</span>
                 </div>
-                <div class="layer-item" data-basemap="satellite">
+                <div class="layer-item active" data-basemap="satellite">
                     <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
                     <span class="layer-name">Satellite</span>
                 </div>
@@ -1093,14 +811,12 @@
         </div>
     </aside>
 
-    <!-- Mobile FAB -->
     <button class="icon-btn mobile-fab glass" id="mobileFab" title="Layers">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
         </svg>
     </button>
 
-    <!-- Mobile Bottom Sheet -->
     <div class="sheet-overlay" id="sheetOverlay"></div>
     <div class="bottom-sheet" id="bottomSheet">
         <div class="sheet-handle"></div>
@@ -1110,20 +826,25 @@
         </div>
     </div>
 
-    <!-- Legend -->
     <div class="legend glass" id="legend">
         <div class="legend-labels"><span>75+</span><span>60</span><span>45</span><span>30</span><span>15</span><span>dBZ</span></div>
         <div class="legend-gradient"></div>
     </div>
 
-    <!-- Location Button -->
     <button class="icon-btn loc-btn glass" id="locBtn" title="My Location">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
         </svg>
     </button>
 
-    <!-- Playback Bar -->
+    <div class="load-progress" id="loadProgress">
+        <span>Loading radar frames...</span>
+        <div class="load-progress-bar">
+            <div class="load-progress-fill" id="loadProgressFill" style="width: 0%"></div>
+        </div>
+        <span id="loadProgressText">0%</span>
+    </div>
+
     <div class="playback glass">
         <div class="timeline" id="timeline">
             <div class="timeline-forecast" id="timelineForecast"></div>
@@ -1154,15 +875,12 @@
         </div>
     </div>
 
-    <!-- Settings Modal -->
     <div class="modal-overlay" id="modalOverlay"></div>
     <div class="modal" id="settingsModal">
         <div class="modal-header">
             <span class="modal-title">Settings</span>
             <button class="modal-close" id="modalClose">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M18 6 6 18M6 6l12 12"/>
-                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
             </button>
         </div>
         <div class="modal-body">
@@ -1191,15 +909,11 @@
                 </div>
                 <div class="setting-row">
                     <div><div class="setting-label">Smooth Radar</div><div class="setting-hint">Interpolate between pixels</div></div>
-                    <div class="toggle" id="smoothToggle"></div>
+                    <div class="toggle on" id="smoothToggle"></div>
                 </div>
                 <div class="setting-row">
                     <div><div class="setting-label">Snow Colors</div><div class="setting-hint">Show winter precip in pink/blue</div></div>
                     <div class="toggle on" id="snowColorToggle"></div>
-                </div>
-                <div class="setting-row">
-                    <div><div class="setting-label">Crossfade Frames</div><div class="setting-hint">Smooth transition between frames</div></div>
-                    <div class="toggle on" id="crossfadeToggle"></div>
                 </div>
             </div>
             <div class="setting-section">
@@ -1207,8 +921,8 @@
                 <div class="setting-row">
                     <div class="setting-label">Frame Delay</div>
                     <div class="slider-row">
-                        <input type="range" class="slider" id="delaySlider" min="200" max="1200" step="50" value="500">
-                        <span class="slider-value" id="delayValue">500ms</span>
+                        <input type="range" class="slider" id="delaySlider" min="200" max="1200" step="50" value="600">
+                        <span class="slider-value" id="delayValue">600ms</span>
                     </div>
                 </div>
                 <div class="setting-row">
@@ -1260,7 +974,7 @@
     </div>
 
     <div class="toast" id="toast"></div>
-    <div class="data-credit">Data: NWS, RainViewer, SPC, USGS, Census Bureau</div>
+    <div class="data-credit">Data: NWS, RainViewer, SPC, Census Bureau</div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
@@ -1268,7 +982,6 @@
     (function() {
         'use strict';
 
-        // ==================== CONFIG ====================
         const BASEMAPS = {
             dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
             light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
@@ -1281,65 +994,45 @@
             states: 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
             counties: 'https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json',
             nwsAlerts: 'https://api.weather.gov/alerts/active?status=actual',
-            spcOutlookDay1: 'https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson',
-            stormReportsTorn: 'https://www.spc.noaa.gov/climo/reports/today_torn.csv',
-            stormReportsHail: 'https://www.spc.noaa.gov/climo/reports/today_hail.csv',
-            stormReportsWind: 'https://www.spc.noaa.gov/climo/reports/today_wind.csv',
-            riverGauges: 'https://api.water.noaa.gov/nwps/v1/gauges?bbox=-130,20,-60,55&state=all&srid=4326',
-            nexrad: 'https://mesonet.agron.iastate.edu/geojson/nexrad.geojson',
-            airports: 'https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv',
-            tropical: 'https://www.nhc.noaa.gov/gis/forecast/archive/'
+            spcOutlookDay1: 'https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson'
         };
 
-        // ==================== STATE ====================
-        let map, baseLayer, radarLayer, locationMarker;
+        let map, baseLayer, locationMarker;
         let rainviewerData = null;
+        
+        // PRELOADED FRAME LAYERS - Key to smooth animation
+        let frameLayers = [];
+        let framesLoaded = 0;
+        let framesTotal = 0;
+        let framesReady = false;
+        let loadAborted = false;
+        
         let frames = [];
         let currentFrame = 0;
         let lastPastFrame = 0;
         let isPlaying = false;
-        let playInterval = null;
+        let animationId = null;
+        let lastFrameTime = 0;
         let speedMult = 1;
         let searchTimeout = null;
-        let opacityTimeout = null;
 
-        // Layer references
         const layerRefs = {
-            alerts: null,
-            spcOutlook: null,
-            stormReports: null,
-            mesoscale: null,
-            riverGauges: null,
-            tropicalTracks: null,
-            snow: null,
-            temp: null,
-            wind: null,
-            states: null,
-            counties: null,
-            nwsZones: null,
-            labels: null,
-            highways: null,
-            airports: null,
-            nexrad: null,
-            stations: null
+            alerts: null, spcOutlook: null, stormReports: null,
+            temp: null, wind: null, states: null, counties: null, labels: null
         };
 
-        // Cached data
-        const dataCache = {
-            statesGeo: null,
-            countiesGeo: null
-        };
+        const dataCache = { statesGeo: null, countiesGeo: null };
 
+        // Default settings matching user's config file
         const settings = {
             source: 'rainviewer',
-            basemap: 'dark',
+            basemap: 'satellite',
             theme: 'dark',
             opacity: 0.9,
-            smooth: 0,
+            smooth: 1,
             snowColor: 1,
             colorScheme: 4,
-            crossfade: true,
-            delay: 500,
+            delay: 600,
             loop: true,
             autoRefresh: true,
             owmKey: '',
@@ -1348,29 +1041,11 @@
             countyBorderWidth: 1,
             borderOpacity: 0.6,
             layers: {
-                radar: true,
-                satellite: false,
-                alerts: true,
-                spcOutlook: false,
-                stormReports: false,
-                mesoscale: false,
-                riverGauges: false,
-                tropicalTracks: false,
-                snow: false,
-                temp: false,
-                wind: false,
-                states: true,
-                counties: false,
-                nwsZones: false,
-                labels: false,
-                highways: false,
-                airports: false,
-                nexrad: false,
-                stations: false
+                radar: true, alerts: true, spcOutlook: true, stormReports: true,
+                temp: false, wind: false, states: true, counties: true, labels: true
             }
         };
 
-        // ==================== INIT ====================
         function init() {
             loadSettings();
             applyTheme();
@@ -1378,10 +1053,9 @@
             initUI();
             loadRadarData();
             
-            // Load enabled layers
             Object.keys(settings.layers).forEach(layer => {
-                if (settings.layers[layer]) {
-                    handleLayerToggle(layer, true, true); // silent = true for init
+                if (settings.layers[layer] && layer !== 'radar') {
+                    handleLayerToggle(layer, true, true);
                 }
             });
             
@@ -1391,44 +1065,57 @@
 
         function loadSettings() {
             try {
-                const s = localStorage.getItem('stormview_pro_enhanced');
+                const s = localStorage.getItem('stormview_pro_v2');
                 if (s) Object.assign(settings, JSON.parse(s));
             } catch(e) {}
         }
 
         function saveSettings() {
-            try { localStorage.setItem('stormview_pro_enhanced', JSON.stringify(settings)); } catch(e) {}
+            try { localStorage.setItem('stormview_pro_v2', JSON.stringify(settings)); } catch(e) {}
         }
 
         function applyTheme() {
             document.body.classList.toggle('light-theme', settings.theme === 'light');
         }
 
-        // ==================== MAP ====================
         function initMap() {
             map = L.map('map', {
                 center: [39, -96],
                 zoom: 5,
                 zoomControl: true,
                 attributionControl: true,
-                preferCanvas: true // Better performance for many features
+                preferCanvas: true
             });
             map.zoomControl.setPosition('bottomleft');
             
-            // Create custom panes for layer ordering
+            map.createPane('radarPane');
+            map.getPane('radarPane').style.zIndex = 250;
+            
             map.createPane('boundaryPane');
             map.getPane('boundaryPane').style.zIndex = 350;
-            
-            map.createPane('weatherPane');
-            map.getPane('weatherPane').style.zIndex = 400;
             
             map.createPane('alertPane');
             map.getPane('alertPane').style.zIndex = 450;
             
-            map.createPane('markerPane');
-            map.getPane('markerPane').style.zIndex = 500;
-            
             setBasemap(settings.basemap);
+            
+            // Reload frames when map view changes significantly
+            map.on('zoomend', debounce(onMapViewChange, 500));
+        }
+
+        function debounce(fn, delay) {
+            let timer;
+            return function(...args) {
+                clearTimeout(timer);
+                timer = setTimeout(() => fn.apply(this, args), delay);
+            };
+        }
+
+        function onMapViewChange() {
+            // Only reload if we have frames and animation isn't playing
+            if (frames.length > 0 && !isPlaying && settings.source === 'rainviewer') {
+                // Frames auto-adjust to new zoom via Leaflet tile loading
+            }
         }
 
         function setBasemap(id) {
@@ -1436,8 +1123,8 @@
             
             const url = BASEMAPS[id] || BASEMAPS.dark;
             baseLayer = L.tileLayer(url, {
-                attribution: '&copy; CARTO',
-                subdomains: id === 'satellite' ? [] : 'abcd',
+                attribution: '&copy; CARTO / ESRI',
+                subdomains: (id === 'satellite' || id === 'topo') ? [] : 'abcd',
                 maxZoom: 19
             });
             baseLayer.addTo(map);
@@ -1450,13 +1137,15 @@
             saveSettings();
         }
 
-        // ==================== RADAR ====================
+        // ==================== SMOOTH PRELOADED RADAR ====================
         async function loadRadarData() {
             try {
+                pause();
+                clearAllFrameLayers();
+                framesReady = false;
+                
                 if (settings.source === 'rainviewer') {
-                    await loadRainViewer();
-                } else if (settings.source === 'owm') {
-                    loadOWMRadar();
+                    await loadRainViewerPreloaded();
                 } else if (settings.source === 'mrms') {
                     await loadMRMS();
                 }
@@ -1466,113 +1155,174 @@
             }
         }
 
-        async function loadRainViewer() {
+        async function loadRainViewerPreloaded() {
+            showLoadProgress();
+            loadAborted = false;
+            
             const resp = await fetch('https://api.rainviewer.com/public/weather-maps.json');
             rainviewerData = await resp.json();
 
             frames = [];
             
-            if (settings.layers.satellite && !settings.layers.radar) {
-                if (rainviewerData.satellite?.infrared) {
-                    frames = rainviewerData.satellite.infrared.map(f => ({...f, isSat: true}));
-                }
+            if (rainviewerData.radar?.past) {
+                frames = [...rainviewerData.radar.past];
                 lastPastFrame = frames.length - 1;
-            } else {
-                if (rainviewerData.radar?.past) {
-                    frames = [...rainviewerData.radar.past];
-                    lastPastFrame = frames.length - 1;
-                }
-                if (rainviewerData.radar?.nowcast) {
-                    frames.push(...rainviewerData.radar.nowcast.map(f => ({...f, isForecast: true})));
-                }
+            }
+            if (rainviewerData.radar?.nowcast) {
+                frames.push(...rainviewerData.radar.nowcast.map(f => ({...f, isForecast: true})));
             }
 
-            currentFrame = Math.min(currentFrame, frames.length - 1);
-            if (currentFrame < 0) currentFrame = lastPastFrame;
+            framesTotal = frames.length;
+            framesLoaded = 0;
+            updateLoadProgress(0);
+
+            // STAGGERED LOADING: Load frames one at a time with delay to avoid rate limiting
+            for (let i = 0; i < frames.length; i++) {
+                if (loadAborted) break;
+                
+                const frame = frames[i];
+                const url = buildRadarUrl(frame);
+                
+                const layer = L.tileLayer(url, {
+                    opacity: 0, // Start hidden
+                    pane: 'radarPane',
+                    className: 'radar-layer',
+                    updateWhenIdle: true,
+                    updateWhenZooming: false,
+                    keepBuffer: 4
+                });
+                
+                // Wait for this layer to load before starting next
+                await new Promise((resolve) => {
+                    let resolved = false;
+                    
+                    layer.on('load', () => {
+                        if (!resolved) {
+                            resolved = true;
+                            framesLoaded++;
+                            updateLoadProgress(framesLoaded / framesTotal * 100);
+                            resolve();
+                        }
+                    });
+                    
+                    // Timeout fallback in case load event doesn't fire
+                    setTimeout(() => {
+                        if (!resolved) {
+                            resolved = true;
+                            framesLoaded++;
+                            updateLoadProgress(framesLoaded / framesTotal * 100);
+                            resolve();
+                        }
+                    }, 3000);
+                    
+                    layer.addTo(map);
+                });
+                
+                frameLayers.push(layer);
+                
+                // Show first frame immediately once loaded
+                if (i === 0) {
+                    layer.setOpacity(settings.opacity);
+                    currentFrame = 0;
+                    updateTimestamp();
+                    updateTimelineUI();
+                }
+                
+                // Small delay between frame loads to avoid rate limiting
+                if (i < frames.length - 1 && !loadAborted) {
+                    await new Promise(r => setTimeout(r, 100));
+                }
+            }
             
-            showFrame(currentFrame);
-            updateTimelineUI();
+            onAllFramesLoaded();
+        }
+
+        function buildRadarUrl(frame) {
+            const color = settings.colorScheme;
+            const smooth = settings.smooth;
+            const snow = settings.snowColor;
+            return `${rainviewerData.host}${frame.path}/256/{z}/{x}/{y}/${color}/${smooth}_${snow}.png`;
+        }
+
+        function onAllFramesLoaded() {
+            framesReady = true;
+            hideLoadProgress();
+            toast('Radar ready - smooth playback enabled');
+            
+            // Set to most recent past frame
+            currentFrame = lastPastFrame;
+            showPreloadedFrame(currentFrame);
+        }
+
+        function showPreloadedFrame(idx) {
+            if (!frameLayers.length || idx < 0 || idx >= frameLayers.length) return;
+            
+            const prevFrame = currentFrame;
+            currentFrame = idx;
+            
+            // Smooth crossfade: show new frame, then hide old
+            // The CSS transition handles the smooth opacity change
+            if (frameLayers[idx]) {
+                frameLayers[idx].setOpacity(settings.opacity);
+            }
+            
+            // Hide all other frames after a brief delay for crossfade effect
+            setTimeout(() => {
+                frameLayers.forEach((layer, i) => {
+                    if (i !== currentFrame) {
+                        layer.setOpacity(0);
+                    }
+                });
+            }, 50); // 50ms overlap for smooth crossfade
+            
+            updateTimestamp();
+            updateTimelineFill();
+        }
+
+        function clearAllFrameLayers() {
+            loadAborted = true; // Stop any in-progress loading
+            frameLayers.forEach(layer => {
+                if (map.hasLayer(layer)) map.removeLayer(layer);
+            });
+            frameLayers = [];
+            framesLoaded = 0;
+            framesReady = false;
+        }
+
+        function showLoadProgress() {
+            document.getElementById('loadProgress').classList.add('show');
+            document.getElementById('playBtn').classList.add('loading');
+        }
+
+        function hideLoadProgress() {
+            document.getElementById('loadProgress').classList.remove('show');
+            document.getElementById('playBtn').classList.remove('loading');
+        }
+
+        function updateLoadProgress(pct) {
+            document.getElementById('loadProgressFill').style.width = pct + '%';
+            document.getElementById('loadProgressText').textContent = Math.round(pct) + '%';
         }
 
         async function loadMRMS() {
-            // Use Iowa State MRMS WMS
-            clearRadarLayer();
-            radarLayer = L.tileLayer.wms('https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi', {
+            clearAllFrameLayers();
+            
+            const layer = L.tileLayer.wms('https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi', {
                 layers: 'nexrad-n0q-900913',
                 format: 'image/png',
                 transparent: true,
                 opacity: settings.opacity,
-                zIndex: 50
+                pane: 'radarPane'
             });
-            radarLayer.addTo(map);
+            layer.addTo(map);
+            frameLayers.push(layer);
             
-            // For MRMS, we don't have animation frames
             frames = [{ time: Date.now() / 1000, path: 'mrms' }];
             lastPastFrame = 0;
             currentFrame = 0;
+            framesReady = true;
             updateTimestamp();
             updateTimelineUI();
-        }
-
-        function loadOWMRadar() {
-            if (!settings.owmKey) {
-                toast('OpenWeatherMap API key required', true);
-                return;
-            }
-            clearRadarLayer();
-            radarLayer = L.tileLayer(`https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${settings.owmKey}`, {
-                opacity: settings.opacity,
-                zIndex: 50
-            });
-            radarLayer.addTo(map);
-            
-            frames = [{ time: Date.now() / 1000, path: 'owm' }];
-            lastPastFrame = 0;
-            currentFrame = 0;
-            updateTimestamp();
-            updateTimelineUI();
-        }
-
-        function clearRadarLayer() {
-            if (radarLayer) {
-                map.removeLayer(radarLayer);
-                radarLayer = null;
-            }
-        }
-
-        function showFrame(idx) {
-            if (!frames.length || !rainviewerData || settings.source !== 'rainviewer') return;
-            
-            const frame = frames[idx];
-            const isSat = frame.isSat;
-            const color = isSat ? 0 : settings.colorScheme;
-            const smooth = isSat ? 0 : settings.smooth;
-            const snow = isSat ? 0 : settings.snowColor;
-            
-            const url = `${rainviewerData.host}${frame.path}/256/{z}/{x}/{y}/${color}/${smooth}_${snow}.png`;
-
-            if (settings.crossfade && radarLayer) {
-                const newLayer = L.tileLayer(url, { opacity: 0, zIndex: 50 });
-                newLayer.addTo(map);
-                
-                setTimeout(() => newLayer.setOpacity(settings.opacity), 50);
-                
-                const oldLayer = radarLayer;
-                oldLayer.setOpacity(0);
-                setTimeout(() => {
-                    if (map.hasLayer(oldLayer)) map.removeLayer(oldLayer);
-                }, 400);
-                
-                radarLayer = newLayer;
-            } else {
-                clearRadarLayer();
-                radarLayer = L.tileLayer(url, { opacity: settings.opacity, zIndex: 50 });
-                radarLayer.addTo(map);
-            }
-
-            currentFrame = idx;
-            updateTimestamp();
-            updateTimelineFill();
         }
 
         function updateTimestamp() {
@@ -1611,13 +1361,26 @@
             updateTimelineFill();
         }
 
-        // ==================== PLAYBACK ====================
+        // ==================== SMOOTH ANIMATION LOOP ====================
         function play() {
-            if (isPlaying) return;
+            if (isPlaying || !framesReady || frames.length < 2) return;
             isPlaying = true;
             document.getElementById('playIcon').innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
             
-            playInterval = setInterval(() => {
+            lastFrameTime = performance.now();
+            animationLoop();
+        }
+
+        function animationLoop() {
+            if (!isPlaying) return;
+            
+            const now = performance.now();
+            const elapsed = now - lastFrameTime;
+            const frameDelay = settings.delay / speedMult;
+            
+            if (elapsed >= frameDelay) {
+                lastFrameTime = now;
+                
                 let next = currentFrame + 1;
                 if (next >= frames.length) {
                     if (settings.loop) {
@@ -1627,14 +1390,19 @@
                         return;
                     }
                 }
-                showFrame(next);
-            }, settings.delay / speedMult);
+                showPreloadedFrame(next);
+            }
+            
+            animationId = requestAnimationFrame(animationLoop);
         }
 
         function pause() {
             isPlaying = false;
             document.getElementById('playIcon').innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
-            clearInterval(playInterval);
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
         }
 
         function togglePlay() {
@@ -1648,9 +1416,8 @@
 
             switch(name) {
                 case 'radar':
-                case 'satellite':
-                    pause();
-                    loadRadarData();
+                    if (on) loadRadarData();
+                    else clearAllFrameLayers();
                     break;
                 case 'alerts':
                     on ? loadAlerts() : removeLayer('alerts');
@@ -1660,18 +1427,6 @@
                     break;
                 case 'stormReports':
                     on ? loadStormReports() : removeLayer('stormReports');
-                    break;
-                case 'mesoscale':
-                    on ? loadMesoscale() : removeLayer('mesoscale');
-                    break;
-                case 'riverGauges':
-                    on ? loadRiverGauges() : removeLayer('riverGauges');
-                    break;
-                case 'tropicalTracks':
-                    on ? loadTropicalTracks() : removeLayer('tropicalTracks');
-                    break;
-                case 'snow':
-                    toggleSnowLayer(on);
                     break;
                 case 'temp':
                     toggleOWMLayer('temp', 'temp_new');
@@ -1685,29 +1440,12 @@
                 case 'counties':
                     on ? loadCounties() : removeLayer('counties');
                     break;
-                case 'nwsZones':
-                    on ? loadNWSZones() : removeLayer('nwsZones');
-                    break;
                 case 'labels':
                     toggleLabelsLayer(on);
                     break;
-                case 'highways':
-                    toggleHighwaysLayer(on);
-                    break;
-                case 'airports':
-                    on ? loadAirports() : removeLayer('airports');
-                    break;
-                case 'nexrad':
-                    on ? loadNEXRAD() : removeLayer('nexrad');
-                    break;
-                case 'stations':
-                    on ? loadWeatherStations() : removeLayer('stations');
-                    break;
             }
             
-            if (!silent) {
-                toast(`${getLayerName(name)} ${on ? 'enabled' : 'disabled'}`);
-            }
+            if (!silent) toast(`${getLayerName(name)} ${on ? 'enabled' : 'disabled'}`);
         }
 
         function removeLayer(name) {
@@ -1719,12 +1457,9 @@
 
         function getLayerName(key) {
             const names = {
-                radar: 'Radar', satellite: 'Satellite', alerts: 'NWS Alerts',
-                spcOutlook: 'SPC Outlook', stormReports: 'Storm Reports', mesoscale: 'Mesoscale Discussions',
-                riverGauges: 'River Gauges', tropicalTracks: 'Tropical Tracks', snow: 'Snow Depth',
-                temp: 'Temperature', wind: 'Wind', states: 'State Borders', counties: 'County Borders',
-                nwsZones: 'NWS Zones', labels: 'City Labels', highways: 'Interstates',
-                airports: 'Airports', nexrad: 'NEXRAD Sites', stations: 'Weather Stations'
+                radar: 'Radar', alerts: 'NWS Alerts', spcOutlook: 'SPC Outlook',
+                stormReports: 'Storm Reports', temp: 'Temperature', wind: 'Wind',
+                states: 'State Borders', counties: 'County Borders', labels: 'City Labels'
             };
             return names[key] || key;
         }
@@ -1733,7 +1468,7 @@
         async function loadAlerts() {
             try {
                 const resp = await fetch(DATA_URLS.nwsAlerts, {
-                    headers: { 'User-Agent': 'StormViewPro/1.0' }
+                    headers: { 'User-Agent': 'StormViewPro/2.0' }
                 });
                 const data = await resp.json();
                 const features = data.features || [];
@@ -1750,7 +1485,6 @@
                         else if (evt.includes('flash flood')) color = '#00ff00';
                         else if (evt.includes('flood')) color = '#00aa00';
                         else if (evt.includes('winter') || evt.includes('blizzard')) color = '#ff69b4';
-                        else if (evt.includes('wind')) color = '#d2691e';
                         else if (evt.includes('warning')) color = '#ff6600';
                         else if (evt.includes('watch')) color = '#ffcc00';
                         return { color, weight: 2, fillColor: color, fillOpacity: 0.2, dashArray: evt.includes('watch') ? '5, 5' : null };
@@ -1792,16 +1526,12 @@
                 removeLayer('spcOutlook');
 
                 const riskColors = {
-                    'TSTM': '#76d576',
-                    'MRGL': '#8b9b4b',
-                    'SLGT': '#f6f67b',
-                    'ENH': '#e0a060',
-                    'MDT': '#e06060',
-                    'HIGH': '#ff00ff'
+                    'TSTM': '#76d576', 'MRGL': '#8b9b4b', 'SLGT': '#f6f67b',
+                    'ENH': '#e0a060', 'MDT': '#e06060', 'HIGH': '#ff00ff'
                 };
 
                 layerRefs.spcOutlook = L.geoJSON(data, {
-                    pane: 'weatherPane',
+                    pane: 'alertPane',
                     style: (f) => {
                         const label = f.properties?.LABEL || f.properties?.DN || '';
                         const color = riskColors[label] || '#999';
@@ -1831,30 +1561,27 @@
 
         async function loadStormReports() {
             try {
-                const [tornResp, hailResp, windResp] = await Promise.all([
-                    fetch(DATA_URLS.stormReportsTorn).then(r => r.text()).catch(() => ''),
-                    fetch(DATA_URLS.stormReportsHail).then(r => r.text()).catch(() => ''),
-                    fetch(DATA_URLS.stormReportsWind).then(r => r.text()).catch(() => '')
-                ]);
+                const urls = [
+                    'https://www.spc.noaa.gov/climo/reports/today_torn.csv',
+                    'https://www.spc.noaa.gov/climo/reports/today_hail.csv',
+                    'https://www.spc.noaa.gov/climo/reports/today_wind.csv'
+                ];
+                
+                const [tornResp, hailResp, windResp] = await Promise.all(
+                    urls.map(url => fetch(url).then(r => r.text()).catch(() => ''))
+                );
 
                 const markers = [];
                 
                 const parseCSV = (csv, type) => {
-                    const lines = csv.trim().split('\n').slice(1); // Skip header
+                    const lines = csv.trim().split('\n').slice(1);
                     lines.forEach(line => {
                         const parts = line.split(',');
                         if (parts.length >= 8) {
                             const lat = parseFloat(parts[5]);
                             const lon = parseFloat(parts[6]);
                             if (!isNaN(lat) && !isNaN(lon)) {
-                                markers.push({
-                                    lat, lon,
-                                    type,
-                                    time: parts[0],
-                                    location: parts[2],
-                                    state: parts[3],
-                                    remarks: parts[7] || ''
-                                });
+                                markers.push({ lat, lon, type, time: parts[0], location: parts[2], state: parts[3], remarks: parts[7] || '' });
                             }
                         }
                     });
@@ -1875,142 +1602,14 @@
                 layerRefs.stormReports = L.layerGroup();
                 
                 markers.forEach(m => {
-                    const marker = L.marker([m.lat, m.lon], { 
-                        icon: icons[m.type],
-                        pane: 'markerPane'
-                    });
-                    marker.bindPopup(`
-                        <div class="report-popup">
-                            <h4>${m.type.charAt(0).toUpperCase() + m.type.slice(1)} Report</h4>
-                            <div class="details">${m.location}, ${m.state}</div>
-                            <div class="details">${m.remarks}</div>
-                            <div class="meta">Time: ${m.time}</div>
-                        </div>
-                    `);
+                    const marker = L.marker([m.lat, m.lon], { icon: icons[m.type] });
+                    marker.bindPopup(`<strong>${m.type.charAt(0).toUpperCase() + m.type.slice(1)}</strong><br>${m.location}, ${m.state}<br><small>${m.remarks}</small>`);
                     marker.addTo(layerRefs.stormReports);
                 });
 
                 if (settings.layers.stormReports) layerRefs.stormReports.addTo(map);
             } catch(e) {
                 console.error('Storm reports error:', e);
-            }
-        }
-
-        async function loadMesoscale() {
-            try {
-                const resp = await fetch('https://www.spc.noaa.gov/products/md/md.geojson');
-                const data = await resp.json();
-
-                removeLayer('mesoscale');
-
-                layerRefs.mesoscale = L.geoJSON(data, {
-                    pane: 'weatherPane',
-                    style: { color: '#c084fc', weight: 3, fillColor: '#c084fc', fillOpacity: 0.15, dashArray: '8, 4' },
-                    onEachFeature: (f, layer) => {
-                        const num = f.properties?.number || f.properties?.id || '';
-                        layer.bindPopup(`
-                            <div class="spc-popup">
-                                <h4>Mesoscale Discussion #${num}</h4>
-                                <div class="meta">Click for details at SPC</div>
-                            </div>
-                        `);
-                    }
-                });
-
-                if (settings.layers.mesoscale) layerRefs.mesoscale.addTo(map);
-            } catch(e) {
-                console.error('Mesoscale error:', e);
-            }
-        }
-
-        async function loadRiverGauges() {
-            try {
-                // Use NWS AHPS data - simpler endpoint
-                const resp = await fetch('https://api.weather.gov/stations?state=TX&limit=50', {
-                    headers: { 'User-Agent': 'StormViewPro/1.0' }
-                });
-                
-                removeLayer('riverGauges');
-                layerRefs.riverGauges = L.layerGroup();
-
-                // Alternative: Use USGS Water Services for river data
-                const usgsResp = await fetch('https://waterservices.usgs.gov/nwis/iv/?format=json&stateCd=TX&parameterCd=00065&siteStatus=active');
-                const usgsData = await usgsResp.json();
-                
-                if (usgsData.value?.timeSeries) {
-                    usgsData.value.timeSeries.slice(0, 100).forEach(ts => {
-                        const site = ts.sourceInfo;
-                        if (site?.geoLocation?.geogLocation) {
-                            const lat = site.geoLocation.geogLocation.latitude;
-                            const lon = site.geoLocation.geogLocation.longitude;
-                            const name = site.siteName || 'Unknown';
-                            const value = ts.values?.[0]?.value?.[0]?.value || 'N/A';
-                            
-                            const marker = L.circleMarker([lat, lon], {
-                                radius: 6,
-                                fillColor: '#22d3ee',
-                                fillOpacity: 0.8,
-                                color: '#fff',
-                                weight: 1,
-                                pane: 'markerPane'
-                            });
-                            
-                            marker.bindPopup(`
-                                <div class="gauge-popup">
-                                    <h4>${name}</h4>
-                                    <div class="level">${value} ft</div>
-                                    <div class="status">Gage Height</div>
-                                </div>
-                            `);
-                            
-                            marker.addTo(layerRefs.riverGauges);
-                        }
-                    });
-                }
-
-                if (settings.layers.riverGauges) layerRefs.riverGauges.addTo(map);
-            } catch(e) {
-                console.error('River gauges error:', e);
-                toast('River gauge data limited', true);
-            }
-        }
-
-        async function loadTropicalTracks() {
-            try {
-                // Check for active tropical systems
-                const resp = await fetch('https://www.nhc.noaa.gov/CurrentStorms.json');
-                const data = await resp.json();
-
-                removeLayer('tropicalTracks');
-                layerRefs.tropicalTracks = L.layerGroup();
-
-                if (data.activeStorms && data.activeStorms.length > 0) {
-                    toast(`${data.activeStorms.length} active tropical system(s)`);
-                    // Would need to fetch individual track GeoJSON for each storm
-                } else {
-                    toast('No active tropical systems');
-                }
-
-                if (settings.layers.tropicalTracks) layerRefs.tropicalTracks.addTo(map);
-            } catch(e) {
-                console.error('Tropical error:', e);
-            }
-        }
-
-        function toggleSnowLayer(on) {
-            if (on) {
-                if (!layerRefs.snow) {
-                    layerRefs.snow = L.tileLayer.wms('https://mesonet.agron.iastate.edu/cgi-bin/wms/us/wwa.cgi', {
-                        layers: 'snowdepth',
-                        format: 'image/png',
-                        transparent: true,
-                        opacity: 0.6,
-                        zIndex: 40
-                    });
-                }
-                layerRefs.snow.addTo(map);
-            } else {
-                removeLayer('snow');
             }
         }
 
@@ -2085,33 +1684,11 @@
             }
         }
 
-        async function loadNWSZones() {
-            try {
-                // Use simplified NWS zones from Iowa State
-                removeLayer('nwsZones');
-                
-                layerRefs.nwsZones = L.tileLayer.wms('https://mesonet.agron.iastate.edu/cgi-bin/wms/us/wwa.cgi', {
-                    layers: 'nws_warnings',
-                    format: 'image/png',
-                    transparent: true,
-                    opacity: 0.5,
-                    pane: 'boundaryPane'
-                });
-
-                if (settings.layers.nwsZones) layerRefs.nwsZones.addTo(map);
-            } catch(e) {
-                console.error('NWS Zones error:', e);
-            }
-        }
-
         function toggleLabelsLayer(on) {
             if (on) {
                 if (!layerRefs.labels) {
                     layerRefs.labels = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-                        subdomains: 'abcd',
-                        opacity: 0.9,
-                        zIndex: 600,
-                        pane: 'overlayPane'
+                        subdomains: 'abcd', opacity: 0.9, zIndex: 600, pane: 'overlayPane'
                     });
                 }
                 layerRefs.labels.addTo(map);
@@ -2120,149 +1697,12 @@
             }
         }
 
-        function toggleHighwaysLayer(on) {
-            if (on) {
-                if (!layerRefs.highways) {
-                    // Use CARTO reference layer that includes roads
-                    layerRefs.highways = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
-                        subdomains: 'abcd',
-                        opacity: 0.4,
-                        zIndex: 300,
-                        pane: 'boundaryPane'
-                    });
-                }
-                layerRefs.highways.addTo(map);
-            } else {
-                removeLayer('highways');
-            }
-        }
-
-        // ==================== INFRASTRUCTURE LAYERS ====================
-        async function loadAirports() {
-            try {
-                removeLayer('airports');
-                layerRefs.airports = L.layerGroup();
-
-                // Major US airports (simplified list)
-                const majorAirports = [
-                    { name: 'ATL', lat: 33.6407, lon: -84.4277 },
-                    { name: 'DFW', lat: 32.8998, lon: -97.0403 },
-                    { name: 'DEN', lat: 39.8561, lon: -104.6737 },
-                    { name: 'ORD', lat: 41.9742, lon: -87.9073 },
-                    { name: 'LAX', lat: 33.9416, lon: -118.4085 },
-                    { name: 'JFK', lat: 40.6413, lon: -73.7781 },
-                    { name: 'SFO', lat: 37.6213, lon: -122.379 },
-                    { name: 'SEA', lat: 47.4502, lon: -122.3088 },
-                    { name: 'MIA', lat: 25.7959, lon: -80.287 },
-                    { name: 'PHX', lat: 33.4373, lon: -112.0078 },
-                    { name: 'IAH', lat: 29.9902, lon: -95.3368 },
-                    { name: 'MSP', lat: 44.8848, lon: -93.2223 },
-                    { name: 'DTW', lat: 42.2162, lon: -83.3554 },
-                    { name: 'BOS', lat: 42.3656, lon: -71.0096 },
-                    { name: 'EWR', lat: 40.6895, lon: -74.1745 }
-                ];
-
-                majorAirports.forEach(apt => {
-                    const marker = L.marker([apt.lat, apt.lon], {
-                        icon: L.divIcon({
-                            className: 'airport-icon',
-                            html: `<div style="background:#60a5fa;color:#fff;padding:2px 4px;border-radius:3px;font-size:9px;font-weight:bold;white-space:nowrap;">${apt.name}</div>`
-                        }),
-                        pane: 'markerPane'
-                    });
-                    marker.addTo(layerRefs.airports);
-                });
-
-                if (settings.layers.airports) layerRefs.airports.addTo(map);
-            } catch(e) {
-                console.error('Airports error:', e);
-            }
-        }
-
-        async function loadNEXRAD() {
-            try {
-                const resp = await fetch(DATA_URLS.nexrad);
-                const data = await resp.json();
-
-                removeLayer('nexrad');
-                layerRefs.nexrad = L.layerGroup();
-
-                data.features.forEach(f => {
-                    const coords = f.geometry.coordinates;
-                    const props = f.properties;
-                    
-                    const marker = L.circleMarker([coords[1], coords[0]], {
-                        radius: 5,
-                        fillColor: '#4ade80',
-                        fillOpacity: 0.9,
-                        color: '#fff',
-                        weight: 1,
-                        pane: 'markerPane'
-                    });
-                    
-                    marker.bindPopup(`
-                        <div>
-                            <strong>${props.id || 'NEXRAD'}</strong><br>
-                            ${props.name || ''}<br>
-                            <small>${props.state || ''}</small>
-                        </div>
-                    `);
-                    
-                    marker.addTo(layerRefs.nexrad);
-                });
-
-                if (settings.layers.nexrad) layerRefs.nexrad.addTo(map);
-            } catch(e) {
-                console.error('NEXRAD error:', e);
-            }
-        }
-
-        async function loadWeatherStations() {
-            try {
-                // Get stations for a sample state
-                const resp = await fetch('https://api.weather.gov/stations?state=OK&limit=50', {
-                    headers: { 'User-Agent': 'StormViewPro/1.0' }
-                });
-                const data = await resp.json();
-
-                removeLayer('stations');
-                layerRefs.stations = L.layerGroup();
-
-                if (data.features) {
-                    data.features.forEach(f => {
-                        const coords = f.geometry?.coordinates;
-                        if (coords) {
-                            const marker = L.circleMarker([coords[1], coords[0]], {
-                                radius: 4,
-                                fillColor: '#94a3b8',
-                                fillOpacity: 0.8,
-                                color: '#fff',
-                                weight: 1,
-                                pane: 'markerPane'
-                            });
-                            
-                            marker.bindPopup(`<strong>${f.properties?.stationIdentifier || 'Station'}</strong><br>${f.properties?.name || ''}`);
-                            marker.addTo(layerRefs.stations);
-                        }
-                    });
-                }
-
-                if (settings.layers.stations) layerRefs.stations.addTo(map);
-            } catch(e) {
-                console.error('Stations error:', e);
-            }
-        }
-
         // ==================== UI ====================
         function initUI() {
-            // Panel collapse
             document.querySelectorAll('.panel-header').forEach(header => {
-                header.addEventListener('click', () => {
-                    header.closest('.panel-section').classList.toggle('collapsed');
-                });
+                header.addEventListener('click', () => header.closest('.panel-section').classList.toggle('collapsed'));
             });
 
-            // Layer toggles
             document.querySelectorAll('[data-layer]').forEach(el => {
                 const layer = el.dataset.layer;
                 el.classList.toggle('active', settings.layers[layer]);
@@ -2272,7 +1712,6 @@
                 });
             });
 
-            // Source selection
             document.querySelectorAll('[data-source]').forEach(el => {
                 el.classList.toggle('active', el.dataset.source === settings.source);
                 el.addEventListener('click', () => {
@@ -2285,21 +1724,19 @@
                 });
             });
 
-            // Basemap selection
             document.querySelectorAll('[data-basemap]').forEach(el => {
                 el.classList.toggle('active', el.dataset.basemap === settings.basemap);
                 el.addEventListener('click', () => setBasemap(el.dataset.basemap));
             });
 
-            // Playback controls
             document.getElementById('playBtn').addEventListener('click', togglePlay);
             document.getElementById('prevBtn').addEventListener('click', () => {
                 pause();
-                showFrame(Math.max(0, currentFrame - 1));
+                showPreloadedFrame(Math.max(0, currentFrame - 1));
             });
             document.getElementById('nextBtn').addEventListener('click', () => {
                 pause();
-                showFrame(Math.min(frames.length - 1, currentFrame + 1));
+                showPreloadedFrame(Math.min(frames.length - 1, currentFrame + 1));
             });
             document.getElementById('loopBtn').addEventListener('click', (e) => {
                 settings.loop = !settings.loop;
@@ -2308,17 +1745,15 @@
             });
             document.getElementById('speedBtn').addEventListener('click', cycleSpeed);
 
-            // Timeline scrubbing
             const timeline = document.getElementById('timeline');
             timeline.addEventListener('click', (e) => {
                 const rect = timeline.getBoundingClientRect();
                 const pct = (e.clientX - rect.left) / rect.width;
                 const idx = Math.floor(pct * frames.length);
                 pause();
-                showFrame(Math.max(0, Math.min(frames.length - 1, idx)));
+                showPreloadedFrame(Math.max(0, Math.min(frames.length - 1, idx)));
             });
 
-            // Other buttons
             document.getElementById('themeBtn').addEventListener('click', toggleTheme);
             document.getElementById('refreshBtn').addEventListener('click', () => {
                 toast('Refreshing data...');
@@ -2329,7 +1764,6 @@
             });
             document.getElementById('locBtn').addEventListener('click', goToLocation);
 
-            // Settings modal
             document.getElementById('settingsBtn').addEventListener('click', () => {
                 document.getElementById('modalOverlay').classList.add('open');
                 document.getElementById('settingsModal').classList.add('open');
@@ -2337,7 +1771,6 @@
             document.getElementById('modalOverlay').addEventListener('click', closeModal);
             document.getElementById('modalClose').addEventListener('click', closeModal);
 
-            // Timestamp toggle
             document.getElementById('timestampTz').addEventListener('click', () => {
                 settings.useLocalTime = !settings.useLocalTime;
                 updateTimestamp();
@@ -2361,11 +1794,10 @@
         }
 
         function cycleSpeed() {
-            const speeds = [0.5, 1, 1.5, 2];
+            const speeds = [0.5, 1, 1.5, 2, 3];
             const idx = speeds.indexOf(speedMult);
             speedMult = speeds[(idx + 1) % speeds.length];
             document.getElementById('speedBtn').textContent = speedMult + 'x';
-            if (isPlaying) { pause(); play(); }
         }
 
         function initSearch() {
@@ -2425,7 +1857,6 @@
         }
 
         function initSettingsControls() {
-            // Opacity
             const opacitySlider = document.getElementById('opacitySlider');
             const opacityValue = document.getElementById('opacityValue');
             opacitySlider.value = settings.opacity;
@@ -2434,24 +1865,23 @@
             opacitySlider.addEventListener('input', (e) => {
                 const val = parseFloat(e.target.value);
                 opacityValue.textContent = Math.round(val * 100) + '%';
-                clearTimeout(opacityTimeout);
-                opacityTimeout = setTimeout(() => {
-                    settings.opacity = val;
-                    if (radarLayer) radarLayer.setOpacity(val);
-                    saveSettings();
-                }, 100);
+                settings.opacity = val;
+                // Update current visible frame opacity
+                if (frameLayers[currentFrame]) {
+                    frameLayers[currentFrame].setOpacity(val);
+                }
+                saveSettings();
             });
 
-            // Color scheme
             const colorSchemeSelect = document.getElementById('colorSchemeSelect');
             colorSchemeSelect.value = settings.colorScheme;
             colorSchemeSelect.addEventListener('change', (e) => {
                 settings.colorScheme = parseInt(e.target.value);
                 saveSettings();
-                showFrame(currentFrame);
+                // Reload frames with new color scheme
+                if (settings.source === 'rainviewer') loadRadarData();
             });
 
-            // Delay
             const delaySlider = document.getElementById('delaySlider');
             const delayValue = document.getElementById('delayValue');
             delaySlider.value = settings.delay;
@@ -2461,37 +1891,24 @@
                 const val = parseInt(e.target.value);
                 delayValue.textContent = val + 'ms';
                 settings.delay = val;
-                if (isPlaying) { pause(); play(); }
                 saveSettings();
             });
 
-            // Toggles
-            initToggle('smoothToggle', 'smooth', () => showFrame(currentFrame));
-            initToggle('snowColorToggle', 'snowColor', () => showFrame(currentFrame));
-            initToggle('crossfadeToggle', 'crossfade');
+            initToggle('smoothToggle', 'smooth', () => { if (settings.source === 'rainviewer') loadRadarData(); });
+            initToggle('snowColorToggle', 'snowColor', () => { if (settings.source === 'rainviewer') loadRadarData(); });
             initToggle('autoRefreshToggle', 'autoRefresh');
 
-            // Border settings
             initBorderSlider('stateBorderWidth', 'stateBorderValue', 'stateBorderWidth', 'px', () => {
-                if (layerRefs.states) {
-                    layerRefs.states.setStyle({ weight: settings.stateBorderWidth });
-                }
+                if (layerRefs.states) layerRefs.states.setStyle({ weight: settings.stateBorderWidth });
             });
             initBorderSlider('countyBorderWidth', 'countyBorderValue', 'countyBorderWidth', 'px', () => {
-                if (layerRefs.counties) {
-                    layerRefs.counties.setStyle({ weight: settings.countyBorderWidth });
-                }
+                if (layerRefs.counties) layerRefs.counties.setStyle({ weight: settings.countyBorderWidth });
             });
             initBorderSlider('borderOpacity', 'borderOpacityValue', 'borderOpacity', '%', () => {
-                if (layerRefs.states) {
-                    layerRefs.states.setStyle({ opacity: settings.borderOpacity });
-                }
-                if (layerRefs.counties) {
-                    layerRefs.counties.setStyle({ opacity: settings.borderOpacity * 0.7 });
-                }
+                if (layerRefs.states) layerRefs.states.setStyle({ opacity: settings.borderOpacity });
+                if (layerRefs.counties) layerRefs.counties.setStyle({ opacity: settings.borderOpacity * 0.7 });
             }, true);
 
-            // API key
             document.getElementById('owmKeyInput').value = settings.owmKey || '';
             document.getElementById('saveKeysBtn').addEventListener('click', () => {
                 settings.owmKey = document.getElementById('owmKeyInput').value.trim();
@@ -2499,7 +1916,6 @@
                 toast('API key saved');
             });
 
-            // Import/Export
             document.getElementById('exportBtn').addEventListener('click', exportSettings);
             document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
             document.getElementById('importFile').addEventListener('change', importSettings);
@@ -2537,7 +1953,6 @@
             
             document.getElementById('mobileContent').innerHTML = document.getElementById('sidebar').innerHTML;
 
-            // Re-attach listeners
             document.getElementById('mobileContent').querySelectorAll('[data-layer]').forEach(el => {
                 const layer = el.dataset.layer;
                 el.classList.toggle('active', settings.layers[layer]);
@@ -2642,7 +2057,6 @@
                 if (settings.autoRefresh && !isPlaying) {
                     loadRadarData();
                     if (settings.layers.alerts) loadAlerts();
-                    if (settings.layers.stormReports) loadStormReports();
                 }
             }, 5 * 60 * 1000);
         }
