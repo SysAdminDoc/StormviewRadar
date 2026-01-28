@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>StormView Pro v2</title>
+    <title>StormView Pro v3</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
-            --glass-bg: rgba(15, 23, 42, 0.85);
+            --glass-bg: rgba(15, 23, 42, 0.92);
             --glass-border: rgba(255, 255, 255, 0.1);
             --glass-hover: rgba(255, 255, 255, 0.08);
+            --panel-bg: rgba(15, 23, 42, 0.98);
             --text: #f1f5f9;
             --text-dim: #94a3b8;
             --text-muted: #64748b;
@@ -19,14 +20,18 @@
             --warning: #fbbf24;
             --danger: #f87171;
             --purple: #a78bfa;
+            --pink: #f472b6;
+            --orange: #fb923c;
             --radius: 16px;
             --radius-sm: 10px;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
 
         .light-theme {
-            --glass-bg: rgba(255, 255, 255, 0.88);
+            --glass-bg: rgba(255, 255, 255, 0.92);
             --glass-border: rgba(0, 0, 0, 0.1);
             --glass-hover: rgba(0, 0, 0, 0.05);
+            --panel-bg: rgba(255, 255, 255, 0.98);
             --text: #0f172a;
             --text-dim: #475569;
             --text-muted: #94a3b8;
@@ -47,9 +52,8 @@
 
         #map { position: absolute; inset: 0; z-index: 1; }
 
-        /* Smooth radar layer transitions - key for fluid animation */
-        .leaflet-tile-container { transition: opacity 0.2s ease-out !important; }
-        .radar-layer { transition: opacity 0.15s linear !important; }
+        .leaflet-tile-container { transition: opacity 0.15s ease-out !important; }
+        .radar-layer { transition: opacity 0.12s linear !important; }
         .radar-layer .leaflet-tile { transition: opacity 0.1s linear !important; }
 
         .leaflet-control-attribution {
@@ -75,15 +79,17 @@
         .leaflet-control-zoom-out { border-radius: 0 0 var(--radius-sm) var(--radius-sm) !important; }
 
         .leaflet-popup-content-wrapper {
-            background: var(--glass-bg) !important;
-            backdrop-filter: blur(16px);
+            background: var(--panel-bg) !important;
+            backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
             border-radius: var(--radius) !important;
             color: var(--text);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            box-shadow: var(--shadow);
+            max-width: 320px;
         }
-        .leaflet-popup-tip { background: var(--glass-bg) !important; }
-        .leaflet-popup-close-button { color: var(--text-dim) !important; font-size: 20px !important; }
+        .leaflet-popup-tip { background: var(--panel-bg) !important; }
+        .leaflet-popup-close-button { color: var(--text-dim) !important; font-size: 20px !important; padding: 8px 10px 0 0 !important; }
+        .leaflet-popup-content { margin: 14px 16px !important; }
 
         .glass {
             background: var(--glass-bg);
@@ -93,6 +99,7 @@
             border-radius: var(--radius);
         }
 
+        /* Header */
         .header {
             position: absolute;
             top: 12px; left: 12px; right: 12px;
@@ -113,7 +120,7 @@
         }
         .logo-icon svg { width: 22px; height: 22px; stroke: #fff; fill: none; }
 
-        .search-box { flex: 1; max-width: 300px; position: relative; }
+        .search-box { flex: 1; max-width: 320px; position: relative; }
         .search-input {
             width: 100%; height: 40px;
             padding: 0 40px 0 42px;
@@ -143,7 +150,7 @@
         .search-results {
             position: absolute; top: calc(100% + 6px); left: 0; right: 0;
             max-height: 280px; overflow-y: auto;
-            display: none; z-index: 100;
+            display: none; z-index: 1100;
         }
         .search-results.open { display: block; }
         .search-item {
@@ -180,55 +187,36 @@
         .icon-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
         .icon-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; }
 
+        /* Sidebar */
         .sidebar {
-            position: absolute; top: 80px; left: 12px;
-            width: 240px; max-height: calc(100% - 200px);
+            position: absolute;
+            top: 80px; left: 12px;
+            width: 260px;
+            max-height: calc(100% - 200px);
             overflow-y: auto;
-            display: flex; flex-direction: column; gap: 10px;
-            z-index: 900; padding-bottom: 16px;
+            display: flex; flex-direction: column; gap: 8px;
+            z-index: 900;
+            padding-bottom: 16px;
         }
         .sidebar::-webkit-scrollbar { width: 6px; }
         .sidebar::-webkit-scrollbar-track { background: transparent; }
         .sidebar::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 3px; }
 
-        .panel-section { padding: 14px; }
+        .panel-section { 
+            padding: 12px; 
+            overflow: hidden;
+        }
+        .panel-content {
+            overflow: hidden;
+        }
         .panel-title {
-            display: flex; align-items: center; gap: 8px;
-            font-size: 11px; font-weight: 700;
+            display: flex; align-items: center; gap: 6px;
+            font-size: 10px; font-weight: 700;
             color: var(--text-muted);
             text-transform: uppercase; letter-spacing: 0.5px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
-        .panel-title svg { width: 14px; height: 14px; stroke: var(--text-muted); }
-
-        .layer-item {
-            display: flex; align-items: center; gap: 10px;
-            padding: 10px; border-radius: var(--radius-sm);
-            cursor: pointer; transition: all 0.15s; margin-bottom: 4px;
-        }
-        .layer-item:hover { background: var(--glass-hover); }
-        .layer-item.active { background: rgba(56, 189, 248, 0.15); }
-
-        .layer-check {
-            width: 20px; height: 20px;
-            border: 2px solid var(--text-muted);
-            border-radius: 5px;
-            display: grid; place-items: center;
-            flex-shrink: 0; transition: all 0.15s;
-        }
-        .layer-check svg { width: 12px; height: 12px; stroke: transparent; stroke-width: 3; }
-        .layer-item.active .layer-check { background: var(--accent); border-color: var(--accent); }
-        .layer-item.active .layer-check svg { stroke: #fff; }
-
-        .layer-icon { width: 22px; display: grid; place-items: center; flex-shrink: 0; }
-        .layer-icon svg { width: 18px; height: 18px; }
-        .layer-name { font-size: 13px; flex: 1; }
-        .layer-badge {
-            font-size: 9px; padding: 2px 6px; border-radius: 4px;
-            font-weight: 700; text-transform: uppercase;
-        }
-        .layer-badge.api { background: var(--warning); color: #000; }
-        .layer-badge.new { background: var(--success); color: #000; }
+        .panel-title svg { width: 12px; height: 12px; stroke: var(--text-muted); }
 
         .panel-header {
             display: flex; align-items: center; justify-content: space-between;
@@ -238,6 +226,93 @@
         .panel-section.collapsed .chevron { transform: rotate(-90deg); }
         .panel-section.collapsed .panel-content { display: none; }
 
+        .layer-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 5px;
+            width: 100%;
+        }
+
+        .layer-chip {
+            display: flex; align-items: center; gap: 6px;
+            padding: 8px 10px;
+            background: var(--glass-hover);
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.15s;
+            font-size: 11px;
+            min-width: 0; /* Allow shrinking */
+            overflow: hidden;
+        }
+        .layer-chip:hover { background: rgba(56, 189, 248, 0.1); }
+        .layer-chip.active { 
+            background: rgba(56, 189, 248, 0.15); 
+            border-color: var(--accent);
+        }
+        .layer-chip.full-width { grid-column: span 2; }
+        .layer-chip .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .layer-chip .layer-name { 
+            flex: 1; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis;
+            min-width: 0;
+        }
+        .layer-chip .badge {
+            font-size: 7px; padding: 2px 4px; border-radius: 3px;
+            font-weight: 700; text-transform: uppercase;
+            background: var(--success); color: #000;
+            flex-shrink: 0;
+        }
+        .layer-chip .badge.api { background: var(--warning); }
+
+        .source-tabs {
+            display: flex; gap: 4px;
+            background: var(--glass-hover);
+            padding: 3px;
+            border-radius: var(--radius-sm);
+        }
+        .source-tab {
+            flex: 1;
+            padding: 7px 10px;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            color: var(--text-dim);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .source-tab:hover { color: var(--text); }
+        .source-tab.active { background: var(--accent); color: #fff; }
+
+        .basemap-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+        }
+        .basemap-btn {
+            aspect-ratio: 1;
+            background: var(--glass-hover);
+            border: 2px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            display: grid; place-items: center;
+            transition: all 0.15s;
+            color: var(--text-dim);
+            padding: 6px;
+        }
+        .basemap-btn:hover { border-color: var(--text-muted); }
+        .basemap-btn.active { border-color: var(--accent); color: var(--accent); }
+        .basemap-btn svg { width: 16px; height: 16px; }
+
+        /* Legend */
         .legend {
             position: absolute; right: 12px; top: 50%;
             transform: translateY(-50%);
@@ -258,6 +333,7 @@
             font-weight: 500; text-align: right;
         }
 
+        /* Playback */
         .playback {
             position: absolute;
             bottom: 12px; left: 12px; right: 12px;
@@ -332,7 +408,6 @@
         }
         .speed-pill:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-        /* Loading Progress */
         .load-progress {
             position: absolute;
             bottom: 100px; left: 50%;
@@ -363,66 +438,89 @@
             transition: width 0.2s;
         }
 
-        .modal-overlay {
+        /* Settings Panel - Slide-in from right */
+        .settings-overlay {
             position: fixed; inset: 0;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(4px);
+            background: rgba(0,0,0,0.5);
             z-index: 2000;
             opacity: 0; visibility: hidden;
-            transition: all 0.2s;
+            transition: all 0.3s;
         }
-        .modal-overlay.open { opacity: 1; visibility: visible; }
+        .settings-overlay.open { opacity: 1; visibility: visible; }
 
-        .modal {
-            position: fixed; top: 50%; left: 50%;
-            transform: translate(-50%, -50%) scale(0.95);
-            width: 480px; max-width: 95vw; max-height: 85vh;
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 20px;
+        .settings-panel {
+            position: fixed;
+            top: 0; right: 0; bottom: 0;
+            width: 380px; max-width: 100vw;
+            background: var(--panel-bg);
+            border-left: 1px solid var(--glass-border);
             z-index: 2001;
-            opacity: 0; visibility: hidden;
-            transition: all 0.25s;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
             display: flex; flex-direction: column;
-            overflow: hidden;
         }
-        .modal.open { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
+        .settings-panel.open { transform: translateX(0); }
 
-        .modal-header {
+        .settings-header {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 20px 24px;
+            padding: 16px 20px;
             border-bottom: 1px solid var(--glass-border);
         }
-        .modal-title { font-size: 18px; font-weight: 700; }
-        .modal-close {
+        .settings-header h2 { font-size: 18px; font-weight: 700; }
+        .settings-close {
             width: 36px; height: 36px;
             background: var(--glass-hover);
             border: none; border-radius: 10px;
             color: var(--text); cursor: pointer;
             display: grid; place-items: center;
         }
-        .modal-close svg { width: 20px; height: 20px; }
+        .settings-close svg { width: 20px; height: 20px; }
 
-        .modal-body { flex: 1; overflow-y: auto; padding: 24px; }
+        .settings-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .settings-tab {
+            flex: 1;
+            padding: 14px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-dim);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .settings-tab:hover { color: var(--text); }
+        .settings-tab.active { 
+            color: var(--accent); 
+            border-bottom-color: var(--accent);
+        }
 
-        .setting-section { margin-bottom: 28px; }
-        .setting-section:last-child { margin-bottom: 0; }
-        .setting-section-title {
+        .settings-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .settings-section { margin-bottom: 24px; }
+        .settings-section:last-child { margin-bottom: 0; }
+        .settings-section-title {
             font-size: 11px; font-weight: 700;
             color: var(--text-muted);
             text-transform: uppercase; letter-spacing: 0.5px;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
         .setting-row {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 14px 0;
+            padding: 12px 0;
             border-bottom: 1px solid var(--glass-border);
         }
         .setting-row:last-child { border-bottom: none; }
         .setting-label { font-size: 14px; }
-        .setting-hint { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+        .setting-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
         .toggle {
             width: 48px; height: 26px;
@@ -444,7 +542,7 @@
         .toggle.on { background: var(--accent); }
         .toggle.on::after { transform: translateX(22px); }
 
-        .slider-row { display: flex; align-items: center; gap: 12px; }
+        .slider-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
         .slider {
             flex: 1; height: 6px;
             -webkit-appearance: none;
@@ -462,18 +560,25 @@
             color: var(--accent); min-width: 50px; text-align: right;
         }
 
-        select.dropdown {
-            background: var(--glass-hover);
-            border: 1px solid var(--glass-border);
-            border-radius: 8px;
-            color: var(--text);
-            padding: 8px 12px;
-            font-size: 13px;
-            outline: none; cursor: pointer;
+        .color-scheme-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
         }
-        select.dropdown option { background: #1e293b; }
+        .color-scheme-btn {
+            aspect-ratio: 1.5;
+            border: 2px solid var(--glass-border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+            overflow: hidden;
+        }
+        .color-scheme-btn:hover { border-color: var(--text-muted); }
+        .color-scheme-btn.active { border-color: var(--accent); }
+        .color-scheme-btn .gradient {
+            width: 100%; height: 100%;
+        }
 
-        .api-group { margin-bottom: 12px; }
         .api-input {
             width: 100%; padding: 12px;
             background: var(--glass-hover);
@@ -506,9 +611,8 @@
         }
         .btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
         .btn svg { width: 16px; height: 16px; }
-        .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-        .btn-primary:hover { background: #0ea5e9; }
 
+        /* Mobile */
         .sheet-overlay {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.5);
@@ -521,9 +625,8 @@
         .bottom-sheet {
             position: fixed;
             bottom: 0; left: 0; right: 0;
-            max-height: 75vh;
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
+            max-height: 70vh;
+            background: var(--panel-bg);
             border-top-left-radius: 24px;
             border-top-right-radius: 24px;
             border: 1px solid var(--glass-border);
@@ -537,11 +640,44 @@
         .bottom-sheet.open { transform: translateY(0); }
         .sheet-handle { width: 40px; height: 4px; background: var(--text-muted); border-radius: 2px; margin: 12px auto; }
         .sheet-content { flex: 1; overflow-y: auto; padding: 0 16px 24px; }
-        .sheet-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; text-align: center; }
 
         .mobile-fab { display: none; position: fixed; bottom: 140px; left: 12px; z-index: 1000; }
         .loc-btn { position: absolute; bottom: 140px; right: 12px; z-index: 900; }
 
+        /* Status indicators */
+        .status-bar {
+            position: absolute; top: 80px; right: 12px;
+            display: flex; flex-direction: column; gap: 8px;
+            z-index: 899;
+        }
+        .status-chip {
+            padding: 6px 12px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            font-size: 11px;
+            color: var(--text-dim);
+            display: none;
+            align-items: center;
+            gap: 6px;
+        }
+        .status-chip.show { display: flex; }
+        .status-chip .dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        .status-chip .dot.green { background: var(--success); }
+        .status-chip .dot.blue { background: var(--accent); }
+        .status-chip .dot.yellow { background: var(--warning); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* Loading */
         .loading-overlay {
             position: fixed; inset: 0;
             background: #0f172a;
@@ -565,8 +701,7 @@
             position: fixed; bottom: 100px; left: 50%;
             transform: translateX(-50%) translateY(100px);
             padding: 12px 24px;
-            background: var(--glass-bg);
-            backdrop-filter: blur(16px);
+            background: var(--panel-bg);
             border: 1px solid var(--glass-border);
             border-radius: 30px;
             color: var(--text);
@@ -578,54 +713,42 @@
         .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
         .toast.error { border-color: var(--danger); color: var(--danger); }
 
-        .alert-popup h4 { margin-bottom: 8px; }
-        .alert-popup p { font-size: 13px; line-height: 1.5; margin-bottom: 8px; }
-        .alert-popup .meta { font-size: 11px; color: var(--text-muted); }
-        .alert-badge {
-            display: inline-block;
-            padding: 3px 8px; border-radius: 4px;
-            font-size: 11px; font-weight: 700;
-            text-transform: uppercase;
-        }
-        .alert-badge.warn { background: var(--danger); color: #fff; }
-        .alert-badge.watch { background: var(--warning); color: #000; }
-        .alert-badge.adv { background: var(--accent); color: #fff; }
-
-        .spc-popup { max-width: 280px; }
-        .spc-popup h4 { margin-bottom: 4px; font-size: 14px; }
-        .spc-popup .risk { font-weight: 600; margin-bottom: 8px; }
-        .spc-popup .meta { font-size: 11px; color: var(--text-muted); }
-
         .data-credit {
             position: absolute; bottom: 4px; left: 4px;
             font-size: 9px; color: var(--text-muted);
             z-index: 899; pointer-events: none;
         }
 
-        .tile-status {
-            position: absolute; top: 80px; right: 12px;
-            padding: 6px 12px;
-            background: var(--glass-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            font-size: 11px;
-            color: var(--text-muted);
-            z-index: 899;
-            display: none;
-            align-items: center;
-            gap: 6px;
+        /* Popup styling */
+        .popup-content { line-height: 1.5; }
+        .popup-content h4 { margin-bottom: 8px; font-size: 15px; }
+        .popup-content p { font-size: 13px; margin-bottom: 6px; }
+        .popup-content .meta { font-size: 11px; color: var(--text-muted); }
+        .popup-content .badge {
+            display: inline-block;
+            padding: 3px 8px; border-radius: 4px;
+            font-size: 10px; font-weight: 700;
+            text-transform: uppercase;
         }
-        .tile-status.show { display: flex; }
-        .tile-status .dot {
+        .popup-content .badge.danger { background: var(--danger); color: #fff; }
+        .popup-content .badge.warning { background: var(--warning); color: #000; }
+        .popup-content .badge.info { background: var(--accent); color: #fff; }
+        .popup-content .badge.success { background: var(--success); color: #000; }
+
+        .layer-legend {
+            display: flex; flex-wrap: wrap; gap: 6px 10px;
+            padding: 8px 0 0 0;
+            border-top: 1px solid var(--glass-border);
+            margin-top: 8px;
+        }
+        .legend-item {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 9px; color: var(--text-muted);
+        }
+        .legend-item .dot {
             width: 6px; height: 6px;
-            background: var(--accent);
             border-radius: 50%;
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 0.4; transform: scale(0.8); }
-            50% { opacity: 1; transform: scale(1.2); }
+            flex-shrink: 0;
         }
 
         @media (max-width: 768px) {
@@ -635,6 +758,7 @@
             .search-box { max-width: 180px; }
             .timestamp-box { display: none; }
             .legend { right: 8px; }
+            .settings-panel { width: 100%; }
         }
 
         @media (max-width: 480px) {
@@ -695,7 +819,7 @@
                     <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
                 </svg>
             </button>
-            <button class="icon-btn" id="refreshBtn" title="Refresh Data">
+            <button class="icon-btn" id="refreshBtn" title="Refresh All Data">
                 <svg viewBox="0 0 24 24" stroke-width="2">
                     <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
                     <path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
@@ -712,317 +836,384 @@
     </header>
 
     <aside class="sidebar" id="sidebar">
+        <!-- Radar Source -->
         <div class="panel-section glass">
-            <div class="panel-header">
-                <div class="panel-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/></svg>
-                    Radar Source
-                </div>
-                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            <div class="panel-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                Radar Source
             </div>
-            <div class="panel-content">
-                <div class="layer-item active" data-source="rainviewer">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <span class="layer-name">RainViewer</span>
-                </div>
-                <div class="layer-item" data-source="mrms">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <span class="layer-name">MRMS (Iowa State)</span>
-                    <span class="layer-badge new">NEW</span>
-                </div>
+            <div class="source-tabs">
+                <button class="source-tab active" data-source="rainviewer">RainViewer</button>
+                <button class="source-tab" data-source="mrms">MRMS</button>
             </div>
         </div>
 
+        <!-- Weather Layers -->
         <div class="panel-section glass">
             <div class="panel-header">
                 <div class="panel-title">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/></svg>
-                    Weather Overlays
+                    Weather Layers
                 </div>
                 <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
             <div class="panel-content">
-                <div class="layer-item active" data-layer="radar">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 14v6M8 14v6M12 16v6"/></svg></div>
-                    <span class="layer-name">Radar</span>
+                <div class="layer-grid">
+                    <div class="layer-chip active full-width" data-layer="radar">
+                        <span class="dot" style="background: var(--accent)"></span>
+                        <span class="layer-name">Radar</span>
+                    </div>
+                    <div class="layer-chip active" data-layer="alerts">
+                        <span class="dot" style="background: var(--danger)"></span>
+                        <span class="layer-name">Alerts</span>
+                    </div>
+                    <div class="layer-chip active" data-layer="spcOutlook">
+                        <span class="dot" style="background: var(--warning)"></span>
+                        <span class="layer-name">SPC Outlook</span>
+                    </div>
+                    <div class="layer-chip" data-layer="stormReports">
+                        <span class="dot" style="background: var(--purple)"></span>
+                        <span class="layer-name">Reports</span>
+                    </div>
+                    <div class="layer-chip" data-layer="lightning">
+                        <span class="dot" style="background: #ffff00"></span>
+                        <span class="layer-name">Lightning</span>
+                    </div>
+                    <div class="layer-chip" data-layer="satellite">
+                        <span class="dot" style="background: #00ffff"></span>
+                        <span class="layer-name">Satellite</span>
+                    </div>
+                    <div class="layer-chip" data-layer="riverGauges">
+                        <span class="dot" style="background: var(--success)"></span>
+                        <span class="layer-name">Rivers</span>
+                    </div>
+                    <div class="layer-chip" data-layer="surfaceObs">
+                        <span class="dot" style="background: var(--pink)"></span>
+                        <span class="layer-name">Sfc Obs</span>
+                    </div>
                 </div>
-                <div class="layer-item active" data-layer="alerts">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg></div>
-                    <span class="layer-name">NWS Alerts</span>
-                </div>
-                <div class="layer-item" data-layer="spcOutlook">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
-                    <span class="layer-name">SPC Outlook</span>
-                </div>
-                <div class="layer-item" data-layer="stormReports">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>
-                    <span class="layer-name">Storm Reports</span>
-                </div>
-                <div class="layer-item" data-layer="temp">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg></div>
-                    <span class="layer-name">Temperature</span>
-                    <span class="layer-badge api">API</span>
-                </div>
-                <div class="layer-item" data-layer="wind">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg></div>
-                    <span class="layer-name">Wind Speed</span>
-                    <span class="layer-badge api">API</span>
+                <div class="layer-legend">
+                    <div class="legend-item"><span class="dot" style="background:#ff0000"></span>Tornado</div>
+                    <div class="legend-item"><span class="dot" style="background:#00ff00"></span>Hail</div>
+                    <div class="legend-item"><span class="dot" style="background:#0099ff"></span>Wind</div>
                 </div>
             </div>
         </div>
 
+        <!-- Additional Layers -->
         <div class="panel-section glass">
             <div class="panel-header">
                 <div class="panel-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-                    Boundaries
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>
+                    Map Overlays
                 </div>
                 <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
             <div class="panel-content">
-                <div class="layer-item active" data-layer="states">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>
-                    <span class="layer-name">State Borders</span>
-                </div>
-                <div class="layer-item" data-layer="counties">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
-                    <span class="layer-name">County Borders</span>
-                </div>
-                <div class="layer-item" data-layer="labels">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <div class="layer-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></div>
-                    <span class="layer-name">City Labels</span>
+                <div class="layer-grid">
+                    <div class="layer-chip active" data-layer="states">
+                        <span class="dot" style="background: var(--purple)"></span>
+                        <span class="layer-name">States</span>
+                    </div>
+                    <div class="layer-chip active" data-layer="counties">
+                        <span class="dot" style="background: var(--text-muted)"></span>
+                        <span class="layer-name">Counties</span>
+                    </div>
+                    <div class="layer-chip active" data-layer="labels">
+                        <span class="dot" style="background: var(--text)"></span>
+                        <span class="layer-name">Labels</span>
+                    </div>
+                    <div class="layer-chip" data-layer="highways">
+                        <span class="dot" style="background: var(--orange)"></span>
+                        <span class="layer-name">Roads</span>
+                    </div>
                 </div>
             </div>
         </div>
 
+        <!-- OWM Layers -->
         <div class="panel-section glass">
             <div class="panel-header">
                 <div class="panel-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" x2="8" y1="2" y2="18"/><line x1="16" x2="16" y1="6" y2="22"/></svg>
-                    Base Map
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>
+                    Model Data
                 </div>
                 <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
             </div>
             <div class="panel-content">
-                <div class="layer-item" data-basemap="dark">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <span class="layer-name">Dark</span>
+                <div class="layer-grid">
+                    <div class="layer-chip" data-layer="temp">
+                        <span class="dot" style="background: var(--danger)"></span>
+                        <span class="layer-name">Temp</span>
+                        <span class="badge api">API</span>
+                    </div>
+                    <div class="layer-chip" data-layer="wind">
+                        <span class="dot" style="background: var(--accent)"></span>
+                        <span class="layer-name">Wind</span>
+                        <span class="badge api">API</span>
+                    </div>
+                    <div class="layer-chip" data-layer="clouds">
+                        <span class="dot" style="background: #aaa"></span>
+                        <span class="layer-name">Clouds</span>
+                        <span class="badge api">API</span>
+                    </div>
+                    <div class="layer-chip" data-layer="pressure">
+                        <span class="dot" style="background: var(--pink)"></span>
+                        <span class="layer-name">Pressure</span>
+                        <span class="badge api">API</span>
+                    </div>
                 </div>
-                <div class="layer-item" data-basemap="light">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <span class="layer-name">Light</span>
-                </div>
-                <div class="layer-item" data-basemap="darkNolabels">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <span class="layer-name">Dark (No Labels)</span>
-                </div>
-                <div class="layer-item active" data-basemap="satellite">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <span class="layer-name">Satellite</span>
-                </div>
-                <div class="layer-item" data-basemap="topo">
-                    <div class="layer-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>
-                    <span class="layer-name">Terrain</span>
-                </div>
+            </div>
+        </div>
+
+        <!-- Base Map -->
+        <div class="panel-section glass">
+            <div class="panel-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>
+                Base Map
+            </div>
+            <div class="basemap-grid">
+                <button class="basemap-btn" data-basemap="dark" title="Dark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                </button>
+                <button class="basemap-btn" data-basemap="light" title="Light">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                </button>
+                <button class="basemap-btn active" data-basemap="satellite" title="Satellite">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                </button>
+                <button class="basemap-btn" data-basemap="topo" title="Terrain">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>
+                </button>
+                <button class="basemap-btn" data-basemap="darkNolabels" title="Clean">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+                </button>
             </div>
         </div>
     </aside>
 
-    <button class="icon-btn mobile-fab glass" id="mobileFab" title="Layers">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
-        </svg>
-    </button>
-
-    <div class="sheet-overlay" id="sheetOverlay"></div>
-    <div class="bottom-sheet" id="bottomSheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-content">
-            <div class="sheet-title">Layers & Settings</div>
-            <div id="mobileContent"></div>
-        </div>
-    </div>
-
+    <!-- Legend -->
     <div class="legend glass" id="legend">
-        <div class="legend-labels"><span>75+</span><span>60</span><span>45</span><span>30</span><span>15</span><span>dBZ</span></div>
         <div class="legend-gradient"></div>
-    </div>
-
-    <button class="icon-btn loc-btn glass" id="locBtn" title="My Location">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
-        </svg>
-    </button>
-
-    <div class="load-progress" id="loadProgress">
-        <span>Loading radar frames...</span>
-        <div class="load-progress-bar">
-            <div class="load-progress-fill" id="loadProgressFill" style="width: 0%"></div>
+        <div class="legend-labels">
+            <span>75+ dBZ</span>
+            <span>65</span>
+            <span>55</span>
+            <span>45</span>
+            <span>35</span>
+            <span>25</span>
+            <span>15</span>
+            <span>5 dBZ</span>
         </div>
-        <span id="loadProgressText">0%</span>
     </div>
 
-    <div class="playback glass">
+    <!-- Playback Controls -->
+    <div class="playback glass" id="playback">
         <div class="timeline" id="timeline">
             <div class="timeline-forecast" id="timelineForecast"></div>
             <div class="timeline-fill" id="timelineFill"></div>
             <div class="timeline-thumb" id="timelineThumb"></div>
         </div>
         <div class="controls">
-            <button class="speed-pill" id="speedBtn">1x</button>
-            <button class="ctrl-btn" id="prevBtn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/>
-                </svg>
+            <button class="ctrl-btn" id="stepBackBtn" title="Previous Frame">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg>
             </button>
-            <button class="play-btn" id="playBtn">
+            <button class="play-btn" id="playBtn" title="Play/Pause">
                 <svg id="playIcon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             </button>
-            <button class="ctrl-btn" id="nextBtn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/>
-                </svg>
+            <button class="ctrl-btn" id="stepFwdBtn" title="Next Frame">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg>
             </button>
-            <button class="ctrl-btn active" id="loopBtn" title="Loop">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/>
-                    <path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
-                </svg>
+            <button class="speed-pill" id="speedBtn">1x</button>
+            <button class="ctrl-btn" id="loopBtn" title="Loop">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
             </button>
         </div>
     </div>
 
-    <div class="modal-overlay" id="modalOverlay"></div>
-    <div class="modal" id="settingsModal">
-        <div class="modal-header">
-            <span class="modal-title">Settings</span>
-            <button class="modal-close" id="modalClose">
+    <!-- Load Progress -->
+    <div class="load-progress" id="loadProgress">
+        <span id="loadProgressText">0%</span>
+        <div class="load-progress-bar">
+            <div class="load-progress-fill" id="loadProgressFill"></div>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div class="status-chip" id="tileStatus"><span class="dot blue"></span><span id="tileStatusText">Caching...</span></div>
+        <div class="status-chip" id="dataStatus"><span class="dot green"></span><span id="dataStatusText">Data loaded</span></div>
+    </div>
+
+    <!-- Location Button -->
+    <button class="icon-btn loc-btn glass" id="locBtn" title="My Location">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+    </button>
+
+    <!-- Mobile FAB -->
+    <button class="icon-btn mobile-fab glass" id="mobileFab">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/></svg>
+    </button>
+
+    <!-- Settings Panel -->
+    <div class="settings-overlay" id="settingsOverlay"></div>
+    <div class="settings-panel" id="settingsPanel">
+        <div class="settings-header">
+            <h2>Settings</h2>
+            <button class="settings-close" id="settingsClose">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
             </button>
         </div>
-        <div class="modal-body">
-            <div class="setting-section">
-                <div class="setting-section-title">Radar Appearance</div>
-                <div class="setting-row">
-                    <div class="setting-label">Opacity</div>
-                    <div class="slider-row">
-                        <input type="range" class="slider" id="opacitySlider" min="0.3" max="1" step="0.05" value="0.9">
-                        <span class="slider-value" id="opacityValue">90%</span>
+        <div class="settings-tabs">
+            <button class="settings-tab active" data-tab="display">Display</button>
+            <button class="settings-tab" data-tab="radar">Radar</button>
+            <button class="settings-tab" data-tab="api">API Keys</button>
+        </div>
+        <div class="settings-content">
+            <!-- Display Tab -->
+            <div class="settings-tab-content" data-tab-content="display">
+                <div class="settings-section">
+                    <div class="settings-section-title">Appearance</div>
+                    <div class="setting-row">
+                        <div><div class="setting-label">Dark Theme</div></div>
+                        <div class="toggle on" id="themeToggle"></div>
+                    </div>
+                    <div class="setting-row">
+                        <div><div class="setting-label">Show Legend</div></div>
+                        <div class="toggle on" id="legendToggle"></div>
                     </div>
                 </div>
-                <div class="setting-row">
-                    <div class="setting-label">Color Scheme</div>
-                    <select class="dropdown" id="colorSchemeSelect">
-                        <option value="0">Black & White</option>
-                        <option value="1">Original</option>
-                        <option value="2">Universal Blue</option>
-                        <option value="3">TITAN</option>
-                        <option value="4" selected>TWC</option>
-                        <option value="5">Meteored</option>
-                        <option value="6">NEXRAD Level III</option>
-                        <option value="7">Rainbow</option>
-                        <option value="8">Dark Sky</option>
-                    </select>
+                <div class="settings-section">
+                    <div class="settings-section-title">Border Style</div>
+                    <div class="setting-row">
+                        <div class="setting-label">State Border Width</div>
+                        <div class="slider-row">
+                            <input type="range" class="slider" id="stateBorderSlider" min="1" max="4" step="0.5" value="2">
+                            <span class="slider-value" id="stateBorderValue">2px</span>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-label">County Border Width</div>
+                        <div class="slider-row">
+                            <input type="range" class="slider" id="countyBorderSlider" min="0.5" max="2" step="0.25" value="1">
+                            <span class="slider-value" id="countyBorderValue">1px</span>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-label">Border Opacity</div>
+                        <div class="slider-row">
+                            <input type="range" class="slider" id="borderOpacitySlider" min="0.2" max="1" step="0.1" value="0.6">
+                            <span class="slider-value" id="borderOpacityValue">60%</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="setting-row">
-                    <div><div class="setting-label">Smooth Radar</div><div class="setting-hint">Interpolate between pixels</div></div>
-                    <div class="toggle on" id="smoothToggle"></div>
-                </div>
-                <div class="setting-row">
-                    <div><div class="setting-label">Snow Colors</div><div class="setting-hint">Show winter precip in pink/blue</div></div>
-                    <div class="toggle on" id="snowColorToggle"></div>
+                <div class="settings-section">
+                    <div class="settings-section-title">Import / Export</div>
+                    <div class="btn-row">
+                        <button class="btn" id="exportBtn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                            Export
+                        </button>
+                        <button class="btn" id="importBtn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                            Import
+                        </button>
+                    </div>
+                    <input type="file" id="importFile" accept=".json" style="display:none;">
                 </div>
             </div>
-            <div class="setting-section">
-                <div class="setting-section-title">Playback</div>
-                <div class="setting-row">
-                    <div class="setting-label">Frame Delay</div>
-                    <div class="slider-row">
-                        <input type="range" class="slider" id="delaySlider" min="200" max="1200" step="50" value="600">
-                        <span class="slider-value" id="delayValue">600ms</span>
+            <!-- Radar Tab -->
+            <div class="settings-tab-content" data-tab-content="radar" style="display:none;">
+                <div class="settings-section">
+                    <div class="settings-section-title">Radar Display</div>
+                    <div class="setting-row">
+                        <div class="setting-label">Opacity</div>
+                        <div class="slider-row">
+                            <input type="range" class="slider" id="opacitySlider" min="0.3" max="1" step="0.05" value="0.85">
+                            <span class="slider-value" id="opacityValue">85%</span>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <div><div class="setting-label">Smooth Radar</div><div class="setting-hint">Interpolate radar tiles</div></div>
+                        <div class="toggle on" id="smoothToggle"></div>
+                    </div>
+                    <div class="setting-row">
+                        <div><div class="setting-label">Snow Colors</div><div class="setting-hint">Pink shading for snow</div></div>
+                        <div class="toggle on" id="snowToggle"></div>
                     </div>
                 </div>
-                <div class="setting-row">
-                    <div><div class="setting-label">Auto-Refresh</div><div class="setting-hint">Update data every 5 minutes</div></div>
-                    <div class="toggle on" id="autoRefreshToggle"></div>
+                <div class="settings-section">
+                    <div class="settings-section-title">Color Scheme</div>
+                    <div class="color-scheme-grid" id="colorSchemes">
+                        <div class="color-scheme-btn" data-scheme="0"><div class="gradient" style="background:linear-gradient(90deg,#000,#0f0,#ff0,#f00,#f0f)"></div></div>
+                        <div class="color-scheme-btn" data-scheme="1"><div class="gradient" style="background:linear-gradient(90deg,#000,#00f,#0ff,#0f0,#ff0,#f00)"></div></div>
+                        <div class="color-scheme-btn" data-scheme="2"><div class="gradient" style="background:linear-gradient(90deg,#000,#004,#00f,#0ff,#ff0,#f00)"></div></div>
+                        <div class="color-scheme-btn" data-scheme="3"><div class="gradient" style="background:linear-gradient(90deg,#000,#222,#666,#aaa,#fff)"></div></div>
+                        <div class="color-scheme-btn active" data-scheme="4"><div class="gradient" style="background:linear-gradient(90deg,#006,#00f,#0ff,#0f0,#ff0,#f80,#f00,#f0f)"></div></div>
+                        <div class="color-scheme-btn" data-scheme="5"><div class="gradient" style="background:linear-gradient(90deg,#000,#300,#600,#900,#f00,#f60,#fc0)"></div></div>
+                        <div class="color-scheme-btn" data-scheme="6"><div class="gradient" style="background:linear-gradient(90deg,#001,#003,#00a,#0af,#0fa,#af0,#fa0,#f00)"></div></div>
+                        <div class="color-scheme-btn" data-scheme="7"><div class="gradient" style="background:linear-gradient(90deg,#111,#333,#888,#ccc,#fff)"></div></div>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-section-title">Animation</div>
+                    <div class="setting-row">
+                        <div class="setting-label">Frame Delay</div>
+                        <div class="slider-row">
+                            <input type="range" class="slider" id="delaySlider" min="200" max="1200" step="50" value="600">
+                            <span class="slider-value" id="delayValue">600ms</span>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <div><div class="setting-label">Auto-Refresh</div><div class="setting-hint">Update every 5 minutes</div></div>
+                        <div class="toggle on" id="autoRefreshToggle"></div>
+                    </div>
+                    <div class="setting-row">
+                        <div><div class="setting-label">Loop Animation</div></div>
+                        <div class="toggle on" id="loopToggle"></div>
+                    </div>
                 </div>
             </div>
-            <div class="setting-section">
-                <div class="setting-section-title">Boundary Style</div>
-                <div class="setting-row">
-                    <div class="setting-label">State Border Width</div>
-                    <div class="slider-row">
-                        <input type="range" class="slider" id="stateBorderWidth" min="1" max="4" step="0.5" value="2">
-                        <span class="slider-value" id="stateBorderValue">2px</span>
-                    </div>
+            <!-- API Tab -->
+            <div class="settings-tab-content" data-tab-content="api" style="display:none;">
+                <div class="settings-section">
+                    <div class="settings-section-title">OpenWeatherMap</div>
+                    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Required for Temperature, Wind, Clouds, and Pressure layers</p>
+                    <input type="text" class="api-input" id="owmKeyInput" placeholder="Enter your OWM API key">
+                    <a class="api-link" href="https://openweathermap.org/api" target="_blank">
+                        Get free API key
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+                    </a>
                 </div>
-                <div class="setting-row">
-                    <div class="setting-label">County Border Width</div>
-                    <div class="slider-row">
-                        <input type="range" class="slider" id="countyBorderWidth" min="0.5" max="2" step="0.25" value="1">
-                        <span class="slider-value" id="countyBorderValue">1px</span>
-                    </div>
+                <div class="settings-section">
+                    <div class="settings-section-title">WAQI (Air Quality)</div>
+                    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Optional - for air quality overlay</p>
+                    <input type="text" class="api-input" id="waqiKeyInput" placeholder="Enter your WAQI API key">
+                    <a class="api-link" href="https://aqicn.org/data-platform/token/" target="_blank">
+                        Get free API key
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+                    </a>
                 </div>
-                <div class="setting-row">
-                    <div class="setting-label">Border Opacity</div>
-                    <div class="slider-row">
-                        <input type="range" class="slider" id="borderOpacity" min="0.2" max="1" step="0.1" value="0.6">
-                        <span class="slider-value" id="borderOpacityValue">60%</span>
-                    </div>
-                </div>
-            </div>
-            <div class="setting-section">
-                <div class="setting-section-title">Tile Caching</div>
-                <div class="setting-row">
-                    <div><div class="setting-label">Load Delay</div><div class="setting-hint">Slower = more reliable, faster = quicker cache</div></div>
-                    <div class="slider-row">
-                        <input type="range" class="slider" id="tileDelaySlider" min="30" max="200" step="10" value="80">
-                        <span class="slider-value" id="tileDelayValue">80ms</span>
-                    </div>
-                </div>
-                <div class="setting-row">
-                    <div><div class="setting-label">Refresh Delay</div><div class="setting-hint">Time between refresh requests</div></div>
-                    <div class="slider-row">
-                        <input type="range" class="slider" id="refreshDelaySlider" min="100" max="500" step="25" value="200">
-                        <span class="slider-value" id="refreshDelayValue">200ms</span>
-                    </div>
-                </div>
-                <div class="setting-row">
-                    <div><div class="setting-label">Background Caching</div><div class="setting-hint">Continuously cache tiles</div></div>
-                    <div class="toggle on" id="bgCacheToggle"></div>
-                </div>
-            </div>
-            <div class="setting-section">
-                <div class="setting-section-title">API Keys</div>
-                <div class="api-group">
-                    <input type="text" class="api-input" id="owmKeyInput" placeholder="OpenWeatherMap API Key">
-                    <a class="api-link" href="https://openweathermap.org/api" target="_blank">Get free API key <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg></a>
-                </div>
-                <button class="btn btn-primary" id="saveKeysBtn" style="width:100%;margin-top:12px;">Save API Keys</button>
-            </div>
-            <div class="setting-section">
-                <div class="setting-section-title">Import / Export</div>
-                <div class="btn-row">
-                    <button class="btn" id="exportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Export</button>
-                    <button class="btn" id="importBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg> Import</button>
-                </div>
-                <input type="file" id="importFile" accept=".json" style="display:none;">
+                <button class="btn" id="saveKeysBtn" style="width:100%;margin-top:20px;background:var(--accent);color:#fff;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Save API Keys
+                </button>
             </div>
         </div>
     </div>
 
+    <!-- Mobile Bottom Sheet -->
+    <div class="sheet-overlay" id="sheetOverlay"></div>
+    <div class="bottom-sheet" id="bottomSheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-content" id="mobileContent"></div>
+    </div>
+
+    <!-- Toast -->
     <div class="toast" id="toast"></div>
-    <div class="tile-status" id="tileStatus"><span class="dot"></span><span id="tileStatusText">Caching tiles...</span></div>
-    <div class="data-credit">Data: NWS, RainViewer, SPC, Census Bureau</div>
+
+    <!-- Data Credit -->
+    <div class="data-credit">Data: NWS, RainViewer, SPC, IEM, USGS</div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
@@ -1030,6 +1221,7 @@
     (function() {
         'use strict';
 
+        // ==================== CONFIGURATION ====================
         const BASEMAPS = {
             dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
             light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
@@ -1042,31 +1234,20 @@
             states: 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
             counties: 'https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json',
             nwsAlerts: 'https://api.weather.gov/alerts/active?status=actual',
-            spcOutlookDay1: 'https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson'
+            spcOutlookDay1: 'https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson',
+            iemLSR: 'https://mesonet.agron.iastate.edu/geojson/lsr.geojson?recent=86400',
+            surfaceObs: 'https://mesonet.agron.iastate.edu/geojson/network/AWOS.geojson',
+            usgsGauges: 'https://waterservices.usgs.gov/nwis/iv/?format=json&bBox=-130,24,-65,50&parameterCd=00065&siteStatus=active'
         };
 
+        // ==================== STATE ====================
         let map, baseLayer, locationMarker;
         let rainviewerData = null;
-        
-        // PRELOADED FRAME LAYERS - Key to smooth animation
         let frameLayers = [];
         let framesLoaded = 0;
         let framesTotal = 0;
         let framesReady = false;
         let loadAborted = false;
-        
-        // Tile preloading system
-        let tileQueue = [];
-        let tileQueueRunning = false;
-        let tilesLoaded = 0;
-        let tilesTotal = 0;
-        let preloadPhase = 'frames'; // 'frames', 'tiles', 'refresh'
-        const PRELOAD_ZOOMS = [4, 5, 6, 7, 8, 9, 10, 11, 12]; // Zoom levels to preload
-        
-        // Dynamic delay getters (use settings)
-        function getTileLoadDelay() { return settings.tileLoadDelay || 80; }
-        function getRefreshDelay() { return settings.refreshDelay || 200; }
-        
         let frames = [];
         let currentFrame = 0;
         let lastPastFrame = 0;
@@ -1078,37 +1259,40 @@
 
         const layerRefs = {
             alerts: null, spcOutlook: null, stormReports: null,
-            temp: null, wind: null, states: null, counties: null, labels: null
+            lightning: null, satellite: null, riverGauges: null, surfaceObs: null,
+            temp: null, wind: null, clouds: null, pressure: null,
+            states: null, counties: null, labels: null, highways: null
         };
 
         const dataCache = { statesGeo: null, countiesGeo: null };
 
-        // Default settings matching user's config file
         const settings = {
             source: 'rainviewer',
             basemap: 'satellite',
             theme: 'dark',
-            opacity: 0.9,
+            opacity: 0.85,
             smooth: 1,
             snowColor: 1,
             colorScheme: 4,
             delay: 600,
             loop: true,
             autoRefresh: true,
+            showLegend: true,
             owmKey: '',
+            waqiKey: '',
             useLocalTime: true,
             stateBorderWidth: 2,
             countyBorderWidth: 1,
             borderOpacity: 0.6,
-            tileLoadDelay: 80,
-            refreshDelay: 200,
-            bgCacheEnabled: true,
             layers: {
-                radar: true, alerts: true, spcOutlook: true, stormReports: true,
-                temp: false, wind: false, states: true, counties: true, labels: true
+                radar: true, alerts: true, spcOutlook: true, stormReports: false,
+                lightning: false, satellite: false, riverGauges: false, surfaceObs: false,
+                temp: false, wind: false, clouds: false, pressure: false,
+                states: true, counties: true, labels: true, highways: false
             }
         };
 
+        // ==================== INITIALIZATION ====================
         function init() {
             loadSettings();
             applyTheme();
@@ -1128,19 +1312,20 @@
 
         function loadSettings() {
             try {
-                const s = localStorage.getItem('stormview_pro_v2');
+                const s = localStorage.getItem('stormview_pro_v3');
                 if (s) Object.assign(settings, JSON.parse(s));
             } catch(e) {}
         }
 
         function saveSettings() {
-            try { localStorage.setItem('stormview_pro_v2', JSON.stringify(settings)); } catch(e) {}
+            try { localStorage.setItem('stormview_pro_v3', JSON.stringify(settings)); } catch(e) {}
         }
 
         function applyTheme() {
             document.body.classList.toggle('light-theme', settings.theme === 'light');
         }
 
+        // ==================== MAP ====================
         function initMap() {
             map = L.map('map', {
                 center: [39, -96],
@@ -1151,6 +1336,9 @@
             });
             map.zoomControl.setPosition('bottomleft');
             
+            map.createPane('satellitePane');
+            map.getPane('satellitePane').style.zIndex = 200;
+            
             map.createPane('radarPane');
             map.getPane('radarPane').style.zIndex = 250;
             
@@ -1160,26 +1348,10 @@
             map.createPane('alertPane');
             map.getPane('alertPane').style.zIndex = 450;
             
-            setBasemap(settings.basemap);
+            map.createPane('markerPane');
+            map.getPane('markerPane').style.zIndex = 500;
             
-            // Reload frames when map view changes significantly
-            map.on('zoomend', debounce(onMapViewChange, 500));
-            map.on('moveend', onMapMoveEnd);
-        }
-
-        function debounce(fn, delay) {
-            let timer;
-            return function(...args) {
-                clearTimeout(timer);
-                timer = setTimeout(() => fn.apply(this, args), delay);
-            };
-        }
-
-        function onMapViewChange() {
-            // Only reload if we have frames and animation isn't playing
-            if (frames.length > 0 && !isPlaying && settings.source === 'rainviewer') {
-                // Frames auto-adjust to new zoom via Leaflet tile loading
-            }
+            setBasemap(settings.basemap);
         }
 
         function setBasemap(id) {
@@ -1201,7 +1373,7 @@
             saveSettings();
         }
 
-        // ==================== SMOOTH PRELOADED RADAR ====================
+        // ==================== RADAR ====================
         async function loadRadarData() {
             try {
                 pause();
@@ -1240,7 +1412,6 @@
             framesLoaded = 0;
             updateLoadProgress(0);
 
-            // STAGGERED LOADING: Load frames one at a time with delay to avoid rate limiting
             for (let i = 0; i < frames.length; i++) {
                 if (loadAborted) break;
                 
@@ -1248,17 +1419,16 @@
                 const url = buildRadarUrl(frame);
                 
                 const layer = L.tileLayer(url, {
-                    opacity: 0, // Start hidden
+                    opacity: 0,
                     pane: 'radarPane',
                     className: 'radar-layer',
                     updateWhenIdle: true,
                     updateWhenZooming: false,
                     keepBuffer: 4,
-                    maxNativeZoom: 12,  // RainViewer max tile zoom
-                    maxZoom: 19         // Scale up tiles for higher zooms
+                    maxNativeZoom: 12,
+                    maxZoom: 19
                 });
                 
-                // Wait for this layer to load before starting next
                 await new Promise((resolve) => {
                     let resolved = false;
                     
@@ -1271,7 +1441,6 @@
                         }
                     });
                     
-                    // Timeout fallback in case load event doesn't fire
                     setTimeout(() => {
                         if (!resolved) {
                             resolved = true;
@@ -1286,7 +1455,6 @@
                 
                 frameLayers.push(layer);
                 
-                // Show first frame immediately once loaded
                 if (i === 0) {
                     layer.setOpacity(settings.opacity);
                     currentFrame = 0;
@@ -1294,9 +1462,8 @@
                     updateTimelineUI();
                 }
                 
-                // Small delay between frame loads to avoid rate limiting
                 if (i < frames.length - 1 && !loadAborted) {
-                    await new Promise(r => setTimeout(r, 100));
+                    await new Promise(r => setTimeout(r, 80));
                 }
             }
             
@@ -1313,274 +1480,17 @@
         function onAllFramesLoaded() {
             framesReady = true;
             hideLoadProgress();
-            
-            // Set to most recent past frame
-            currentFrame = lastPastFrame;
-            showPreloadedFrame(currentFrame);
-            
-            // Start aggressive tile preloading for all zoom levels
-            toast('Preloading tiles for all zoom levels...');
-            setTimeout(() => startTilePreloading(), 500);
-        }
-
-        // ==================== TILE PRELOADING SYSTEM ====================
-        
-        function startTilePreloading() {
-            if (!rainviewerData || !frames.length) return;
-            
-            preloadPhase = 'tiles';
-            tileQueue = [];
-            tilesLoaded = 0;
-            
-            // Get bounds to preload - use continental US if zoomed out, else current view
-            const mapBounds = map.getBounds();
-            const usBounds = L.latLngBounds([24, -125], [50, -66]); // Continental US
-            const bounds = map.getZoom() < 6 ? usBounds : mapBounds.pad(0.5);
-            
-            // Queue tiles for all zoom levels and all frames
-            for (const zoom of PRELOAD_ZOOMS) {
-                const tiles = getTilesForBounds(bounds, zoom);
-                for (const frame of frames) {
-                    for (const tile of tiles) {
-                        const url = buildTileUrl(frame, zoom, tile.x, tile.y);
-                        tileQueue.push(url);
-                    }
-                }
-            }
-            
-            tilesTotal = tileQueue.length;
-            console.log(`Queued ${tilesTotal} tiles for preloading`);
-            
-            showTileProgress();
-            processTileQueue();
-        }
-        
-        function getTilesForBounds(bounds, zoom) {
-            const tiles = [];
-            const min = latLngToTile(bounds.getSouthWest(), zoom);
-            const max = latLngToTile(bounds.getNorthEast(), zoom);
-            
-            // Limit tiles per zoom to avoid too many requests
-            const maxTilesPerZoom = 100;
-            let count = 0;
-            
-            for (let x = min.x; x <= max.x && count < maxTilesPerZoom; x++) {
-                for (let y = max.y; y <= min.y && count < maxTilesPerZoom; y++) {
-                    tiles.push({ x, y });
-                    count++;
-                }
-            }
-            return tiles;
-        }
-        
-        function latLngToTile(latlng, zoom) {
-            const lat = latlng.lat;
-            const lng = latlng.lng;
-            const n = Math.pow(2, zoom);
-            const x = Math.floor((lng + 180) / 360 * n);
-            const latRad = lat * Math.PI / 180;
-            const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
-            return { x: Math.max(0, Math.min(n - 1, x)), y: Math.max(0, Math.min(n - 1, y)) };
-        }
-        
-        function buildTileUrl(frame, zoom, x, y) {
-            const color = settings.colorScheme;
-            const smooth = settings.smooth;
-            const snow = settings.snowColor;
-            return `${rainviewerData.host}${frame.path}/256/${zoom}/${x}/${y}/${color}/${smooth}_${snow}.png`;
-        }
-        
-        function processTileQueue() {
-            if (loadAborted || !tileQueue.length) {
-                tileQueueRunning = false;
-                if (preloadPhase === 'tiles') {
-                    hideTileProgress();
-                    toast('Tile preloading complete - starting refresh cycle');
-                    startContinuousRefresh();
-                } else if (preloadPhase === 'refresh') {
-                    // Briefly hide status when refresh cycle completes
-                    document.getElementById('tileStatusText').textContent = 'Cache ready';
-                    setTimeout(() => {
-                        if (tileQueue.length === 0) setTileStatusIdle();
-                    }, 2000);
-                }
-                return;
-            }
-            
-            tileQueueRunning = true;
-            const url = tileQueue.shift();
-            
-            const img = new Image();
-            img.onload = img.onerror = () => {
-                tilesLoaded++;
-                updateTileProgress();
-                
-                const delay = preloadPhase === 'refresh' ? getRefreshDelay() : getTileLoadDelay();
-                setTimeout(() => processTileQueue(), delay);
-            };
-            img.src = url;
-        }
-        
-        function startContinuousRefresh() {
-            if (loadAborted || !settings.bgCacheEnabled) return;
-            
-            preloadPhase = 'refresh';
-            
-            // Show status indicator
-            document.getElementById('tileStatus').classList.add('show');
-            
-            // Refresh tiles for current view and nearby zoom levels
-            const currentZoom = Math.round(map.getZoom());
-            const bounds = map.getBounds().pad(0.3);
-            const zoomsToRefresh = [
-                Math.max(4, currentZoom - 2),
-                Math.max(4, currentZoom - 1),
-                Math.min(12, currentZoom),
-                Math.min(12, currentZoom + 1),
-                Math.min(12, currentZoom + 2)
-            ].filter((v, i, a) => a.indexOf(v) === i); // unique values
-            
-            tileQueue = [];
-            
-            for (const zoom of zoomsToRefresh) {
-                const tiles = getTilesForBounds(bounds, zoom);
-                for (const frame of frames) {
-                    for (const tile of tiles) {
-                        const url = buildTileUrl(frame, zoom, tile.x, tile.y);
-                        tileQueue.push(url);
-                    }
-                }
-            }
-            
-            // Shuffle queue for more even coverage
-            shuffleArray(tileQueue);
-            
-            tilesTotal = tileQueue.length;
-            tilesLoaded = 0;
-            
-            console.log(`Refresh cycle: ${tilesTotal} tiles queued`);
-            
-            if (!tileQueueRunning && tileQueue.length > 0) {
-                processTileQueue();
-            }
-        }
-        
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-        }
-        
-        function showTileProgress() {
-            const el = document.getElementById('loadProgress');
-            el.querySelector('span').textContent = 'Preloading tiles...';
-            el.classList.add('show');
-            document.getElementById('tileStatus').classList.add('show');
-            document.getElementById('tileStatusText').textContent = 'Caching tiles...';
-        }
-        
-        function hideTileProgress() {
-            document.getElementById('loadProgress').classList.remove('show');
-        }
-        
-        function updateTileProgress() {
-            const pct = tilesTotal > 0 ? (tilesLoaded / tilesTotal * 100) : 0;
-            
-            if (preloadPhase === 'tiles') {
-                document.getElementById('loadProgressFill').style.width = pct + '%';
-                document.getElementById('loadProgressText').textContent = Math.round(pct) + '%';
-                document.getElementById('tileStatusText').textContent = `Caching: ${tilesLoaded}/${tilesTotal}`;
-            } else if (preloadPhase === 'refresh') {
-                document.getElementById('tileStatusText').textContent = `Refreshing: ${tilesLoaded}/${tilesTotal}`;
-            }
-        }
-        
-        function setTileStatusIdle() {
-            document.getElementById('tileStatus').classList.remove('show');
-        }
-        
-        // Restart refresh cycle when map moves
-        let refreshDebounceTimer = null;
-        function onMapMoveEnd() {
-            if (preloadPhase === 'refresh' && framesReady) {
-                clearTimeout(refreshDebounceTimer);
-                refreshDebounceTimer = setTimeout(() => {
-                    startContinuousRefresh();
-                }, 1000);
-            }
-        }
-        
-        // Periodically restart refresh cycle to keep tiles fresh
-        setInterval(() => {
-            if (framesReady && settings.bgCacheEnabled && preloadPhase === 'refresh' && tileQueue.length === 0) {
-                console.log('Restarting refresh cycle...');
-                startContinuousRefresh();
-            }
-        }, 30000); // Every 30 seconds
-
-        function showPreloadedFrame(idx) {
-            if (!frameLayers.length || idx < 0 || idx >= frameLayers.length) return;
-            
-            const prevFrame = currentFrame;
-            currentFrame = idx;
-            
-            // Smooth crossfade: show new frame, then hide old
-            // The CSS transition handles the smooth opacity change
-            if (frameLayers[idx]) {
-                frameLayers[idx].setOpacity(settings.opacity);
-            }
-            
-            // Hide all other frames after a brief delay for crossfade effect
-            setTimeout(() => {
-                frameLayers.forEach((layer, i) => {
-                    if (i !== currentFrame) {
-                        layer.setOpacity(0);
-                    }
-                });
-            }, 50); // 50ms overlap for smooth crossfade
-            
-            updateTimestamp();
-            updateTimelineFill();
-        }
-
-        function clearAllFrameLayers() {
-            loadAborted = true; // Stop any in-progress loading
-            tileQueue = []; // Clear tile queue
-            tileQueueRunning = false;
-            frameLayers.forEach(layer => {
-                if (map.hasLayer(layer)) map.removeLayer(layer);
-            });
-            frameLayers = [];
-            framesLoaded = 0;
-            framesReady = false;
-        }
-
-        function showLoadProgress() {
-            document.getElementById('loadProgress').classList.add('show');
-            document.getElementById('playBtn').classList.add('loading');
-        }
-
-        function hideLoadProgress() {
-            document.getElementById('loadProgress').classList.remove('show');
-            document.getElementById('playBtn').classList.remove('loading');
-        }
-
-        function updateLoadProgress(pct) {
-            document.getElementById('loadProgressFill').style.width = pct + '%';
-            document.getElementById('loadProgressText').textContent = Math.round(pct) + '%';
+            showDataStatus('Radar loaded');
+            toast('Radar ready - ' + frames.length + ' frames');
         }
 
         async function loadMRMS() {
             clearAllFrameLayers();
             
-            const layer = L.tileLayer.wms('https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi', {
-                layers: 'nexrad-n0q-900913',
-                format: 'image/png',
-                transparent: true,
+            const layer = L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q/{z}/{x}/{y}.png', {
                 opacity: settings.opacity,
                 pane: 'radarPane',
-                maxNativeZoom: 12,
+                maxNativeZoom: 8,
                 maxZoom: 19
             });
             layer.addTo(map);
@@ -1592,50 +1502,46 @@
             framesReady = true;
             updateTimestamp();
             updateTimelineUI();
+            hideLoadProgress();
+            toast('MRMS radar loaded');
         }
 
-        function updateTimestamp() {
-            const frame = frames[currentFrame];
-            if (!frame) return;
-
-            const date = new Date(frame.time * 1000);
-            let timeStr;
-
-            if (settings.useLocalTime) {
-                timeStr = date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-                document.getElementById('timestampTz').textContent = 'Local Time';
-            } else {
-                timeStr = date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
-                document.getElementById('timestampTz').textContent = 'UTC';
+        function showPreloadedFrame(idx) {
+            if (!frameLayers.length || idx < 0 || idx >= frameLayers.length) return;
+            
+            currentFrame = idx;
+            
+            if (frameLayers[idx]) {
+                frameLayers[idx].setOpacity(settings.opacity);
             }
-
-            const isForecast = currentFrame > lastPastFrame;
-            document.getElementById('timestampText').textContent = timeStr + (isForecast ? ' (Forecast)' : '');
-            document.getElementById('timestampBox').classList.toggle('forecast', isForecast);
-        }
-
-        function updateTimelineFill() {
-            const pct = frames.length > 0 ? ((currentFrame + 1) / frames.length) * 100 : 0;
-            document.getElementById('timelineFill').style.width = pct + '%';
-            document.getElementById('timelineThumb').style.left = pct + '%';
-        }
-
-        function updateTimelineUI() {
-            if (lastPastFrame < frames.length - 1) {
-                const start = ((lastPastFrame + 1) / frames.length) * 100;
-                document.getElementById('timelineForecast').style.width = (100 - start) + '%';
-            } else {
-                document.getElementById('timelineForecast').style.width = '0';
-            }
+            
+            setTimeout(() => {
+                frameLayers.forEach((layer, i) => {
+                    if (i !== currentFrame) {
+                        layer.setOpacity(0);
+                    }
+                });
+            }, 40);
+            
+            updateTimestamp();
             updateTimelineFill();
         }
 
-        // ==================== SMOOTH ANIMATION LOOP ====================
+        function clearAllFrameLayers() {
+            loadAborted = true;
+            frameLayers.forEach(layer => {
+                if (map.hasLayer(layer)) map.removeLayer(layer);
+            });
+            frameLayers = [];
+            framesLoaded = 0;
+            framesReady = false;
+        }
+
+        // ==================== ANIMATION ====================
         function play() {
             if (isPlaying || !framesReady || frames.length < 2) return;
             isPlaying = true;
             document.getElementById('playIcon').innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
-            
             lastFrameTime = performance.now();
             animationLoop();
         }
@@ -1678,7 +1584,23 @@
             isPlaying ? pause() : play();
         }
 
-        // ==================== LAYER HANDLERS ====================
+        function stepFrame(dir) {
+            if (!framesReady || frames.length < 2) return;
+            pause();
+            let next = currentFrame + dir;
+            if (next < 0) next = frames.length - 1;
+            if (next >= frames.length) next = 0;
+            showPreloadedFrame(next);
+        }
+
+        function cycleSpeed() {
+            const speeds = [0.5, 1, 1.5, 2, 3];
+            const idx = speeds.indexOf(speedMult);
+            speedMult = speeds[(idx + 1) % speeds.length];
+            document.getElementById('speedBtn').textContent = speedMult + 'x';
+        }
+
+        // ==================== WEATHER LAYERS ====================
         function handleLayerToggle(name, on, silent = false) {
             settings.layers[name] = on;
             saveSettings();
@@ -1697,11 +1619,23 @@
                 case 'stormReports':
                     on ? loadStormReports() : removeLayer('stormReports');
                     break;
-                case 'temp':
-                    toggleOWMLayer('temp', 'temp_new');
+                case 'lightning':
+                    on ? loadLightning() : removeLayer('lightning');
                     break;
+                case 'satellite':
+                    on ? loadSatellite() : removeLayer('satellite');
+                    break;
+                case 'riverGauges':
+                    on ? loadRiverGauges() : removeLayer('riverGauges');
+                    break;
+                case 'surfaceObs':
+                    on ? loadSurfaceObs() : removeLayer('surfaceObs');
+                    break;
+                case 'temp':
                 case 'wind':
-                    toggleOWMLayer('wind', 'wind_new');
+                case 'clouds':
+                case 'pressure':
+                    toggleOWMLayer(name);
                     break;
                 case 'states':
                     on ? loadStates() : removeLayer('states');
@@ -1711,6 +1645,9 @@
                     break;
                 case 'labels':
                     toggleLabelsLayer(on);
+                    break;
+                case 'highways':
+                    toggleHighwaysLayer(on);
                     break;
             }
             
@@ -1727,17 +1664,19 @@
         function getLayerName(key) {
             const names = {
                 radar: 'Radar', alerts: 'NWS Alerts', spcOutlook: 'SPC Outlook',
-                stormReports: 'Storm Reports', temp: 'Temperature', wind: 'Wind',
-                states: 'State Borders', counties: 'County Borders', labels: 'City Labels'
+                stormReports: 'Storm Reports', lightning: 'Lightning', satellite: 'Satellite',
+                riverGauges: 'River Gauges', surfaceObs: 'Surface Obs',
+                temp: 'Temperature', wind: 'Wind', clouds: 'Clouds', pressure: 'Pressure',
+                states: 'State Borders', counties: 'County Borders', labels: 'City Labels', highways: 'Highways'
             };
             return names[key] || key;
         }
 
-        // ==================== WEATHER OVERLAYS ====================
+        // NWS Alerts
         async function loadAlerts() {
             try {
                 const resp = await fetch(DATA_URLS.nwsAlerts, {
-                    headers: { 'User-Agent': 'StormViewPro/2.0' }
+                    headers: { 'User-Agent': 'StormViewPro/3.0' }
                 });
                 const data = await resp.json();
                 const features = data.features || [];
@@ -1759,25 +1698,23 @@
                         return { color, weight: 2, fillColor: color, fillOpacity: 0.2, dashArray: evt.includes('watch') ? '5, 5' : null };
                     },
                     onEachFeature: (f, layer) => {
-                        layer.on('click', () => {
-                            const p = f.properties;
-                            const evt = p.event || 'Alert';
-                            const headline = p.headline || '';
-                            const desc = (p.description || '').substring(0, 400);
-                            const expires = p.expires ? new Date(p.expires).toLocaleString() : 'N/A';
-                            let badgeClass = 'adv';
-                            if (evt.toLowerCase().includes('warning')) badgeClass = 'warn';
-                            else if (evt.toLowerCase().includes('watch')) badgeClass = 'watch';
-                            
-                            layer.bindPopup(`
-                                <div class="alert-popup">
-                                    <h4><span class="alert-badge ${badgeClass}">${evt}</span></h4>
-                                    <p><strong>${headline}</strong></p>
-                                    <p>${desc}${desc.length >= 400 ? '...' : ''}</p>
-                                    <div class="meta">Expires: ${expires}</div>
-                                </div>
-                            `, { maxWidth: 320 }).openPopup();
-                        });
+                        const p = f.properties;
+                        const evt = p.event || 'Alert';
+                        const headline = p.headline || '';
+                        const desc = (p.description || '').substring(0, 300);
+                        const expires = p.expires ? new Date(p.expires).toLocaleString() : 'N/A';
+                        let badgeClass = 'info';
+                        if (evt.toLowerCase().includes('warning')) badgeClass = 'danger';
+                        else if (evt.toLowerCase().includes('watch')) badgeClass = 'warning';
+                        
+                        layer.bindPopup(`
+                            <div class="popup-content">
+                                <h4><span class="badge ${badgeClass}">${evt}</span></h4>
+                                <p><strong>${headline}</strong></p>
+                                <p>${desc}${desc.length >= 300 ? '...' : ''}</p>
+                                <div class="meta">Expires: ${expires}</div>
+                            </div>
+                        `, { maxWidth: 300 });
                     }
                 });
 
@@ -1787,6 +1724,7 @@
             }
         }
 
+        // SPC Outlook
         async function loadSPCOutlook() {
             try {
                 const resp = await fetch(DATA_URLS.spcOutlookDay1);
@@ -1795,27 +1733,31 @@
                 removeLayer('spcOutlook');
 
                 const riskColors = {
-                    'TSTM': '#76d576', 'MRGL': '#8b9b4b', 'SLGT': '#f6f67b',
-                    'ENH': '#e0a060', 'MDT': '#e06060', 'HIGH': '#ff00ff'
+                    'TSTM': '#c0e8c0', 'MRGL': '#66a366', 'SLGT': '#ffe066',
+                    'ENH': '#ffa500', 'MDT': '#ff0000', 'HIGH': '#ff00ff'
+                };
+                const riskNames = {
+                    'TSTM': 'Thunderstorm', 'MRGL': 'Marginal', 'SLGT': 'Slight',
+                    'ENH': 'Enhanced', 'MDT': 'Moderate', 'HIGH': 'High'
                 };
 
                 layerRefs.spcOutlook = L.geoJSON(data, {
                     pane: 'alertPane',
                     style: (f) => {
-                        const label = f.properties?.LABEL || f.properties?.DN || '';
-                        const color = riskColors[label] || '#999';
-                        return { color, weight: 2, fillColor: color, fillOpacity: 0.3 };
+                        const label = f.properties?.LABEL || f.properties?.label || '';
+                        return {
+                            color: riskColors[label] || '#999',
+                            weight: 2,
+                            fillColor: riskColors[label] || '#999',
+                            fillOpacity: 0.25
+                        };
                     },
                     onEachFeature: (f, layer) => {
-                        const label = f.properties?.LABEL || f.properties?.DN || 'Unknown';
-                        const riskNames = {
-                            'TSTM': 'Thunderstorm', 'MRGL': 'Marginal', 'SLGT': 'Slight',
-                            'ENH': 'Enhanced', 'MDT': 'Moderate', 'HIGH': 'High'
-                        };
+                        const label = f.properties?.LABEL || f.properties?.label || '';
                         layer.bindPopup(`
-                            <div class="spc-popup">
+                            <div class="popup-content">
                                 <h4>Day 1 Convective Outlook</h4>
-                                <div class="risk" style="color:${riskColors[label] || '#fff'}">${riskNames[label] || label} Risk</div>
+                                <p style="color:${riskColors[label] || '#fff'};font-weight:600;">${riskNames[label] || label} Risk</p>
                                 <div class="meta">Storm Prediction Center</div>
                             </div>
                         `);
@@ -1828,52 +1770,48 @@
             }
         }
 
+        // Storm Reports (IEM)
         async function loadStormReports() {
             try {
-                const urls = [
-                    'https://www.spc.noaa.gov/climo/reports/today_torn.csv',
-                    'https://www.spc.noaa.gov/climo/reports/today_hail.csv',
-                    'https://www.spc.noaa.gov/climo/reports/today_wind.csv'
-                ];
-                
-                const [tornResp, hailResp, windResp] = await Promise.all(
-                    urls.map(url => fetch(url).then(r => r.text()).catch(() => ''))
-                );
-
-                const markers = [];
-                
-                const parseCSV = (csv, type) => {
-                    const lines = csv.trim().split('\n').slice(1);
-                    lines.forEach(line => {
-                        const parts = line.split(',');
-                        if (parts.length >= 8) {
-                            const lat = parseFloat(parts[5]);
-                            const lon = parseFloat(parts[6]);
-                            if (!isNaN(lat) && !isNaN(lon)) {
-                                markers.push({ lat, lon, type, time: parts[0], location: parts[2], state: parts[3], remarks: parts[7] || '' });
-                            }
-                        }
-                    });
-                };
-
-                parseCSV(tornResp, 'tornado');
-                parseCSV(hailResp, 'hail');
-                parseCSV(windResp, 'wind');
+                const resp = await fetch(DATA_URLS.iemLSR);
+                const data = await resp.json();
 
                 removeLayer('stormReports');
 
-                const icons = {
-                    tornado: L.divIcon({ className: 'report-icon', html: '<div style="background:#ff0000;width:12px;height:12px;border-radius:50%;border:2px solid #fff;"></div>' }),
-                    hail: L.divIcon({ className: 'report-icon', html: '<div style="background:#00ff00;width:10px;height:10px;border-radius:50%;border:2px solid #fff;"></div>' }),
-                    wind: L.divIcon({ className: 'report-icon', html: '<div style="background:#0099ff;width:10px;height:10px;border-radius:50%;border:2px solid #fff;"></div>' })
+                const typeColors = {
+                    'TORNADO': '#ff0000',
+                    'HAIL': '#00ff00',
+                    'TSTM WND DMG': '#0099ff',
+                    'TSTM WND GST': '#0099ff',
+                    'FLASH FLOOD': '#00aa00',
+                    'FUNNEL CLOUD': '#ff6600'
                 };
 
-                layerRefs.stormReports = L.layerGroup();
-                
-                markers.forEach(m => {
-                    const marker = L.marker([m.lat, m.lon], { icon: icons[m.type] });
-                    marker.bindPopup(`<strong>${m.type.charAt(0).toUpperCase() + m.type.slice(1)}</strong><br>${m.location}, ${m.state}<br><small>${m.remarks}</small>`);
-                    marker.addTo(layerRefs.stormReports);
+                layerRefs.stormReports = L.geoJSON(data, {
+                    pane: 'markerPane',
+                    pointToLayer: (f, latlng) => {
+                        const type = f.properties?.typetext || '';
+                        const color = typeColors[type] || '#ff6600';
+                        return L.circleMarker(latlng, {
+                            radius: type === 'TORNADO' ? 8 : 6,
+                            fillColor: color,
+                            color: '#fff',
+                            weight: 2,
+                            fillOpacity: 0.9
+                        });
+                    },
+                    onEachFeature: (f, layer) => {
+                        const p = f.properties;
+                        layer.bindPopup(`
+                            <div class="popup-content">
+                                <h4>${p.typetext || 'Report'}</h4>
+                                <p><strong>${p.city || ''}, ${p.state || ''}</strong></p>
+                                ${p.magnitude ? `<p>Magnitude: ${p.magnitude}</p>` : ''}
+                                <p>${p.remark || ''}</p>
+                                <div class="meta">${p.valid || ''}</div>
+                            </div>
+                        `);
+                    }
                 });
 
                 if (settings.layers.stormReports) layerRefs.stormReports.addTo(map);
@@ -1882,15 +1820,151 @@
             }
         }
 
-        function toggleOWMLayer(name, layerType) {
-            if (!settings.owmKey) {
+        // Lightning (IEM proxy)
+        async function loadLightning() {
+            try {
+                removeLayer('lightning');
+                
+                // Using IEM lightning tile service
+                layerRefs.lightning = L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/q2-ltg/{z}/{x}/{y}.png', {
+                    opacity: 0.8,
+                    pane: 'radarPane',
+                    maxNativeZoom: 8,
+                    maxZoom: 19
+                });
+
+                if (settings.layers.lightning) layerRefs.lightning.addTo(map);
+            } catch(e) {
+                console.error('Lightning error:', e);
+            }
+        }
+
+        // Satellite (IEM GOES)
+        function loadSatellite() {
+            removeLayer('satellite');
+            
+            layerRefs.satellite = L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes_east_conus_ch13/{z}/{x}/{y}.png', {
+                opacity: 0.7,
+                pane: 'satellitePane',
+                maxNativeZoom: 8,
+                maxZoom: 19
+            });
+
+            if (settings.layers.satellite) layerRefs.satellite.addTo(map);
+        }
+
+        // River Gauges (USGS)
+        async function loadRiverGauges() {
+            try {
+                removeLayer('riverGauges');
+                
+                // Using simplified bounding box for CONUS
+                const resp = await fetch('https://waterservices.usgs.gov/nwis/iv/?format=json&bBox=-125,24,-66,50&parameterCd=00065&siteStatus=active&siteType=ST');
+                const data = await resp.json();
+                
+                layerRefs.riverGauges = L.layerGroup();
+                
+                const sites = data.value?.timeSeries || [];
+                const limitedSites = sites.slice(0, 500); // Limit for performance
+                
+                limitedSites.forEach(site => {
+                    try {
+                        const geo = site.sourceInfo?.geoLocation?.geogLocation;
+                        if (!geo) return;
+                        
+                        const lat = geo.latitude;
+                        const lon = geo.longitude;
+                        const name = site.sourceInfo?.siteName || 'Unknown';
+                        const value = site.values?.[0]?.value?.[0]?.value || 'N/A';
+                        
+                        const marker = L.circleMarker([lat, lon], {
+                            radius: 5,
+                            fillColor: '#00ff88',
+                            color: '#fff',
+                            weight: 1,
+                            fillOpacity: 0.8,
+                            pane: 'markerPane'
+                        });
+                        
+                        marker.bindPopup(`
+                            <div class="popup-content">
+                                <h4>River Gauge</h4>
+                                <p><strong>${name}</strong></p>
+                                <p>Stage: ${value} ft</p>
+                                <div class="meta">USGS Water Services</div>
+                            </div>
+                        `);
+                        
+                        marker.addTo(layerRefs.riverGauges);
+                    } catch(e) {}
+                });
+
+                if (settings.layers.riverGauges) layerRefs.riverGauges.addTo(map);
+                toast(`Loaded ${limitedSites.length} river gauges`);
+            } catch(e) {
+                console.error('River gauges error:', e);
+                toast('Error loading river gauges', true);
+            }
+        }
+
+        // Surface Observations (IEM)
+        async function loadSurfaceObs() {
+            try {
+                removeLayer('surfaceObs');
+                
+                const resp = await fetch('https://mesonet.agron.iastate.edu/api/1/currents.geojson?network=AWOS');
+                const data = await resp.json();
+                
+                layerRefs.surfaceObs = L.geoJSON(data, {
+                    pane: 'markerPane',
+                    pointToLayer: (f, latlng) => {
+                        return L.circleMarker(latlng, {
+                            radius: 5,
+                            fillColor: '#ff69b4',
+                            color: '#fff',
+                            weight: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
+                    onEachFeature: (f, layer) => {
+                        const p = f.properties;
+                        layer.bindPopup(`
+                            <div class="popup-content">
+                                <h4>${p.station || 'Station'}</h4>
+                                <p><strong>${p.name || ''}</strong></p>
+                                <p>Temp: ${p.tmpf ? p.tmpf + '°F' : 'N/A'}</p>
+                                <p>Wind: ${p.sknt ? p.sknt + ' kt' : 'N/A'} ${p.drct ? 'from ' + p.drct + '°' : ''}</p>
+                                <p>Dewpoint: ${p.dwpf ? p.dwpf + '°F' : 'N/A'}</p>
+                                <div class="meta">Updated: ${p.local_valid || 'N/A'}</div>
+                            </div>
+                        `);
+                    }
+                });
+
+                if (settings.layers.surfaceObs) layerRefs.surfaceObs.addTo(map);
+            } catch(e) {
+                console.error('Surface obs error:', e);
+            }
+        }
+
+        // OWM Layers
+        function toggleOWMLayer(name) {
+            if (!settings.owmKey && settings.layers[name]) {
                 toast('OpenWeatherMap API key required', true);
                 document.querySelector(`[data-layer="${name}"]`)?.classList.remove('active');
                 settings.layers[name] = false;
+                saveSettings();
                 return;
             }
 
-            const url = `https://tile.openweathermap.org/map/${layerType}/{z}/{x}/{y}.png?appid=${settings.owmKey}`;
+            const layerTypes = {
+                temp: 'temp_new',
+                wind: 'wind_new',
+                clouds: 'clouds_new',
+                pressure: 'pressure_new'
+            };
+            
+            const url = `https://tile.openweathermap.org/map/${layerTypes[name]}/{z}/{x}/{y}.png?appid=${settings.owmKey}`;
             
             removeLayer(name);
             if (settings.layers[name]) {
@@ -1904,7 +1978,7 @@
             }
         }
 
-        // ==================== BOUNDARY LAYERS ====================
+        // Boundary Layers
         async function loadStates() {
             try {
                 if (!dataCache.statesGeo) {
@@ -1934,7 +2008,6 @@
         async function loadCounties() {
             try {
                 if (!dataCache.countiesGeo) {
-                    toast('Loading county data...');
                     const resp = await fetch(DATA_URLS.counties);
                     const topology = await resp.json();
                     dataCache.countiesGeo = topojson.feature(topology, topology.objects.counties);
@@ -1959,24 +2032,108 @@
         }
 
         function toggleLabelsLayer(on) {
+            removeLayer('labels');
             if (on) {
-                if (!layerRefs.labels) {
-                    layerRefs.labels = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-                        subdomains: 'abcd', opacity: 0.9, zIndex: 600, pane: 'overlayPane'
-                    });
-                }
+                const labelUrl = settings.theme === 'light' 
+                    ? 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png'
+                    : 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png';
+                layerRefs.labels = L.tileLayer(labelUrl, {
+                    subdomains: 'abcd', opacity: 0.9, zIndex: 600, pane: 'overlayPane'
+                });
                 layerRefs.labels.addTo(map);
-            } else {
-                removeLayer('labels');
+            }
+        }
+
+        function toggleHighwaysLayer(on) {
+            removeLayer('highways');
+            if (on) {
+                // Using Stamen/Carto lines overlay
+                layerRefs.highways = L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/toner-lines/{z}/{x}/{y}.png', {
+                    opacity: 0.4, zIndex: 350, pane: 'boundaryPane'
+                });
+                layerRefs.highways.addTo(map);
             }
         }
 
         // ==================== UI ====================
+        function updateTimestamp() {
+            const frame = frames[currentFrame];
+            if (!frame) return;
+
+            const date = new Date(frame.time * 1000);
+            let timeStr;
+
+            if (settings.useLocalTime) {
+                timeStr = date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+                document.getElementById('timestampTz').textContent = 'Local Time';
+            } else {
+                timeStr = date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
+                document.getElementById('timestampTz').textContent = 'UTC';
+            }
+
+            const isForecast = currentFrame > lastPastFrame;
+            document.getElementById('timestampText').textContent = timeStr + (isForecast ? ' (Forecast)' : '');
+            document.getElementById('timestampBox').classList.toggle('forecast', isForecast);
+        }
+
+        function updateTimelineFill() {
+            const pct = frames.length > 0 ? ((currentFrame + 1) / frames.length) * 100 : 0;
+            document.getElementById('timelineFill').style.width = pct + '%';
+            document.getElementById('timelineThumb').style.left = pct + '%';
+        }
+
+        function updateTimelineUI() {
+            if (lastPastFrame < frames.length - 1) {
+                const start = ((lastPastFrame + 1) / frames.length) * 100;
+                document.getElementById('timelineForecast').style.width = (100 - start) + '%';
+            } else {
+                document.getElementById('timelineForecast').style.width = '0';
+            }
+            updateTimelineFill();
+        }
+
+        function showLoadProgress() {
+            document.getElementById('loadProgress').classList.add('show');
+            document.getElementById('playBtn').classList.add('loading');
+        }
+
+        function hideLoadProgress() {
+            document.getElementById('loadProgress').classList.remove('show');
+            document.getElementById('playBtn').classList.remove('loading');
+        }
+
+        function updateLoadProgress(pct) {
+            document.getElementById('loadProgressFill').style.width = pct + '%';
+            document.getElementById('loadProgressText').textContent = Math.round(pct) + '%';
+        }
+
+        function showDataStatus(msg) {
+            const el = document.getElementById('dataStatus');
+            document.getElementById('dataStatusText').textContent = msg;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 3000);
+        }
+
+        function toast(msg, isError) {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.classList.toggle('error', !!isError);
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 2500);
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+        }
+
+        // ==================== UI INITIALIZATION ====================
         function initUI() {
+            // Panel collapsing
             document.querySelectorAll('.panel-header').forEach(header => {
                 header.addEventListener('click', () => header.closest('.panel-section').classList.toggle('collapsed'));
             });
 
+            // Layer toggles
             document.querySelectorAll('[data-layer]').forEach(el => {
                 const layer = el.dataset.layer;
                 el.classList.toggle('active', settings.layers[layer]);
@@ -1986,6 +2143,7 @@
                 });
             });
 
+            // Source tabs
             document.querySelectorAll('[data-source]').forEach(el => {
                 el.classList.toggle('active', el.dataset.source === settings.source);
                 el.addEventListener('click', () => {
@@ -1998,80 +2156,234 @@
                 });
             });
 
+            // Basemap buttons
             document.querySelectorAll('[data-basemap]').forEach(el => {
                 el.classList.toggle('active', el.dataset.basemap === settings.basemap);
                 el.addEventListener('click', () => setBasemap(el.dataset.basemap));
             });
 
+            // Playback controls
             document.getElementById('playBtn').addEventListener('click', togglePlay);
-            document.getElementById('prevBtn').addEventListener('click', () => {
-                pause();
-                showPreloadedFrame(Math.max(0, currentFrame - 1));
-            });
-            document.getElementById('nextBtn').addEventListener('click', () => {
-                pause();
-                showPreloadedFrame(Math.min(frames.length - 1, currentFrame + 1));
-            });
-            document.getElementById('loopBtn').addEventListener('click', (e) => {
+            document.getElementById('stepBackBtn').addEventListener('click', () => stepFrame(-1));
+            document.getElementById('stepFwdBtn').addEventListener('click', () => stepFrame(1));
+            document.getElementById('speedBtn').addEventListener('click', cycleSpeed);
+            document.getElementById('loopBtn').addEventListener('click', () => {
                 settings.loop = !settings.loop;
-                e.currentTarget.classList.toggle('active', settings.loop);
+                document.getElementById('loopBtn').classList.toggle('active', settings.loop);
+                document.getElementById('loopToggle')?.classList.toggle('on', settings.loop);
                 saveSettings();
             });
-            document.getElementById('speedBtn').addEventListener('click', cycleSpeed);
+            document.getElementById('loopBtn').classList.toggle('active', settings.loop);
 
+            // Timeline scrubbing
             const timeline = document.getElementById('timeline');
             timeline.addEventListener('click', (e) => {
+                if (!framesReady || frames.length < 2) return;
                 const rect = timeline.getBoundingClientRect();
                 const pct = (e.clientX - rect.left) / rect.width;
-                const idx = Math.floor(pct * frames.length);
+                const idx = Math.min(Math.floor(pct * frames.length), frames.length - 1);
                 pause();
-                showPreloadedFrame(Math.max(0, Math.min(frames.length - 1, idx)));
+                showPreloadedFrame(idx);
             });
 
-            document.getElementById('themeBtn').addEventListener('click', toggleTheme);
-            document.getElementById('refreshBtn').addEventListener('click', () => {
-                toast('Refreshing data...');
-                loadRadarData();
+            // Header buttons
+            document.getElementById('themeBtn').addEventListener('click', () => {
+                settings.theme = settings.theme === 'dark' ? 'light' : 'dark';
+                applyTheme();
+                saveSettings();
+                if (settings.layers.labels) toggleLabelsLayer(true);
+            });
+
+            document.getElementById('refreshBtn').addEventListener('click', async () => {
+                toast('Refreshing all data...');
+                await loadRadarData();
                 if (settings.layers.alerts) loadAlerts();
                 if (settings.layers.spcOutlook) loadSPCOutlook();
                 if (settings.layers.stormReports) loadStormReports();
             });
+
             document.getElementById('locBtn').addEventListener('click', goToLocation);
-
-            document.getElementById('settingsBtn').addEventListener('click', () => {
-                document.getElementById('modalOverlay').classList.add('open');
-                document.getElementById('settingsModal').classList.add('open');
-            });
-            document.getElementById('modalOverlay').addEventListener('click', closeModal);
-            document.getElementById('modalClose').addEventListener('click', closeModal);
-
+            
             document.getElementById('timestampTz').addEventListener('click', () => {
                 settings.useLocalTime = !settings.useLocalTime;
-                updateTimestamp();
                 saveSettings();
+                updateTimestamp();
             });
 
+            // Settings panel
+            initSettingsPanel();
+
+            // Search
             initSearch();
-            initSettingsControls();
+
+            // Mobile
             initMobileSheet();
         }
 
-        function closeModal() {
-            document.getElementById('modalOverlay').classList.remove('open');
-            document.getElementById('settingsModal').classList.remove('open');
+        function initSettingsPanel() {
+            const overlay = document.getElementById('settingsOverlay');
+            const panel = document.getElementById('settingsPanel');
+            
+            document.getElementById('settingsBtn').addEventListener('click', () => {
+                overlay.classList.add('open');
+                panel.classList.add('open');
+            });
+            
+            const closeSettings = () => {
+                overlay.classList.remove('open');
+                panel.classList.remove('open');
+            };
+            
+            overlay.addEventListener('click', closeSettings);
+            document.getElementById('settingsClose').addEventListener('click', closeSettings);
+
+            // Tabs
+            document.querySelectorAll('.settings-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.settings-tab-content').forEach(c => c.style.display = 'none');
+                    tab.classList.add('active');
+                    document.querySelector(`[data-tab-content="${tab.dataset.tab}"]`).style.display = 'block';
+                });
+            });
+
+            // Display settings
+            const themeToggle = document.getElementById('themeToggle');
+            themeToggle.classList.toggle('on', settings.theme === 'dark');
+            themeToggle.addEventListener('click', () => {
+                settings.theme = themeToggle.classList.toggle('on') ? 'dark' : 'light';
+                applyTheme();
+                saveSettings();
+                if (settings.layers.labels) toggleLabelsLayer(true);
+            });
+
+            const legendToggle = document.getElementById('legendToggle');
+            legendToggle.classList.toggle('on', settings.showLegend);
+            legendToggle.addEventListener('click', () => {
+                settings.showLegend = legendToggle.classList.toggle('on');
+                document.getElementById('legend').style.display = settings.showLegend ? 'block' : 'none';
+                saveSettings();
+            });
+            document.getElementById('legend').style.display = settings.showLegend ? 'block' : 'none';
+
+            // Border sliders
+            initSlider('stateBorderSlider', 'stateBorderValue', 'stateBorderWidth', 'px', () => {
+                if (layerRefs.states) layerRefs.states.setStyle({ weight: settings.stateBorderWidth });
+            });
+            initSlider('countyBorderSlider', 'countyBorderValue', 'countyBorderWidth', 'px', () => {
+                if (layerRefs.counties) layerRefs.counties.setStyle({ weight: settings.countyBorderWidth });
+            });
+            initSlider('borderOpacitySlider', 'borderOpacityValue', 'borderOpacity', '%', () => {
+                if (layerRefs.states) layerRefs.states.setStyle({ opacity: settings.borderOpacity });
+                if (layerRefs.counties) layerRefs.counties.setStyle({ opacity: settings.borderOpacity * 0.7 });
+            }, true);
+
+            // Radar settings
+            initSlider('opacitySlider', 'opacityValue', 'opacity', '%', () => {
+                if (frameLayers[currentFrame]) frameLayers[currentFrame].setOpacity(settings.opacity);
+            }, true);
+            initSlider('delaySlider', 'delayValue', 'delay', 'ms');
+
+            const smoothToggle = document.getElementById('smoothToggle');
+            smoothToggle.classList.toggle('on', settings.smooth === 1);
+            smoothToggle.addEventListener('click', () => {
+                settings.smooth = smoothToggle.classList.toggle('on') ? 1 : 0;
+                saveSettings();
+            });
+
+            const snowToggle = document.getElementById('snowToggle');
+            snowToggle.classList.toggle('on', settings.snowColor === 1);
+            snowToggle.addEventListener('click', () => {
+                settings.snowColor = snowToggle.classList.toggle('on') ? 1 : 0;
+                saveSettings();
+            });
+
+            const autoRefreshToggle = document.getElementById('autoRefreshToggle');
+            autoRefreshToggle.classList.toggle('on', settings.autoRefresh);
+            autoRefreshToggle.addEventListener('click', () => {
+                settings.autoRefresh = autoRefreshToggle.classList.toggle('on');
+                saveSettings();
+            });
+
+            const loopToggle = document.getElementById('loopToggle');
+            loopToggle.classList.toggle('on', settings.loop);
+            loopToggle.addEventListener('click', () => {
+                settings.loop = loopToggle.classList.toggle('on');
+                document.getElementById('loopBtn').classList.toggle('active', settings.loop);
+                saveSettings();
+            });
+
+            // Color schemes
+            document.querySelectorAll('[data-scheme]').forEach(el => {
+                el.classList.toggle('active', parseInt(el.dataset.scheme) === settings.colorScheme);
+                el.addEventListener('click', () => {
+                    document.querySelectorAll('[data-scheme]').forEach(e => e.classList.remove('active'));
+                    el.classList.add('active');
+                    settings.colorScheme = parseInt(el.dataset.scheme);
+                    saveSettings();
+                    loadRadarData();
+                });
+            });
+
+            // API keys
+            document.getElementById('owmKeyInput').value = settings.owmKey;
+            document.getElementById('waqiKeyInput').value = settings.waqiKey || '';
+            
+            document.getElementById('saveKeysBtn').addEventListener('click', () => {
+                settings.owmKey = document.getElementById('owmKeyInput').value.trim();
+                settings.waqiKey = document.getElementById('waqiKeyInput').value.trim();
+                saveSettings();
+                toast('API keys saved');
+            });
+
+            // Import/Export
+            document.getElementById('exportBtn').addEventListener('click', () => {
+                const blob = new Blob([JSON.stringify(settings, null, 2)], {type: 'application/json'});
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'stormview_pro_settings.json';
+                a.click();
+                toast('Settings exported');
+            });
+            
+            document.getElementById('importBtn').addEventListener('click', () => {
+                document.getElementById('importFile').click();
+            });
+            
+            document.getElementById('importFile').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        Object.assign(settings, JSON.parse(ev.target.result));
+                        saveSettings();
+                        toast('Settings imported - reloading...');
+                        setTimeout(() => location.reload(), 1000);
+                    } catch(err) {
+                        toast('Invalid file', true);
+                    }
+                };
+                reader.readAsText(file);
+                e.target.value = '';
+            });
         }
 
-        function toggleTheme() {
-            settings.theme = settings.theme === 'dark' ? 'light' : 'dark';
-            applyTheme();
-            saveSettings();
-        }
-
-        function cycleSpeed() {
-            const speeds = [0.5, 1, 1.5, 2, 3];
-            const idx = speeds.indexOf(speedMult);
-            speedMult = speeds[(idx + 1) % speeds.length];
-            document.getElementById('speedBtn').textContent = speedMult + 'x';
+        function initSlider(sliderId, valueId, settingKey, unit, callback, isPercent = false) {
+            const slider = document.getElementById(sliderId);
+            const valueEl = document.getElementById(valueId);
+            if (!slider || !valueEl) return;
+            
+            slider.value = settings[settingKey];
+            valueEl.textContent = isPercent ? Math.round(settings[settingKey] * 100) + unit : settings[settingKey] + unit;
+            
+            slider.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                valueEl.textContent = isPercent ? Math.round(val * 100) + unit : val + unit;
+                settings[settingKey] = val;
+                saveSettings();
+                if (callback) callback();
+            });
         }
 
         function initSearch() {
@@ -2088,20 +2400,26 @@
                     results.classList.remove('open');
                     return;
                 }
-
+                
                 searchTimeout = setTimeout(async () => {
                     try {
                         const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&q=${encodeURIComponent(q)}&limit=5`);
                         const data = await resp.json();
                         
-                        results.innerHTML = data.map(r => `
-                            <div class="search-item" data-lat="${r.lat}" data-lon="${r.lon}">
-                                <div class="search-item-name">${r.display_name.split(',')[0]}</div>
-                                <div class="search-item-detail">${r.display_name.split(',').slice(1, 3).join(',')}</div>
-                            </div>
-                        `).join('');
-
-                        results.querySelectorAll('.search-item').forEach(item => {
+                        if (data.length === 0) {
+                            results.innerHTML = '<div class="search-item"><div class="search-item-name">No results found</div></div>';
+                        } else {
+                            results.innerHTML = data.map(r => `
+                                <div class="search-item" data-lat="${r.lat}" data-lon="${r.lon}">
+                                    <div class="search-item-name">${r.display_name.split(',')[0]}</div>
+                                    <div class="search-item-detail">${r.display_name.split(',').slice(1, 3).join(',')}</div>
+                                </div>
+                            `).join('');
+                        }
+                        
+                        results.classList.add('open');
+                        
+                        results.querySelectorAll('.search-item[data-lat]').forEach(item => {
                             item.addEventListener('click', () => {
                                 const lat = parseFloat(item.dataset.lat);
                                 const lon = parseFloat(item.dataset.lon);
@@ -2111,8 +2429,6 @@
                                 clear.classList.remove('show');
                             });
                         });
-
-                        results.classList.add('open');
                     } catch(e) {
                         console.error('Search error:', e);
                     }
@@ -2126,133 +2442,9 @@
             });
 
             document.addEventListener('click', (e) => {
-                if (!e.target.closest('.search-box')) results.classList.remove('open');
-            });
-        }
-
-        function initSettingsControls() {
-            const opacitySlider = document.getElementById('opacitySlider');
-            const opacityValue = document.getElementById('opacityValue');
-            opacitySlider.value = settings.opacity;
-            opacityValue.textContent = Math.round(settings.opacity * 100) + '%';
-            
-            opacitySlider.addEventListener('input', (e) => {
-                const val = parseFloat(e.target.value);
-                opacityValue.textContent = Math.round(val * 100) + '%';
-                settings.opacity = val;
-                // Update current visible frame opacity
-                if (frameLayers[currentFrame]) {
-                    frameLayers[currentFrame].setOpacity(val);
+                if (!e.target.closest('.search-box')) {
+                    results.classList.remove('open');
                 }
-                saveSettings();
-            });
-
-            const colorSchemeSelect = document.getElementById('colorSchemeSelect');
-            colorSchemeSelect.value = settings.colorScheme;
-            colorSchemeSelect.addEventListener('change', (e) => {
-                settings.colorScheme = parseInt(e.target.value);
-                saveSettings();
-                // Reload frames with new color scheme
-                if (settings.source === 'rainviewer') loadRadarData();
-            });
-
-            const delaySlider = document.getElementById('delaySlider');
-            const delayValue = document.getElementById('delayValue');
-            delaySlider.value = settings.delay;
-            delayValue.textContent = settings.delay + 'ms';
-            
-            delaySlider.addEventListener('input', (e) => {
-                const val = parseInt(e.target.value);
-                delayValue.textContent = val + 'ms';
-                settings.delay = val;
-                saveSettings();
-            });
-
-            initToggle('smoothToggle', 'smooth', () => { if (settings.source === 'rainviewer') loadRadarData(); });
-            initToggle('snowColorToggle', 'snowColor', () => { if (settings.source === 'rainviewer') loadRadarData(); });
-            initToggle('autoRefreshToggle', 'autoRefresh');
-
-            initBorderSlider('stateBorderWidth', 'stateBorderValue', 'stateBorderWidth', 'px', () => {
-                if (layerRefs.states) layerRefs.states.setStyle({ weight: settings.stateBorderWidth });
-            });
-            initBorderSlider('countyBorderWidth', 'countyBorderValue', 'countyBorderWidth', 'px', () => {
-                if (layerRefs.counties) layerRefs.counties.setStyle({ weight: settings.countyBorderWidth });
-            });
-            initBorderSlider('borderOpacity', 'borderOpacityValue', 'borderOpacity', '%', () => {
-                if (layerRefs.states) layerRefs.states.setStyle({ opacity: settings.borderOpacity });
-                if (layerRefs.counties) layerRefs.counties.setStyle({ opacity: settings.borderOpacity * 0.7 });
-            }, true);
-
-            document.getElementById('owmKeyInput').value = settings.owmKey || '';
-            document.getElementById('saveKeysBtn').addEventListener('click', () => {
-                settings.owmKey = document.getElementById('owmKeyInput').value.trim();
-                saveSettings();
-                toast('API key saved');
-            });
-
-            // Tile caching settings
-            const tileDelaySlider = document.getElementById('tileDelaySlider');
-            const tileDelayValue = document.getElementById('tileDelayValue');
-            tileDelaySlider.value = settings.tileLoadDelay;
-            tileDelayValue.textContent = settings.tileLoadDelay + 'ms';
-            tileDelaySlider.addEventListener('input', (e) => {
-                const val = parseInt(e.target.value);
-                tileDelayValue.textContent = val + 'ms';
-                settings.tileLoadDelay = val;
-                saveSettings();
-            });
-
-            const refreshDelaySlider = document.getElementById('refreshDelaySlider');
-            const refreshDelayValue = document.getElementById('refreshDelayValue');
-            refreshDelaySlider.value = settings.refreshDelay;
-            refreshDelayValue.textContent = settings.refreshDelay + 'ms';
-            refreshDelaySlider.addEventListener('input', (e) => {
-                const val = parseInt(e.target.value);
-                refreshDelayValue.textContent = val + 'ms';
-                settings.refreshDelay = val;
-                saveSettings();
-            });
-
-            const bgCacheToggle = document.getElementById('bgCacheToggle');
-            bgCacheToggle.classList.toggle('on', settings.bgCacheEnabled);
-            bgCacheToggle.addEventListener('click', () => {
-                settings.bgCacheEnabled = bgCacheToggle.classList.toggle('on');
-                saveSettings();
-                if (settings.bgCacheEnabled && framesReady) {
-                    startContinuousRefresh();
-                } else {
-                    tileQueue = [];
-                    setTileStatusIdle();
-                }
-            });
-
-            document.getElementById('exportBtn').addEventListener('click', exportSettings);
-            document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
-            document.getElementById('importFile').addEventListener('change', importSettings);
-        }
-
-        function initToggle(id, setting, callback) {
-            const el = document.getElementById(id);
-            el.classList.toggle('on', !!settings[setting]);
-            el.addEventListener('click', () => {
-                settings[setting] = el.classList.toggle('on') ? 1 : 0;
-                saveSettings();
-                if (callback) callback();
-            });
-        }
-
-        function initBorderSlider(sliderId, valueId, settingKey, unit, callback, isPercent = false) {
-            const slider = document.getElementById(sliderId);
-            const valueEl = document.getElementById(valueId);
-            slider.value = settings[settingKey];
-            valueEl.textContent = isPercent ? Math.round(settings[settingKey] * 100) + unit : settings[settingKey] + unit;
-            
-            slider.addEventListener('input', (e) => {
-                const val = parseFloat(e.target.value);
-                valueEl.textContent = isPercent ? Math.round(val * 100) + unit : val + unit;
-                settings[settingKey] = val;
-                saveSettings();
-                if (callback) callback();
             });
         }
 
@@ -2260,10 +2452,13 @@
             const fab = document.getElementById('mobileFab');
             const overlay = document.getElementById('sheetOverlay');
             const sheet = document.getElementById('bottomSheet');
+            const content = document.getElementById('mobileContent');
             
-            document.getElementById('mobileContent').innerHTML = document.getElementById('sidebar').innerHTML;
+            // Clone sidebar content for mobile
+            content.innerHTML = document.getElementById('sidebar').innerHTML;
 
-            document.getElementById('mobileContent').querySelectorAll('[data-layer]').forEach(el => {
+            // Reinit mobile layer toggles
+            content.querySelectorAll('[data-layer]').forEach(el => {
                 const layer = el.dataset.layer;
                 el.classList.toggle('active', settings.layers[layer]);
                 el.addEventListener('click', () => {
@@ -2273,11 +2468,13 @@
                 });
             });
 
-            document.getElementById('mobileContent').querySelectorAll('[data-source]').forEach(el => {
+            content.querySelectorAll('[data-source]').forEach(el => {
                 el.classList.toggle('active', el.dataset.source === settings.source);
                 el.addEventListener('click', () => {
-                    document.querySelectorAll('[data-source]').forEach(e => e.classList.remove('active'));
+                    content.querySelectorAll('[data-source]').forEach(e => e.classList.remove('active'));
+                    document.querySelectorAll('.sidebar [data-source]').forEach(e => e.classList.remove('active'));
                     el.classList.add('active');
+                    document.querySelector(`.sidebar [data-source="${el.dataset.source}"]`)?.classList.add('active');
                     settings.source = el.dataset.source;
                     saveSettings();
                     pause();
@@ -2285,7 +2482,7 @@
                 });
             });
 
-            document.getElementById('mobileContent').querySelectorAll('[data-basemap]').forEach(el => {
+            content.querySelectorAll('[data-basemap]').forEach(el => {
                 el.classList.toggle('active', el.dataset.basemap === settings.basemap);
                 el.addEventListener('click', () => setBasemap(el.dataset.basemap));
             });
@@ -2323,45 +2520,6 @@
             );
         }
 
-        function exportSettings() {
-            const blob = new Blob([JSON.stringify(settings, null, 2)], {type: 'application/json'});
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'stormview_pro_settings.json';
-            a.click();
-            toast('Settings exported');
-        }
-
-        function importSettings(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                try {
-                    Object.assign(settings, JSON.parse(ev.target.result));
-                    saveSettings();
-                    toast('Settings imported - reloading...');
-                    setTimeout(() => location.reload(), 1000);
-                } catch(err) {
-                    toast('Invalid file', true);
-                }
-            };
-            reader.readAsText(file);
-            e.target.value = '';
-        }
-
-        function hideLoading() {
-            document.getElementById('loading').classList.add('hidden');
-        }
-
-        function toast(msg, isError) {
-            const el = document.getElementById('toast');
-            el.textContent = msg;
-            el.classList.toggle('error', !!isError);
-            el.classList.add('show');
-            setTimeout(() => el.classList.remove('show'), 2500);
-        }
-
         function startAutoRefresh() {
             setInterval(() => {
                 if (settings.autoRefresh && !isPlaying) {
@@ -2370,6 +2528,27 @@
                 }
             }, 5 * 60 * 1000);
         }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            
+            switch(e.key) {
+                case ' ':
+                    e.preventDefault();
+                    togglePlay();
+                    break;
+                case 'ArrowLeft':
+                    stepFrame(-1);
+                    break;
+                case 'ArrowRight':
+                    stepFrame(1);
+                    break;
+                case 'r':
+                    loadRadarData();
+                    break;
+            }
+        });
 
         document.addEventListener('DOMContentLoaded', init);
     })();
