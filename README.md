@@ -4,23 +4,25 @@ A modern, feature-rich weather radar visualization application built with vanill
 
 <div align="center">
 
-### 🌩️ [**Launch StormView Radar**](https://sysadmindoc.github.io/StormviewRadar/) 🌩️
+### ⛈️ [**Launch StormView Radar**](https://sysadmindoc.github.io/StormviewRadar/) ⛈️
 
 [![Live Demo](https://img.shields.io/badge/🔴_LIVE-View_Demo-blue?style=for-the-badge&logoColor=white)](https://sysadmindoc.github.io/StormviewRadar/)
 
 </div>
 
-<img width="1399" height="1092" alt="2026-01-29 21_31_33-StormView Pro v3 - Chromium" src="https://github.com/user-attachments/assets/e2937d6a-ec98-4a53-a7be-621b676701ad" />
+<img width="1399" height="1092" alt="StormView Pro v3 Screenshot" src="https://github.com/user-attachments/assets/e2937d6a-ec98-4a53-a7be-621b676701ad" />
 
 
 ## Features
 
 ### Radar & Animation
-- **Dual Radar Sources** — Switch between RainViewer (animated) and MRMS (Iowa State Mesonet)
+- **Dual Radar Sources** — Switch between RainViewer (global, animated) and MRMS (US, real-time)
+- **Hybrid High-Res Mode** — Automatic MRMS enhancement at high zoom levels (US only)
 - **Smooth Animation** — Play, pause, and step through radar frames with customizable speed (0.5x–3x)
 - **Nowcast/Forecast** — View predicted precipitation up to 30 minutes ahead
 - **8 Color Schemes** — Choose from multiple radar color palettes
 - **Adjustable Opacity** — Fine-tune radar transparency for optimal map visibility
+- **Smart Tile Caching** — Optimized loading with rate limit protection
 
 ### Weather Layers
 - **NWS Alerts** — Real-time watches, warnings, and advisories with color-coded polygons
@@ -36,17 +38,16 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Wind** — Wind speed and direction visualization
 - **Clouds** — Cloud cover overlay
 - **Pressure** — Atmospheric pressure visualization
-- **Air Quality** — WAQI air quality index (optional)
 
 ### Map Customization
 - **5 Basemap Styles** — Dark, light, terrain, satellite, and streets
-- **State & County Borders** — Toggleable political boundaries with adjustable width/opacity
+- **State & County Borders** — Toggleable political boundaries
 - **City Labels** — Optional place name labels
 - **Highway Overlay** — Road network visualization
 
 ### User Experience
 - **Dark/Light Theme** — Full theme support with smooth transitions
-- **Location Search** — Find any US location with OpenStreetMap geocoding
+- **Location Search** — Find any location with OpenStreetMap geocoding
 - **Geolocation** — Jump to your current position with one click
 - **Mobile Optimized** — Responsive design with bottom sheet navigation on mobile
 - **Keyboard Shortcuts** — Quick controls for power users
@@ -64,6 +65,8 @@ git clone https://github.com/sysadmindoc/StormviewRadar.git
 cd StormviewRadar
 # Open index.html in your browser
 ```
+
+> **Note:** When running locally from `file://`, RainViewer may be unavailable due to CORS restrictions. The app automatically falls back to MRMS radar in this case. For full functionality, serve via a local web server or use the hosted version.
 
 ## Keyboard Shortcuts
 
@@ -84,11 +87,6 @@ Required for temperature, wind, clouds, and pressure layers.
 2. Copy your API key
 3. Paste in Settings → API tab
 
-### WAQI (Air Quality)
-Optional layer for air quality data.
-1. Get a token at [aqicn.org](https://aqicn.org/data-platform/token/)
-2. Enter in Settings → API tab
-
 ## Data Sources
 
 | Layer | Source | Update Frequency |
@@ -98,6 +96,8 @@ Optional layer for air quality data.
 | Alerts | [NWS API](https://www.weather.gov/documentation/services-web-api) | Real-time |
 | SPC Outlook | [SPC](https://www.spc.noaa.gov/) | Daily |
 | Storm Reports | SPC | As reported |
+| Lightning | Iowa State Mesonet | ~5 minutes |
+| Satellite | GOES East (IEM) | ~15 minutes |
 | River Gauges | [USGS](https://waterservices.usgs.gov/) | Varies |
 
 ## Browser Support
@@ -115,6 +115,16 @@ Optional layer for air quality data.
 - **CSS Variables** — Dynamic theming
 - **LocalStorage** — Settings persistence
 
+## Performance Optimizations
+
+StormView includes several optimizations for smooth performance:
+
+- **Batched Frame Loading** — Radar frames load in small batches to avoid rate limiting
+- **Custom Cached TileLayer** — Extended Leaflet TileLayer with intelligent caching
+- **Seamless Zoom** — Tiles remain visible during zoom, new tiles load in background
+- **Memory Management** — Only nearby frames kept in memory during animation
+- **Graceful Error Handling** — Failed tiles display transparently without broken image icons
+
 ## Configuration Options
 
 Access the settings panel (⚙️) to customize:
@@ -126,6 +136,7 @@ Access the settings panel (⚙️) to customize:
 
 **Radar**
 - Opacity (30%–100%)
+- High-res mode (MRMS enhancement)
 - Smooth interpolation
 - Snow color mode
 - Color scheme selection
@@ -137,8 +148,19 @@ Access the settings panel (⚙️) to customize:
 
 ```
 StormviewRadar/
-├── index.html      # Single-file application
-└── README.md       # Documentation
+├── index.html          # Single-file application
+├── README.md           # Documentation
+├── LICENSE             # MIT License
+└── logo/               # App icons and favicons
+    ├── StormView.ico
+    ├── StormView-16x16.png
+    ├── StormView-32x32.png
+    ├── StormView-48x48.png
+    ├── StormView-64x64.png
+    ├── StormView-96x96.png
+    ├── StormView-128x128.png
+    ├── StormView-192x192.png
+    └── StormView-512x512.png
 ```
 
 ## Contributing
@@ -158,16 +180,19 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 ## Acknowledgments
 
 - [RainViewer](https://www.rainviewer.com/) for radar data API
+- [Iowa State Mesonet](https://mesonet.agron.iastate.edu/) for MRMS, lightning, and satellite data
 - [National Weather Service](https://www.weather.gov/) for alerts and forecasts
 - [Storm Prediction Center](https://www.spc.noaa.gov/) for severe weather outlooks
+- [USGS](https://waterservices.usgs.gov/) for river gauge data
 - [Leaflet](https://leafletjs.com/) for the mapping library
 - [OpenStreetMap](https://www.openstreetmap.org/) contributors
+- [CARTO](https://carto.com/) for basemap tiles
 
 ---
 
 <div align="center">
 
-**StormView Radar** — Track storms like a pro. 🌩️
+**StormView Radar** — Track storms like a pro. ⛈️
 
 [![GitHub Pages](https://img.shields.io/badge/Hosted_on-GitHub_Pages-222?style=flat-square&logo=github)](https://sysadmindoc.github.io/StormviewRadar/)
 
