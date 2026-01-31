@@ -52,31 +52,81 @@
 
         #map { position: absolute; inset: 0; z-index: 1; }
 
+        /* Aggressively hide ALL broken image icons */
+        .leaflet-tile-pane img[src=""],
+        .leaflet-tile-pane img:not([src]),
+        .leaflet-tile-pane img.leaflet-tile-loaded[src=""],
+        .leaflet-tile-pane img[src$="undefined"],
+        .leaflet-tile-pane img.leaflet-tile-error {
+            visibility: hidden !important;
+            opacity: 0 !important;
+        }
+        .leaflet-tile {
+            color: transparent !important;
+            font-size: 0 !important;
+            text-indent: -9999px !important;
+            overflow: hidden !important;
+        }
+        .leaflet-tile::before,
+        .leaflet-tile::after {
+            display: none !important;
+            content: none !important;
+        }
+        .leaflet-tile-container img {
+            background: transparent !important;
+            -webkit-font-smoothing: none !important;
+        }
+        /* Hide broken image placeholder icon in all browsers */
+        .leaflet-tile-pane img:-moz-broken,
+        .leaflet-tile-pane img:-moz-user-disabled,
+        .leaflet-tile-pane img:-moz-loading,
+        .leaflet-tile-pane img:-moz-suppressed {
+            visibility: hidden !important;
+            opacity: 0 !important;
+        }
+        /* WebKit/Chrome broken image handling */
+        .leaflet-tile-pane img::before {
+            content: "" !important;
+            display: block !important;
+            position: absolute !important;
+            background: transparent !important;
+        }
+
         .leaflet-tile-container { transition: opacity 0.15s ease-out !important; }
         .radar-layer { transition: opacity 0.12s linear !important; }
-        .radar-layer .leaflet-tile { transition: opacity 0.1s linear !important; }
+        .radar-layer .leaflet-tile { 
+            transition: opacity 0.1s linear !important;
+            image-rendering: pixelated;
+        }
+        .mrms-detail-layer { transition: opacity 0.2s ease !important; }
+        .mrms-detail-layer .leaflet-tile { 
+            transition: opacity 0.15s ease !important;
+            image-rendering: pixelated;
+        }
+        .radar-primary .leaflet-tile {
+            image-rendering: pixelated;
+            filter: contrast(1.05) saturate(1.1);
+        }
+        .radar-supplemental .leaflet-tile {
+            image-rendering: auto;
+            opacity: 0.85;
+        }
+        /* Cached/preloaded tiles - smooth opacity, no position transition during zoom */
+        .radar-cached .leaflet-tile {
+            transition: opacity 0.2s ease !important;
+        }
+        .radar-cached .leaflet-tile-container {
+            transition: none !important;
+        }
+        /* Keep tiles visible during zoom animation */
+        .leaflet-zoom-anim .radar-cached .leaflet-tile,
+        .leaflet-zoom-anim .radar-layer .leaflet-tile {
+            visibility: visible !important;
+            opacity: inherit !important;
+        }
 
-        .leaflet-control-attribution {
-            background: var(--glass-bg) !important;
-            backdrop-filter: blur(10px);
-            color: var(--text-muted) !important;
-            font-size: 10px !important;
-            padding: 4px 8px !important;
-            border-radius: 8px 0 0 0 !important;
-        }
-        .leaflet-control-attribution a { color: var(--text-dim) !important; }
-        .leaflet-control-zoom { border: none !important; overflow: hidden; border-radius: var(--radius-sm) !important; }
-        .leaflet-control-zoom a {
-            background: var(--glass-bg) !important;
-            backdrop-filter: blur(12px);
-            color: var(--text) !important;
-            border: 1px solid var(--glass-border) !important;
-            width: 36px !important; height: 36px !important;
-            line-height: 34px !important; font-size: 18px !important;
-        }
-        .leaflet-control-zoom a:hover { background: var(--glass-hover) !important; color: var(--accent) !important; }
-        .leaflet-control-zoom-in { border-radius: var(--radius-sm) var(--radius-sm) 0 0 !important; }
-        .leaflet-control-zoom-out { border-radius: 0 0 var(--radius-sm) var(--radius-sm) !important; }
+        /* Hide all Leaflet controls */
+        .leaflet-control-container { display: none !important; }
 
         .leaflet-popup-content-wrapper {
             background: var(--panel-bg) !important;
@@ -164,13 +214,29 @@
         .search-item-detail { font-size: 11px; color: var(--text-muted); }
 
         .timestamp-box {
-            display: flex; align-items: center; gap: 10px;
+            display: flex; align-items: center; gap: 12px;
             padding: 10px 16px; margin-left: auto; white-space: nowrap;
+            min-width: 200px;
         }
         .timestamp-box.forecast { background: rgba(56, 189, 248, 0.15); border-color: var(--accent); }
-        .timestamp-icon svg { width: 18px; height: 18px; stroke: var(--text-dim); }
-        .timestamp-text { font-size: 14px; font-weight: 600; }
-        .timestamp-tz { font-size: 10px; color: var(--text-muted); cursor: pointer; text-decoration: underline dotted; }
+        .timestamp-icon svg { width: 20px; height: 20px; stroke: var(--text-dim); }
+        .timestamp-content { display: flex; flex-direction: column; align-items: flex-start; }
+        .timestamp-text { 
+            font-size: 15px; 
+            font-weight: 600; 
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.01em;
+        }
+        .timestamp-tz { 
+            font-size: 10px; 
+            color: var(--text-muted); 
+            cursor: pointer; 
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            opacity: 0.7;
+            transition: opacity 0.15s;
+        }
+        .timestamp-tz:hover { opacity: 1; }
 
         .header-btns { display: flex; gap: 8px; }
         .icon-btn {
@@ -697,22 +763,6 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .loading-text { margin-top: 16px; color: var(--text-dim); }
 
-        .toast {
-            position: fixed; bottom: 100px; left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            padding: 12px 24px;
-            background: var(--panel-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 30px;
-            color: var(--text);
-            font-size: 14px;
-            z-index: 3000;
-            opacity: 0;
-            transition: all 0.3s;
-        }
-        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-        .toast.error { border-color: var(--danger); color: var(--danger); }
-
         .data-credit {
             position: absolute; bottom: 4px; left: 4px;
             font-size: 9px; color: var(--text-muted);
@@ -807,7 +857,7 @@
                     <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                 </svg>
             </span>
-            <div>
+            <div class="timestamp-content">
                 <div class="timestamp-text" id="timestampText">Loading...</div>
                 <div class="timestamp-tz" id="timestampTz" title="Click to toggle timezone">Local Time</div>
             </div>
@@ -1141,6 +1191,10 @@
                         <div><div class="setting-label">Snow Colors</div><div class="setting-hint">Pink shading for snow</div></div>
                         <div class="toggle on" id="snowToggle"></div>
                     </div>
+                    <div class="setting-row">
+                        <div><div class="setting-label">High-Res Mode</div><div class="setting-hint">MRMS enhancement when zoomed in (US only)</div></div>
+                        <div class="toggle on" id="highResToggle"></div>
+                    </div>
                 </div>
                 <div class="settings-section">
                     <div class="settings-section-title">Color Scheme</div>
@@ -1209,9 +1263,6 @@
         <div class="sheet-content" id="mobileContent"></div>
     </div>
 
-    <!-- Toast -->
-    <div class="toast" id="toast"></div>
-
     <!-- Data Credit -->
     <div class="data-credit">Data: NWS, RainViewer, SPC, IEM, USGS</div>
 
@@ -1256,6 +1307,44 @@
         let lastFrameTime = 0;
         let speedMult = 1;
         let searchTimeout = null;
+        
+        // Advanced Hybrid Radar System with Smart Caching
+        const radarSystem = {
+            // Layers
+            mrmsBase: null,
+            mrmsComposite: null,
+            rainviewerLayer: null,
+            
+            // Cached base layers (low-res for fallback)
+            cachedBaseLayers: [],
+            
+            // State
+            highZoomMode: false,
+            currentZoom: 5,
+            isUS: true,
+            isPreloading: false,
+            
+            // Thresholds
+            HIGH_ZOOM_THRESHOLD: 8,
+            MRMS_PRIMARY_ZOOM: 10,
+            BASE_CACHE_ZOOM: 5,
+            
+            // Tile configuration - optimized for memory
+            tileConfig: {
+                keepBuffer: 2,
+                updateWhenZooming: false,
+                updateWhenIdle: true,
+                maxNativeZoom: 12,
+                maxZoom: 18
+            },
+            
+            // MRMS tile sources (Iowa State Mesonet)
+            sources: {
+                n0q: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png',
+                n0r: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0r-900913/{z}/{x}/{y}.png',
+                ridge: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-0/{z}/{x}/{y}.png'
+            }
+        };
 
         const layerRefs = {
             alerts: null, spcOutlook: null, stormReports: null,
@@ -1278,6 +1367,7 @@
             loop: true,
             autoRefresh: true,
             showLegend: true,
+            highResMode: true, // Use MRMS enhancement at high zoom (US only)
             owmKey: '',
             waqiKey: '',
             useLocalTime: true,
@@ -1297,6 +1387,8 @@
             loadSettings();
             applyTheme();
             initMap();
+            setupZoomHandler();
+            initRadarSystem();
             initUI();
             loadRadarData();
             
@@ -1361,7 +1453,8 @@
             baseLayer = L.tileLayer(url, {
                 attribution: '&copy; CARTO / ESRI',
                 subdomains: (id === 'satellite' || id === 'topo') ? [] : 'abcd',
-                maxZoom: 19
+                maxZoom: 19,
+                errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
             });
             baseLayer.addTo(map);
             baseLayer.setZIndex(0);
@@ -1371,6 +1464,383 @@
                 el.classList.toggle('active', el.dataset.basemap === id);
             });
             saveSettings();
+        }
+
+        // ==================== RATE LIMIT HANDLING ====================
+        const rateLimiter = {
+            isPaused: false,
+            pauseUntil: 0,
+            backoffMs: 3000,
+            maxBackoff: 30000,
+            errorCount: 0,
+            errorWindow: [],
+            windowMs: 2000, // Track errors within 2 second window
+            threshold: 4,   // 4+ errors in window = rate limited
+            
+            recordError() {
+                const now = Date.now();
+                this.errorWindow.push(now);
+                
+                // Clean old errors outside window
+                this.errorWindow = this.errorWindow.filter(t => now - t < this.windowMs);
+                
+                // Check if we hit threshold
+                if (this.errorWindow.length >= this.threshold && !this.isPaused) {
+                    this.pause();
+                }
+            },
+            
+            pause() {
+                this.isPaused = true;
+                this.pauseUntil = Date.now() + this.backoffMs;
+                
+                console.log(`[RateLimiter] Paused for ${this.backoffMs}ms after ${this.errorWindow.length} errors`);
+                
+                setTimeout(() => {
+                    this.resume();
+                }, this.backoffMs);
+                
+                // Increase backoff for next time
+                this.backoffMs = Math.min(this.backoffMs * 1.5, this.maxBackoff);
+            },
+            
+            resume() {
+                this.isPaused = false;
+                this.errorWindow = [];
+                console.log('[RateLimiter] Resuming...');
+                
+                // Trigger redraw of current frame
+                if (frameLayers[currentFrame] && map.hasLayer(frameLayers[currentFrame])) {
+                    setTimeout(() => {
+                        frameLayers[currentFrame].redraw();
+                    }, 100);
+                }
+            },
+            
+            recordSuccess() {
+                // Gradually reduce backoff on sustained success
+                if (this.backoffMs > 3000) {
+                    this.backoffMs = Math.max(3000, this.backoffMs * 0.9);
+                }
+            },
+            
+            reset() {
+                this.backoffMs = 3000;
+                this.errorWindow = [];
+                this.isPaused = false;
+            }
+        };
+
+        // Custom TileLayer - optimized for memory with zoom stability
+        L.TileLayer.Cached = L.TileLayer.extend({
+            options: {
+                errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+                keepBuffer: 4  // Reduced from 25 for memory savings
+            },
+            
+            // Prevent pruning during zoom for visual stability
+            _pruneTiles: function() {
+                if (this._map && this._map._animatingZoom) return;
+                L.TileLayer.prototype._pruneTiles.call(this);
+            },
+            
+            // Skip tile requests when rate limited
+            _update: function(center) {
+                if (rateLimiter.isPaused) return;
+                L.TileLayer.prototype._update.call(this, center);
+            },
+            
+            createTile: function(coords, done) {
+                const tile = document.createElement('img');
+                tile.alt = '';
+                tile.setAttribute('role', 'presentation');
+                
+                // Start hidden
+                tile.style.opacity = '0';
+                tile.style.transition = 'opacity 0.2s';
+                tile.style.color = 'transparent';
+                
+                if (rateLimiter.isPaused) {
+                    tile.src = this.options.errorTileUrl;
+                    done(null, tile);
+                    return tile;
+                }
+                
+                let loaded = false;
+                const self = this;
+                
+                tile.onload = function() {
+                    if (loaded) return;
+                    loaded = true;
+                    rateLimiter.recordSuccess();
+                    tile.style.opacity = '1';
+                    done(null, tile);
+                };
+                
+                tile.onerror = function() {
+                    if (loaded) return;
+                    loaded = true;
+                    rateLimiter.recordError();
+                    tile.src = self.options.errorTileUrl;
+                    tile.style.opacity = '0';
+                    done(null, tile);
+                };
+                
+                tile.src = this.getTileUrl(coords);
+                return tile;
+            }
+        });
+
+        L.tileLayer.cached = function(url, options) {
+            return new L.TileLayer.Cached(url, options);
+        };
+
+        // Legacy rate limited layer (uses new cached layer)
+        L.TileLayer.RateLimited = L.TileLayer.Cached;
+        L.tileLayer.rateLimited = L.tileLayer.cached;
+
+        // Handle zoom to ensure radar tiles stay visible
+        let zoomTimeout = null;
+        let lastZoom = 5;
+        let isZooming = false;
+        
+        function setupZoomHandler() {
+            lastZoom = map.getZoom();
+            
+            map.on('zoomstart', () => {
+                isZooming = true;
+                // Keep current frame fully visible during zoom - don't touch tiles
+                if (frameLayers[currentFrame] && map.hasLayer(frameLayers[currentFrame])) {
+                    frameLayers[currentFrame].setOpacity(settings.opacity);
+                }
+            });
+            
+            map.on('zoom', () => {
+                // During zoom animation - keep everything stable, no tile requests
+                if (frameLayers[currentFrame] && map.hasLayer(frameLayers[currentFrame])) {
+                    frameLayers[currentFrame].setOpacity(settings.opacity);
+                }
+            });
+            
+            map.on('zoomend', () => {
+                isZooming = false;
+                const zoom = map.getZoom();
+                const zoomDelta = zoom - lastZoom;
+                lastZoom = zoom;
+                
+                // Update zoom indicator
+                updateZoomIndicator(zoom);
+                
+                // Manage hybrid radar (MRMS detail at high zoom)
+                updateHybridRadar(zoom);
+                
+                // Delayed tile update - only if needed and not rate limited
+                clearTimeout(zoomTimeout);
+                zoomTimeout = setTimeout(() => {
+                    if (isZooming || rateLimiter.isPaused) return;
+                    
+                    const layer = frameLayers[currentFrame];
+                    if (!layer || !map.hasLayer(layer)) return;
+                    
+                    // Set correct opacity
+                    const isHighZoom = zoom >= radarSystem.MRMS_PRIMARY_ZOOM && radarSystem.isUS && radarSystem.highZoomMode;
+                    layer.setOpacity(isHighZoom ? settings.opacity * 0.5 : settings.opacity);
+                    
+                    // Only request new tiles if we zoomed IN significantly
+                    // Zooming out should just use cached/upscaled tiles
+                    if (zoomDelta > 0 && zoom > 6 && !rateLimiter.isPaused) {
+                        // Gentle refresh for new tiles - doesn't clear existing
+                        requestAnimationFrame(() => {
+                            if (!isZooming && !rateLimiter.isPaused) {
+                                layer._update();
+                            }
+                        });
+                    }
+                }, 400); // Longer delay to prevent rapid requests
+            });
+            
+            // Pan handler - even more conservative with tile requests
+            map.on('moveend', () => {
+                if (isZooming) return;
+                
+                const zoom = map.getZoom();
+                if (zoom >= radarSystem.HIGH_ZOOM_THRESHOLD) {
+                    updateHybridRadar(zoom);
+                    updateZoomIndicator(zoom);
+                }
+            });
+        }
+        
+        // ==================== ADVANCED HYBRID RADAR SYSTEM ====================
+        
+        function initRadarSystem() {
+            radarSystem.currentZoom = map.getZoom();
+            radarSystem.isUS = isViewingUS();
+        }
+        
+        function updateHybridRadar(zoom) {
+            radarSystem.currentZoom = zoom;
+            radarSystem.isUS = isViewingUS();
+            
+            // Only enhance RainViewer source when high-res mode is enabled
+            if (settings.source !== 'rainviewer' || !settings.highResMode) {
+                cleanupRadarLayers();
+                radarSystem.highZoomMode = false;
+                return;
+            }
+            
+            const shouldUseHighZoom = zoom >= radarSystem.HIGH_ZOOM_THRESHOLD && radarSystem.isUS;
+            const shouldUseMRMSPrimary = zoom >= radarSystem.MRMS_PRIMARY_ZOOM && radarSystem.isUS;
+            
+            if (shouldUseHighZoom && !radarSystem.highZoomMode) {
+                // Entering high zoom mode
+                enableHighZoomRadar(shouldUseMRMSPrimary);
+                radarSystem.highZoomMode = true;
+            } else if (!shouldUseHighZoom && radarSystem.highZoomMode) {
+                // Exiting high zoom mode  
+                disableHighZoomRadar();
+                radarSystem.highZoomMode = false;
+            } else if (radarSystem.highZoomMode) {
+                // Update opacity balance based on zoom
+                updateRadarLayerBalance(zoom);
+            }
+        }
+        
+        function enableHighZoomRadar(mrmsIsPrimary) {
+            if (!radarSystem.mrmsBase) {
+                radarSystem.mrmsBase = L.tileLayer.cached(radarSystem.sources.n0q, {
+                    opacity: mrmsIsPrimary ? settings.opacity : settings.opacity * 0.6,
+                    pane: 'radarPane',
+                    maxNativeZoom: 8,
+                    maxZoom: 18,
+                    keepBuffer: 2,
+                    updateWhenZooming: false,
+                    updateWhenIdle: true,
+                    className: mrmsIsPrimary ? 'mrms-detail-layer radar-primary' : 'mrms-detail-layer radar-supplemental'
+                });
+                radarSystem.mrmsBase.addTo(map);
+            }
+            
+            if (frameLayers[currentFrame] && map.hasLayer(frameLayers[currentFrame])) {
+                if (mrmsIsPrimary) {
+                    frameLayers[currentFrame].setOpacity(settings.opacity * 0.5);
+                    radarSystem.mrmsBase.bringToFront();
+                } else {
+                    frameLayers[currentFrame].bringToFront();
+                }
+            }
+            
+            updateZoomIndicator(radarSystem.currentZoom);
+        }
+        
+        function disableHighZoomRadar() {
+            cleanupRadarLayers();
+            
+            // Restore RainViewer opacity
+            if (frameLayers[currentFrame] && map.hasLayer(frameLayers[currentFrame])) {
+                frameLayers[currentFrame].setOpacity(settings.opacity);
+            }
+            
+            updateZoomIndicator(radarSystem.currentZoom);
+        }
+        
+        function updateRadarLayerBalance(zoom) {
+            if (!radarSystem.mrmsBase) return;
+            
+            const isMRMSPrimary = zoom >= radarSystem.MRMS_PRIMARY_ZOOM;
+            
+            if (isMRMSPrimary) {
+                // Higher zoom = more MRMS, less RainViewer
+                const mrmsOpacity = settings.opacity;
+                const rvOpacity = Math.max(0.3, settings.opacity * (1 - (zoom - radarSystem.MRMS_PRIMARY_ZOOM) * 0.1));
+                
+                radarSystem.mrmsBase.setOpacity(mrmsOpacity);
+                if (frameLayers[currentFrame] && map.hasLayer(frameLayers[currentFrame])) {
+                    frameLayers[currentFrame].setOpacity(rvOpacity);
+                }
+                radarSystem.mrmsBase.bringToFront();
+            } else {
+                // RainViewer primary, MRMS supplemental
+                radarSystem.mrmsBase.setOpacity(settings.opacity * 0.6);
+                if (frameLayers[currentFrame] && map.hasLayer(frameLayers[currentFrame])) {
+                    frameLayers[currentFrame].setOpacity(settings.opacity);
+                    frameLayers[currentFrame].bringToFront();
+                }
+            }
+        }
+        
+        function cleanupRadarLayers() {
+            if (radarSystem.mrmsBase) {
+                map.removeLayer(radarSystem.mrmsBase);
+                radarSystem.mrmsBase = null;
+            }
+            if (radarSystem.mrmsComposite) {
+                map.removeLayer(radarSystem.mrmsComposite);
+                radarSystem.mrmsComposite = null;
+            }
+        }
+        
+        function updateZoomIndicator(zoom) {
+            let indicator = document.getElementById('zoomIndicator');
+            
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.id = 'zoomIndicator';
+                indicator.className = 'glass';
+                indicator.style.cssText = `
+                    position: fixed;
+                    bottom: 100px;
+                    right: 16px;
+                    padding: 8px 12px;
+                    font-size: 11px;
+                    z-index: 1000;
+                    display: none;
+                    border-radius: 8px;
+                `;
+                document.body.appendChild(indicator);
+            }
+            
+            if (zoom >= radarSystem.HIGH_ZOOM_THRESHOLD) {
+                let status, color;
+                
+                if (radarSystem.isUS) {
+                    if (zoom >= radarSystem.MRMS_PRIMARY_ZOOM && radarSystem.highZoomMode) {
+                        status = `Z${zoom} | MRMS Primary`;
+                        color = 'var(--success)';
+                    } else if (radarSystem.highZoomMode) {
+                        status = `Z${zoom} | MRMS Enhanced`;
+                        color = 'var(--accent)';
+                    } else {
+                        status = `Z${zoom} | RainViewer`;
+                        color = 'var(--text-dim)';
+                    }
+                } else {
+                    status = `Z${zoom} | International (no MRMS)`;
+                    color = 'var(--warning)';
+                }
+                
+                indicator.innerHTML = status;
+                indicator.style.color = color;
+                indicator.style.borderColor = color;
+                indicator.style.display = 'block';
+            } else {
+                indicator.style.display = 'none';
+            }
+        }
+        
+        function isViewingUS() {
+            const center = map.getCenter();
+            // Continental US bounding box with some buffer
+            return center.lat > 23 && center.lat < 50 && center.lng > -128 && center.lng < -64;
+        }
+        
+        // Gentle refresh of MRMS layer - only if not rate limited
+        function refreshMRMSLayer() {
+            if (rateLimiter.isPaused) return;
+            if (radarSystem.mrmsBase && map.hasLayer(radarSystem.mrmsBase)) {
+                // Use _update instead of redraw - less aggressive
+                radarSystem.mrmsBase._update();
+            }
         }
 
         // ==================== RADAR ====================
@@ -1387,15 +1857,33 @@
                 }
             } catch(e) {
                 console.error('Radar error:', e);
-                toast('Error loading radar', true);
+                
+                // If RainViewer fails (CORS when running locally), fallback to MRMS
+                if (settings.source === 'rainviewer') {
+                    console.log('Falling back to MRMS radar...');
+                    settings.source = 'mrms';
+                    
+                    // Update UI to show MRMS selected
+                    document.querySelectorAll('[data-source]').forEach(el => {
+                        el.classList.toggle('active', el.dataset.source === 'mrms');
+                    });
+                    
+                    try {
+                        await loadMRMS();
+                    } catch(e2) {
+                        console.error('MRMS fallback error:', e2);
+                    }
+                }
             }
         }
 
         async function loadRainViewerPreloaded() {
             showLoadProgress();
             loadAborted = false;
+            rateLimiter.reset();
             
             const resp = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+            if (!resp.ok) throw new Error('RainViewer API error');
             rainviewerData = await resp.json();
 
             frames = [];
@@ -1412,62 +1900,66 @@
             framesLoaded = 0;
             updateLoadProgress(0);
 
-            for (let i = 0; i < frames.length; i++) {
+            // Memory-optimized tile configuration
+            const tileOptions = {
+                opacity: 0,
+                pane: 'radarPane',
+                className: 'radar-layer radar-cached',
+                updateWhenIdle: true,
+                updateWhenZooming: false,
+                keepBuffer: 2,
+                tileSize: 256,
+                maxNativeZoom: 12,
+                maxZoom: 18,
+                minZoom: 3
+            };
+
+            // Load frames in batches
+            const BATCH_SIZE = 3;
+            const BATCH_DELAY = 200;
+            
+            for (let batchStart = 0; batchStart < frames.length; batchStart += BATCH_SIZE) {
                 if (loadAborted) break;
                 
-                const frame = frames[i];
-                const url = buildRadarUrl(frame);
+                while (rateLimiter.isPaused) {
+                    await new Promise(r => setTimeout(r, 500));
+                    if (loadAborted) break;
+                }
                 
-                const layer = L.tileLayer(url, {
-                    opacity: 0,
-                    pane: 'radarPane',
-                    className: 'radar-layer',
-                    updateWhenIdle: true,
-                    updateWhenZooming: false,
-                    keepBuffer: 4,
-                    maxNativeZoom: 12,
-                    maxZoom: 19
-                });
+                const batchEnd = Math.min(batchStart + BATCH_SIZE, frames.length);
                 
-                await new Promise((resolve) => {
-                    let resolved = false;
+                for (let i = batchStart; i < batchEnd; i++) {
+                    const frame = frames[i];
+                    const url = buildRadarUrl(frame);
+                    
+                    const layer = L.tileLayer.cached(url, tileOptions);
                     
                     layer.on('load', () => {
-                        if (!resolved) {
-                            resolved = true;
-                            framesLoaded++;
-                            updateLoadProgress(framesLoaded / framesTotal * 100);
-                            resolve();
-                        }
+                        framesLoaded++;
+                        updateLoadProgress(framesLoaded / framesTotal * 100);
                     });
                     
-                    setTimeout(() => {
-                        if (!resolved) {
-                            resolved = true;
-                            framesLoaded++;
-                            updateLoadProgress(framesLoaded / framesTotal * 100);
-                            resolve();
-                        }
-                    }, 3000);
+                    frameLayers[i] = layer;
                     
-                    layer.addTo(map);
-                });
-                
-                frameLayers.push(layer);
-                
-                if (i === 0) {
-                    layer.setOpacity(settings.opacity);
-                    currentFrame = 0;
-                    updateTimestamp();
-                    updateTimelineUI();
+                    if (i === 0) {
+                        layer.addTo(map);
+                        layer.setOpacity(settings.opacity);
+                        currentFrame = 0;
+                        updateTimestamp();
+                        updateTimelineUI();
+                    }
                 }
                 
-                if (i < frames.length - 1 && !loadAborted) {
-                    await new Promise(r => setTimeout(r, 80));
+                if (batchStart > 0) {
+                    await new Promise(r => setTimeout(r, BATCH_DELAY));
                 }
             }
-            
-            onAllFramesLoaded();
+
+            // Add remaining layers to map lazily (on demand)
+            // They get added when animation reaches them
+            setTimeout(() => {
+                onAllFramesLoaded();
+            }, 500);
         }
 
         function buildRadarUrl(frame) {
@@ -1481,17 +1973,20 @@
             framesReady = true;
             hideLoadProgress();
             showDataStatus('Radar loaded');
-            toast('Radar ready - ' + frames.length + ' frames');
         }
 
         async function loadMRMS() {
             clearAllFrameLayers();
             
-            const layer = L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q/{z}/{x}/{y}.png', {
+            const layer = L.tileLayer.cached('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q/{z}/{x}/{y}.png', {
                 opacity: settings.opacity,
                 pane: 'radarPane',
+                className: 'radar-layer radar-cached',
                 maxNativeZoom: 8,
-                maxZoom: 19
+                maxZoom: 18,
+                keepBuffer: 2,
+                updateWhenZooming: false,
+                updateWhenIdle: true
             });
             layer.addTo(map);
             frameLayers.push(layer);
@@ -1503,25 +1998,49 @@
             updateTimestamp();
             updateTimelineUI();
             hideLoadProgress();
-            toast('MRMS radar loaded');
         }
 
         function showPreloadedFrame(idx) {
             if (!frameLayers.length || idx < 0 || idx >= frameLayers.length) return;
             
+            const prevFrame = currentFrame;
             currentFrame = idx;
             
-            if (frameLayers[idx]) {
-                frameLayers[idx].setOpacity(settings.opacity);
+            // Add current frame to map if not already
+            if (frameLayers[idx] && !map.hasLayer(frameLayers[idx])) {
+                frameLayers[idx].addTo(map);
             }
             
-            setTimeout(() => {
-                frameLayers.forEach((layer, i) => {
-                    if (i !== currentFrame) {
-                        layer.setOpacity(0);
+            // Determine opacity based on zoom level
+            const zoom = map.getZoom();
+            const isHighZoom = zoom >= radarSystem.MRMS_PRIMARY_ZOOM && radarSystem.isUS && radarSystem.highZoomMode;
+            const frameOpacity = isHighZoom ? settings.opacity * 0.5 : settings.opacity;
+            
+            // Show current frame
+            if (frameLayers[idx]) {
+                frameLayers[idx].setOpacity(frameOpacity);
+                if (isHighZoom && radarSystem.mrmsBase) {
+                    radarSystem.mrmsBase.bringToFront();
+                } else {
+                    frameLayers[idx].bringToFront();
+                }
+            }
+            
+            // Remove non-adjacent frames from map to save memory
+            // Keep only current and next 2 frames loaded
+            frameLayers.forEach((layer, i) => {
+                if (!layer) return;
+                const distance = Math.abs(i - currentFrame);
+                if (distance > 2) {
+                    // Remove distant frames entirely
+                    if (map.hasLayer(layer)) {
+                        map.removeLayer(layer);
                     }
-                });
-            }, 40);
+                } else if (i !== currentFrame) {
+                    // Hide adjacent frames but keep them ready
+                    layer.setOpacity(0);
+                }
+            });
             
             updateTimestamp();
             updateTimelineFill();
@@ -1535,6 +2054,10 @@
             frameLayers = [];
             framesLoaded = 0;
             framesReady = false;
+            
+            // Clean up hybrid radar layers
+            cleanupRadarLayers();
+            radarSystem.highZoomMode = false;
         }
 
         // ==================== ANIMATION ====================
@@ -1543,7 +2066,20 @@
             isPlaying = true;
             document.getElementById('playIcon').innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
             lastFrameTime = performance.now();
+            // Preload next few frames for smooth animation
+            preloadNearbyFrames(currentFrame, 3);
             animationLoop();
+        }
+
+        function preloadNearbyFrames(idx, count) {
+            // Preload upcoming frames by adding them to map (but hidden)
+            for (let i = 1; i <= count; i++) {
+                const nextIdx = (idx + i) % frameLayers.length;
+                if (frameLayers[nextIdx] && !map.hasLayer(frameLayers[nextIdx])) {
+                    frameLayers[nextIdx].addTo(map);
+                    frameLayers[nextIdx].setOpacity(0);
+                }
+            }
         }
 
         function animationLoop() {
@@ -1566,6 +2102,8 @@
                     }
                 }
                 showPreloadedFrame(next);
+                // Preload frames ahead of current position
+                preloadNearbyFrames(next, 3);
             }
             
             animationId = requestAnimationFrame(animationLoop);
@@ -1650,8 +2188,6 @@
                     toggleHighwaysLayer(on);
                     break;
             }
-            
-            if (!silent) toast(`${getLayerName(name)} ${on ? 'enabled' : 'disabled'}`);
         }
 
         function removeLayer(name) {
@@ -1825,12 +2361,14 @@
             try {
                 removeLayer('lightning');
                 
-                // Using IEM lightning tile service
-                layerRefs.lightning = L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/q2-ltg/{z}/{x}/{y}.png', {
+                layerRefs.lightning = L.tileLayer.cached('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/q2-ltg/{z}/{x}/{y}.png', {
                     opacity: 0.8,
                     pane: 'radarPane',
                     maxNativeZoom: 8,
-                    maxZoom: 19
+                    maxZoom: 18,
+                    keepBuffer: 2,
+                    updateWhenZooming: false,
+                    updateWhenIdle: true
                 });
 
                 if (settings.layers.lightning) layerRefs.lightning.addTo(map);
@@ -1843,11 +2381,14 @@
         function loadSatellite() {
             removeLayer('satellite');
             
-            layerRefs.satellite = L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes_east_conus_ch13/{z}/{x}/{y}.png', {
+            layerRefs.satellite = L.tileLayer.cached('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes_east_conus_ch13/{z}/{x}/{y}.png', {
                 opacity: 0.7,
                 pane: 'satellitePane',
                 maxNativeZoom: 8,
-                maxZoom: 19
+                maxZoom: 18,
+                keepBuffer: 2,
+                updateWhenZooming: false,
+                updateWhenIdle: true
             });
 
             if (settings.layers.satellite) layerRefs.satellite.addTo(map);
@@ -1900,10 +2441,8 @@
                 });
 
                 if (settings.layers.riverGauges) layerRefs.riverGauges.addTo(map);
-                toast(`Loaded ${limitedSites.length} river gauges`);
             } catch(e) {
                 console.error('River gauges error:', e);
-                toast('Error loading river gauges', true);
             }
         }
 
@@ -1950,7 +2489,7 @@
         // OWM Layers
         function toggleOWMLayer(name) {
             if (!settings.owmKey && settings.layers[name]) {
-                toast('OpenWeatherMap API key required', true);
+                console.warn('OpenWeatherMap API key required');
                 document.querySelector(`[data-layer="${name}"]`)?.classList.remove('active');
                 settings.layers[name] = false;
                 saveSettings();
@@ -1972,7 +2511,8 @@
                     opacity: 0.5, 
                     zIndex: 45,
                     maxNativeZoom: 12,
-                    maxZoom: 19
+                    maxZoom: 19,
+                    errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
                 });
                 layerRefs[name].addTo(map);
             }
@@ -2037,8 +2577,11 @@
                 const labelUrl = settings.theme === 'light' 
                     ? 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png'
                     : 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png';
-                layerRefs.labels = L.tileLayer(labelUrl, {
-                    subdomains: 'abcd', opacity: 0.9, zIndex: 600, pane: 'overlayPane'
+                layerRefs.labels = L.tileLayer.cached(labelUrl, {
+                    subdomains: 'abcd', 
+                    opacity: 0.9, 
+                    zIndex: 600, 
+                    pane: 'overlayPane'
                 });
                 layerRefs.labels.addTo(map);
             }
@@ -2047,9 +2590,10 @@
         function toggleHighwaysLayer(on) {
             removeLayer('highways');
             if (on) {
-                // Using Stamen/Carto lines overlay
-                layerRefs.highways = L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/toner-lines/{z}/{x}/{y}.png', {
-                    opacity: 0.4, zIndex: 350, pane: 'boundaryPane'
+                layerRefs.highways = L.tileLayer.cached('https://stamen-tiles.a.ssl.fastly.net/toner-lines/{z}/{x}/{y}.png', {
+                    opacity: 0.4, 
+                    zIndex: 350, 
+                    pane: 'boundaryPane'
                 });
                 layerRefs.highways.addTo(map);
             }
@@ -2062,17 +2606,26 @@
 
             const date = new Date(frame.time * 1000);
             let timeStr;
+            
+            // Format with consistent width using padded values
+            const formatOpts = { 
+                month: 'short', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true
+            };
 
             if (settings.useLocalTime) {
-                timeStr = date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+                timeStr = date.toLocaleString('en-US', formatOpts);
                 document.getElementById('timestampTz').textContent = 'Local Time';
             } else {
-                timeStr = date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
+                timeStr = date.toLocaleString('en-US', { ...formatOpts, timeZone: 'UTC' });
                 document.getElementById('timestampTz').textContent = 'UTC';
             }
 
             const isForecast = currentFrame > lastPastFrame;
-            document.getElementById('timestampText').textContent = timeStr + (isForecast ? ' (Forecast)' : '');
+            document.getElementById('timestampText').textContent = timeStr + (isForecast ? ' (Fcst)' : '');
             document.getElementById('timestampBox').classList.toggle('forecast', isForecast);
         }
 
@@ -2112,14 +2665,6 @@
             document.getElementById('dataStatusText').textContent = msg;
             el.classList.add('show');
             setTimeout(() => el.classList.remove('show'), 3000);
-        }
-
-        function toast(msg, isError) {
-            const el = document.getElementById('toast');
-            el.textContent = msg;
-            el.classList.toggle('error', !!isError);
-            el.classList.add('show');
-            setTimeout(() => el.classList.remove('show'), 2500);
         }
 
         function hideLoading() {
@@ -2195,7 +2740,6 @@
             });
 
             document.getElementById('refreshBtn').addEventListener('click', async () => {
-                toast('Refreshing all data...');
                 await loadRadarData();
                 if (settings.layers.alerts) loadAlerts();
                 if (settings.layers.spcOutlook) loadSPCOutlook();
@@ -2280,7 +2824,16 @@
 
             // Radar settings
             initSlider('opacitySlider', 'opacityValue', 'opacity', '%', () => {
-                if (frameLayers[currentFrame]) frameLayers[currentFrame].setOpacity(settings.opacity);
+                // Update RainViewer layer
+                if (frameLayers[currentFrame]) {
+                    const zoom = map.getZoom();
+                    const isHighZoom = zoom >= radarSystem.MRMS_PRIMARY_ZOOM && radarSystem.isUS;
+                    frameLayers[currentFrame].setOpacity(isHighZoom ? settings.opacity * 0.5 : settings.opacity);
+                }
+                // Update MRMS layer
+                if (radarSystem.mrmsBase) {
+                    radarSystem.mrmsBase.setOpacity(settings.opacity);
+                }
             }, true);
             initSlider('delaySlider', 'delayValue', 'delay', 'ms');
 
@@ -2296,6 +2849,17 @@
             snowToggle.addEventListener('click', () => {
                 settings.snowColor = snowToggle.classList.toggle('on') ? 1 : 0;
                 saveSettings();
+            });
+
+            const highResToggle = document.getElementById('highResToggle');
+            highResToggle.classList.toggle('on', settings.highResMode);
+            highResToggle.addEventListener('click', () => {
+                settings.highResMode = highResToggle.classList.toggle('on');
+                saveSettings();
+                // Immediately apply/remove high-res mode
+                const zoom = map.getZoom();
+                updateHybridRadar(zoom);
+                updateZoomIndicator(zoom);
             });
 
             const autoRefreshToggle = document.getElementById('autoRefreshToggle');
@@ -2333,7 +2897,6 @@
                 settings.owmKey = document.getElementById('owmKeyInput').value.trim();
                 settings.waqiKey = document.getElementById('waqiKeyInput').value.trim();
                 saveSettings();
-                toast('API keys saved');
             });
 
             // Import/Export
@@ -2343,7 +2906,6 @@
                 a.href = URL.createObjectURL(blob);
                 a.download = 'stormview_pro_settings.json';
                 a.click();
-                toast('Settings exported');
             });
             
             document.getElementById('importBtn').addEventListener('click', () => {
@@ -2358,10 +2920,9 @@
                     try {
                         Object.assign(settings, JSON.parse(ev.target.result));
                         saveSettings();
-                        toast('Settings imported - reloading...');
-                        setTimeout(() => location.reload(), 1000);
+                        setTimeout(() => location.reload(), 500);
                     } catch(err) {
-                        toast('Invalid file', true);
+                        console.error('Import error:', err);
                     }
                 };
                 reader.readAsText(file);
@@ -2499,8 +3060,7 @@
         }
 
         function goToLocation() {
-            if (!navigator.geolocation) return toast('Geolocation not supported', true);
-            toast('Getting location...');
+            if (!navigator.geolocation) return;
             
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
@@ -2513,9 +3073,8 @@
                             radius: 10, fillColor: '#38bdf8', fillOpacity: 1, color: '#fff', weight: 3
                         }).addTo(map);
                     }
-                    toast('Location found');
                 },
-                () => toast('Could not get location', true),
+                () => console.warn('Could not get location'),
                 { enableHighAccuracy: true, timeout: 10000 }
             );
         }
@@ -2549,6 +3108,15 @@
                     break;
             }
         });
+
+        // Global error handler for tile images - catches any broken images that slip through
+        document.addEventListener('error', function(e) {
+            if (e.target.tagName === 'IMG' && e.target.closest('.leaflet-tile-pane')) {
+                e.target.style.opacity = '0';
+                e.target.style.visibility = 'hidden';
+                e.target.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+            }
+        }, true);
 
         document.addEventListener('DOMContentLoaded', init);
     })();
