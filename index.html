@@ -285,24 +285,127 @@
         .icon-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
         .icon-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
         .icon-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; }
+        .sidebar-toggle svg { width: 18px; height: 18px; }
 
-        /* Sidebar */
-        .sidebar {
+        /* ==================== SAVED LOCATIONS ==================== */
+        .bookmarks-wrap { position: relative; }
+        .bookmarks-panel {
             position: absolute;
-            top: 80px; left: 12px;
-            width: 260px;
-            max-height: calc(100% - 200px);
+            top: calc(100% + 8px); right: 0;
+            width: 300px;
+            background: var(--panel-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            z-index: 1300;
+            opacity: 0; visibility: hidden;
+            transform: translateY(-6px);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+        .bookmarks-panel.open { opacity: 1; visibility: visible; transform: translateY(0); }
+
+        .bm-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .bm-header-title { font-size: 13px; font-weight: 700; }
+        .bm-header-count { font-size: 11px; color: var(--text-muted); }
+
+        .bm-list {
+            max-height: 320px; overflow-y: auto;
+        }
+        .bm-list::-webkit-scrollbar { width: 5px; }
+        .bm-list::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 3px; }
+
+        .bm-empty {
+            padding: 28px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+        .bm-empty svg { width: 32px; height: 32px; stroke: var(--text-muted); margin-bottom: 8px; opacity: 0.4; }
+
+        .bm-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--glass-border);
+            cursor: pointer;
+            transition: background 0.12s;
+        }
+        .bm-item:last-child { border-bottom: none; }
+        .bm-item:hover { background: var(--glass-hover); }
+        .bm-item-info { flex: 1; min-width: 0; }
+        .bm-item-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bm-item-coords { font-size: 10px; color: var(--text-muted); }
+        .bm-item-actions { display: flex; gap: 4px; flex-shrink: 0; opacity: 0; transition: opacity 0.15s; }
+        .bm-item:hover .bm-item-actions { opacity: 1; }
+        .bm-action {
+            width: 28px; height: 28px;
+            background: var(--glass-hover);
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            color: var(--text-dim);
+            cursor: pointer;
+            display: grid; place-items: center;
+            transition: all 0.12s;
+        }
+        .bm-action:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+        .bm-action.delete:hover { color: var(--danger); background: rgba(248,113,113,0.15); }
+        .bm-action svg { width: 14px; height: 14px; }
+
+        /* Save button in forecast header */
+        .fc-save {
+            width: 32px; height: 32px;
+            background: var(--glass-hover);
+            border: none; border-radius: 8px;
+            color: var(--text-dim); cursor: pointer;
+            display: grid; place-items: center;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .fc-save:hover { color: var(--accent); background: rgba(56,189,248,0.15); }
+        .fc-save.saved { color: var(--warning); }
+        .fc-save svg { width: 18px; height: 18px; }
+
+        @media (max-width: 768px) {
+            .bookmarks-panel { width: calc(100vw - 24px); right: -40px; }
+        }
+
+        /* Sidebar - Collapsible Drawer */
+        .sidebar {
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            width: 280px;
+            background: var(--panel-bg);
+            border-right: 1px solid var(--glass-border);
             overflow-y: auto;
             display: flex; flex-direction: column; gap: 4px;
-            z-index: 900;
-            padding-bottom: 16px;
+            z-index: 1200;
+            padding: 72px 8px 16px;
+            transform: translateX(-100%);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .sidebar::-webkit-scrollbar { width: 6px; }
+        .sidebar.open { transform: translateX(0); }
+        .sidebar::-webkit-scrollbar { width: 5px; }
         .sidebar::-webkit-scrollbar-track { background: transparent; }
         .sidebar::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 3px; }
 
+        .sidebar-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.35);
+            z-index: 1199;
+            opacity: 0; visibility: hidden;
+            transition: all 0.3s;
+        }
+        .sidebar-overlay.open { opacity: 1; visibility: visible; }
+
         .panel-section { 
-            padding: 8px 10px; 
+            padding: 8px 10px;
+            background: var(--glass-hover);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
             overflow: visible;
         }
         .panel-content {
@@ -453,18 +556,18 @@
         .legend {
             position: absolute; right: 12px; top: 50%;
             transform: translateY(-50%);
-            padding: 12px; z-index: 900;
+            padding: 10px; z-index: 900;
         }
         .legend-gradient {
-            width: 14px; height: 160px; border-radius: 4px;
+            width: 12px; height: 140px; border-radius: 3px;
             background: linear-gradient(to bottom,
                 #ff00ff 0%, #ff0000 15%, #ff6600 25%, #ffc800 35%,
                 #ffff00 45%, #7fff00 55%, #00c800 65%, #00b4ff 75%, #0064ff 85%, #000096 100%
             );
         }
         .legend-labels {
-            position: absolute; right: 32px; top: 12px;
-            height: 160px; display: flex; flex-direction: column;
+            position: absolute; right: 28px; top: 10px;
+            height: 140px; display: flex; flex-direction: column;
             justify-content: space-between;
             font-size: 10px; color: var(--text-muted);
             font-weight: 500; text-align: right;
@@ -473,15 +576,15 @@
         /* Playback */
         .playback {
             position: absolute;
-            bottom: 12px; left: 12px; right: 12px;
-            padding: 16px 20px;
+            bottom: 8px; left: 8px; right: 8px;
+            padding: 10px 16px 8px;
             z-index: 1000;
         }
 
         .timeline {
-            position: relative; height: 14px;
+            position: relative; height: 10px;
             background: rgba(255,255,255,0.1);
-            border-radius: 7px; margin-bottom: 16px; cursor: pointer;
+            border-radius: 5px; margin-bottom: 8px; cursor: pointer;
             touch-action: none;
         }
         .timeline-forecast {
@@ -497,9 +600,9 @@
         }
         .timeline-thumb {
             position: absolute; top: 50%;
-            width: 22px; height: 22px;
+            width: 18px; height: 18px;
             background: #fff;
-            border: 3px solid var(--accent);
+            border: 2px solid var(--accent);
             border-radius: 50%;
             transform: translate(-50%, -50%);
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
@@ -508,9 +611,9 @@
             cursor: grab;
         }
 
-        .controls { display: flex; align-items: center; justify-content: center; gap: 12px; }
+        .controls { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .play-btn {
-            width: 56px; height: 56px;
+            width: 44px; height: 44px;
             background: linear-gradient(135deg, var(--accent), #818cf8);
             border: none; border-radius: 50%;
             color: #fff; cursor: pointer;
@@ -520,11 +623,11 @@
         }
         .play-btn:hover { transform: scale(1.05); }
         .play-btn:active { transform: scale(0.98); }
-        .play-btn svg { width: 24px; height: 24px; fill: #fff; stroke: none; }
+        .play-btn svg { width: 20px; height: 20px; fill: #fff; stroke: none; }
         .play-btn.loading { opacity: 0.6; pointer-events: none; }
 
         .ctrl-btn {
-            width: 44px; height: 44px;
+            width: 36px; height: 36px;
             background: var(--glass-hover);
             border: 1px solid var(--glass-border);
             border-radius: 50%;
@@ -534,22 +637,22 @@
         }
         .ctrl-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
         .ctrl-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-        .ctrl-btn svg { width: 18px; height: 18px; }
+        .ctrl-btn svg { width: 16px; height: 16px; }
 
         .speed-pill {
-            padding: 8px 14px;
+            padding: 6px 12px;
             background: var(--glass-hover);
             border: 1px solid var(--glass-border);
             border-radius: 20px;
             color: var(--text);
-            font-size: 13px; font-weight: 700;
+            font-size: 12px; font-weight: 700;
             cursor: pointer; transition: all 0.15s;
         }
         .speed-pill:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
         .load-progress {
             position: absolute;
-            bottom: 100px; left: 50%;
+            bottom: 90px; left: 50%;
             transform: translateX(-50%);
             padding: 12px 24px;
             background: var(--glass-bg);
@@ -780,12 +883,12 @@
         .sheet-handle { width: 40px; height: 4px; background: var(--text-muted); border-radius: 2px; margin: 12px auto; }
         .sheet-content { flex: 1; overflow-y: auto; padding: 0 16px 24px; }
 
-        .mobile-fab { display: none; position: fixed; bottom: 140px; left: 12px; z-index: 1000; }
-        .loc-btn { position: absolute; bottom: 140px; right: 12px; z-index: 900; }
+        .mobile-fab { display: none; position: fixed; bottom: 120px; left: 12px; z-index: 1000; }
+        .loc-btn { position: absolute; bottom: 120px; right: 12px; z-index: 900; }
 
         /* Status indicators */
         .status-bar {
-            position: absolute; top: 80px; right: 12px;
+            position: absolute; top: 116px; left: 12px;
             display: flex; flex-direction: column; gap: 8px;
             z-index: 899;
         }
@@ -837,7 +940,7 @@
         .loading-text { margin-top: 16px; color: var(--text-dim); }
 
         .data-credit {
-            position: absolute; bottom: 4px; left: 4px;
+            position: absolute; top: 116px; right: 12px;
             font-size: 9px; color: var(--text-muted);
             z-index: 899; pointer-events: none;
         }
@@ -1045,19 +1148,19 @@
         /* ==================== QUICK ACCESS TOOLBAR ==================== */
         .quick-toolbar {
             position: absolute;
-            bottom: 140px; left: 50%;
+            top: 78px; left: 50%;
             transform: translateX(-50%);
-            display: flex; gap: 4px;
-            padding: 5px;
+            display: flex; gap: 3px;
+            padding: 4px;
             z-index: 950;
-            border-radius: 28px;
+            border-radius: 24px;
         }
         .qt-btn {
             display: flex; align-items: center; gap: 5px;
-            padding: 7px 12px;
+            padding: 6px 11px;
             background: transparent;
             border: 1px solid transparent;
-            border-radius: 20px;
+            border-radius: 18px;
             color: var(--text-dim);
             font-size: 11px; font-weight: 600;
             cursor: pointer;
@@ -1087,7 +1190,7 @@
 
         @media (max-width: 768px) {
             .quick-toolbar { 
-                bottom: auto; top: 74px;
+                top: 74px;
                 left: 8px; right: 8px;
                 transform: none;
                 justify-content: center;
@@ -1154,6 +1257,8 @@
 
         @media (max-width: 768px) {
             .sidebar { display: none; }
+            .sidebar-overlay { display: none; }
+            .sidebar-toggle { display: none; }
             .mobile-fab { display: grid; }
             .header { right: 12px; }
             .search-box { max-width: 180px; }
@@ -1165,13 +1270,13 @@
                 align-items: center;
                 justify-content: center;
                 gap: 8px;
-                padding: 6px 14px;
-                font-size: 13px;
+                padding: 4px 14px;
+                font-size: 12px;
                 font-weight: 600;
                 font-variant-numeric: tabular-nums;
                 color: var(--text);
                 pointer-events: none;
-                margin-bottom: 4px;
+                margin-bottom: 2px;
             }
             .mobile-timestamp .forecast-badge {
                 display: inline-block;
@@ -1182,6 +1287,7 @@
                 background: var(--accent);
                 color: #fff;
             }
+            .loc-btn { bottom: 110px; }
         }
 
         @media (max-width: 480px) {
@@ -1194,12 +1300,12 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 10px;
-            font-size: 11px;
+            margin-bottom: 4px;
+            font-size: 10px;
             color: var(--text-muted);
             font-variant-numeric: tabular-nums;
             padding: 0 2px;
-            min-height: 16px;
+            min-height: 14px;
         }
         .frame-indicator .fi-left {
             display: flex; align-items: center; gap: 6px;
@@ -1436,6 +1542,26 @@
         </div>
 
         <div class="header-btns">
+            <button class="icon-btn sidebar-toggle" id="sidebarToggle" title="Layers Panel">
+                <svg viewBox="0 0 24 24" stroke-width="2">
+                    <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/>
+                    <path d="M12 13v8M8 17l4-4 4 4"/>
+                </svg>
+            </button>
+            <div class="bookmarks-wrap">
+                <button class="icon-btn" id="bookmarksBtn" title="Saved Locations">
+                    <svg viewBox="0 0 24 24" stroke-width="2">
+                        <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>
+                    </svg>
+                </button>
+                <div class="bookmarks-panel" id="bookmarksPanel">
+                    <div class="bm-header">
+                        <span class="bm-header-title">Saved Locations</span>
+                        <span class="bm-header-count" id="bmCount"></span>
+                    </div>
+                    <div class="bm-list" id="bmList"></div>
+                </div>
+            </div>
             <button class="icon-btn" id="themeBtn" title="Toggle Theme">
                 <svg viewBox="0 0 24 24" stroke-width="2">
                     <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
@@ -1457,6 +1583,7 @@
         </div>
     </header>
 
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <aside class="sidebar" id="sidebar">
         <!-- Radar Source -->
         <div class="panel-section glass">
@@ -1794,9 +1921,14 @@
                 <div class="fc-location" id="fcLocation">Loading...</div>
                 <div class="fc-coords" id="fcCoords"></div>
             </div>
-            <button class="fc-close" id="fcClose">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-            </button>
+            <div style="display:flex;gap:6px;align-items:center;">
+                <button class="fc-save" id="fcSave" title="Save this location">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+                </button>
+                <button class="fc-close" id="fcClose">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
         </div>
         <div class="fc-body" id="fcBody">
             <div class="fc-loading">
@@ -2274,8 +2406,10 @@
             setupZoomHandler();
             initRadarSystem();
             initUI();
+            initSidebarDrawer();
             initForecastPanel();
             initQuickToolbar();
+            initBookmarks();
             updatePlaybackVisibility();
             loadRadarData();
             
@@ -4633,6 +4767,8 @@
 
                 locEl.textContent = locationName;
                 coordsEl.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)} \u2022 ${om.timezone || ''}`;
+                currentForecastLocation = { name: locationName, lat, lng };
+                updateForecastSaveState();
                 renderForecast(om, alerts);
 
             } catch(e) {
@@ -4737,6 +4873,191 @@
             html += `<div class="fc-powered">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> &amp; <a href="https://www.weather.gov/" target="_blank" rel="noopener">NWS</a></div>`;
 
             body.innerHTML = html;
+        }
+
+        // ==================== SAVED LOCATIONS ====================
+        const BOOKMARKS_KEY = 'stormview_bookmarks';
+        let savedLocations = [];
+        let currentForecastLocation = null; // {name, lat, lng}
+
+        function loadBookmarks() {
+            try {
+                savedLocations = JSON.parse(localStorage.getItem(BOOKMARKS_KEY)) || [];
+            } catch { savedLocations = []; }
+        }
+
+        function saveBookmarks() {
+            localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(savedLocations));
+        }
+
+        function addBookmark(name, lat, lng) {
+            // Check for duplicate (within ~0.01 degree)
+            const exists = savedLocations.some(b =>
+                Math.abs(b.lat - lat) < 0.01 && Math.abs(b.lng - lng) < 0.01
+            );
+            if (exists) {
+                showToast('Location already saved', 'warn');
+                return false;
+            }
+            savedLocations.push({ name, lat, lng, id: Date.now() });
+            saveBookmarks();
+            renderBookmarks();
+            showToast(`Saved: ${name}`, 'success');
+            return true;
+        }
+
+        function removeBookmark(id) {
+            savedLocations = savedLocations.filter(b => b.id !== id);
+            saveBookmarks();
+            renderBookmarks();
+            updateForecastSaveState();
+        }
+
+        function renderBookmarks() {
+            const list = document.getElementById('bmList');
+            const count = document.getElementById('bmCount');
+            if (!list) return;
+
+            count.textContent = savedLocations.length > 0 ? `${savedLocations.length} saved` : '';
+
+            if (savedLocations.length === 0) {
+                list.innerHTML = `<div class="bm-empty">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+                    <div>No saved locations yet</div>
+                    <div style="margin-top:4px;font-size:11px;">Click the map, then tap the bookmark icon in the forecast panel to save a location</div>
+                </div>`;
+                return;
+            }
+
+            list.innerHTML = savedLocations.map(b => `
+                <div class="bm-item" data-bm-id="${b.id}">
+                    <div class="bm-item-info">
+                        <div class="bm-item-name">${b.name}</div>
+                        <div class="bm-item-coords">${b.lat.toFixed(4)}, ${b.lng.toFixed(4)}</div>
+                    </div>
+                    <div class="bm-item-actions">
+                        <button class="bm-action forecast" title="Open forecast" data-action="forecast">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>
+                        </button>
+                        <button class="bm-action delete" title="Remove" data-action="delete">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            // Wire click handlers
+            list.querySelectorAll('.bm-item').forEach(item => {
+                const id = parseInt(item.dataset.bmId);
+                const bm = savedLocations.find(b => b.id === id);
+                if (!bm) return;
+
+                // Click row = fly to location
+                item.addEventListener('click', (e) => {
+                    if (e.target.closest('.bm-action')) return;
+                    map.flyTo([bm.lat, bm.lng], 10);
+                    closeBookmarksPanel();
+                });
+
+                // Forecast button
+                item.querySelector('[data-action="forecast"]')?.addEventListener('click', () => {
+                    openForecast(bm.lat, bm.lng);
+                    closeBookmarksPanel();
+                });
+
+                // Delete button
+                item.querySelector('[data-action="delete"]')?.addEventListener('click', () => {
+                    removeBookmark(id);
+                    showToast(`Removed: ${bm.name}`, 'info');
+                });
+            });
+        }
+
+        function updateForecastSaveState() {
+            const btn = document.getElementById('fcSave');
+            if (!btn || !currentForecastLocation) return;
+            const isSaved = savedLocations.some(b =>
+                Math.abs(b.lat - currentForecastLocation.lat) < 0.01 &&
+                Math.abs(b.lng - currentForecastLocation.lng) < 0.01
+            );
+            btn.classList.toggle('saved', isSaved);
+            // Switch icon to filled bookmark if saved
+            if (isSaved) {
+                btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>';
+                btn.title = 'Location saved';
+            } else {
+                btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>';
+                btn.title = 'Save this location';
+            }
+        }
+
+        function closeBookmarksPanel() {
+            document.getElementById('bookmarksPanel')?.classList.remove('open');
+            document.getElementById('bookmarksBtn')?.classList.remove('active');
+        }
+
+        function initBookmarks() {
+            loadBookmarks();
+            renderBookmarks();
+
+            const btn = document.getElementById('bookmarksBtn');
+            const panel = document.getElementById('bookmarksPanel');
+
+            // Toggle dropdown
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = panel.classList.toggle('open');
+                btn.classList.toggle('active', isOpen);
+            });
+
+            // Close on outside click
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.bookmarks-wrap')) {
+                    closeBookmarksPanel();
+                }
+            });
+
+            // Save from forecast panel
+            document.getElementById('fcSave').addEventListener('click', () => {
+                if (!currentForecastLocation) return;
+                const { name, lat, lng } = currentForecastLocation;
+                
+                // Toggle: if already saved, remove it
+                const existing = savedLocations.find(b =>
+                    Math.abs(b.lat - lat) < 0.01 && Math.abs(b.lng - lng) < 0.01
+                );
+                if (existing) {
+                    removeBookmark(existing.id);
+                    showToast(`Removed: ${name}`, 'info');
+                } else {
+                    addBookmark(name, lat, lng);
+                }
+                updateForecastSaveState();
+            });
+        }
+
+        // ==================== SIDEBAR DRAWER ====================
+        function initSidebarDrawer() {
+            const toggle = document.getElementById('sidebarToggle');
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            
+            function openSidebar() {
+                sidebar.classList.add('open');
+                overlay.classList.add('open');
+                toggle.classList.add('active');
+            }
+            function closeSidebar() {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('open');
+                toggle.classList.remove('active');
+            }
+            
+            toggle.addEventListener('click', () => {
+                if (sidebar.classList.contains('open')) closeSidebar();
+                else openSidebar();
+            });
+            overlay.addEventListener('click', closeSidebar);
         }
 
         // ==================== QUICK ACCESS TOOLBAR ====================
