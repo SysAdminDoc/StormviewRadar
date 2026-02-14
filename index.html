@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>StormView Pro v4 - Enhanced</title>
+    <title>StormView Pro v5 - Forecast Edition</title>
     
     <!-- Favicons -->
     <link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/SysAdminDoc/StormviewRadar/refs/heads/main/logo/StormView.ico">
@@ -858,6 +858,284 @@
         .popup-content .badge.info { background: var(--accent); color: #fff; }
         .popup-content .badge.success { background: var(--success); color: #000; }
 
+        /* ==================== FORECAST PANEL ==================== */
+        .forecast-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 1500;
+            opacity: 0; visibility: hidden;
+            transition: all 0.3s;
+        }
+        .forecast-overlay.open { opacity: 1; visibility: visible; }
+
+        .forecast-panel {
+            position: fixed;
+            bottom: 0; left: 50%; 
+            transform: translateX(-50%) translateY(100%);
+            width: 520px; max-width: 100vw;
+            max-height: 80vh;
+            background: var(--panel-bg);
+            border: 1px solid var(--glass-border);
+            border-bottom: none;
+            border-radius: 20px 20px 0 0;
+            z-index: 1501;
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        .forecast-panel.open { transform: translateX(-50%) translateY(0); }
+
+        .fc-handle { width: 40px; height: 4px; background: var(--text-muted); border-radius: 2px; margin: 10px auto 6px; flex-shrink: 0; }
+
+        .fc-header {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            padding: 4px 20px 12px;
+            border-bottom: 1px solid var(--glass-border);
+            flex-shrink: 0;
+        }
+        .fc-location { font-size: 17px; font-weight: 700; line-height: 1.25; }
+        .fc-coords { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .fc-close {
+            width: 32px; height: 32px;
+            background: var(--glass-hover);
+            border: none; border-radius: 8px;
+            color: var(--text); cursor: pointer;
+            display: grid; place-items: center;
+            flex-shrink: 0;
+        }
+        .fc-close svg { width: 18px; height: 18px; }
+
+        .fc-body {
+            flex: 1; overflow-y: auto;
+            padding: 16px 20px 24px;
+        }
+        .fc-body::-webkit-scrollbar { width: 6px; }
+        .fc-body::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 3px; }
+
+        /* Current conditions */
+        .fc-current {
+            display: flex; align-items: center; gap: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--glass-border);
+            margin-bottom: 16px;
+        }
+        .fc-current-icon { font-size: 48px; line-height: 1; flex-shrink: 0; }
+        .fc-current-temp { font-size: 44px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+        .fc-current-details { flex: 1; min-width: 0; }
+        .fc-condition { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        .fc-stats {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 3px 12px;
+            font-size: 12px; color: var(--text-dim);
+        }
+        .fc-stat-label { color: var(--text-muted); }
+
+        /* NWS Alert banner inside forecast */
+        .fc-alert-banner {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 14px;
+            font-size: 12px; font-weight: 600;
+            background: rgba(248,113,113,0.15);
+            border: 1px solid rgba(248,113,113,0.3);
+            color: var(--danger);
+        }
+        .fc-alert-banner svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+        /* Hourly forecast */
+        .fc-section-title { 
+            font-size: 11px; font-weight: 700; 
+            color: var(--text-muted); text-transform: uppercase; 
+            letter-spacing: 0.5px; margin-bottom: 10px; 
+        }
+        .fc-hourly-scroll {
+            display: flex; gap: 2px;
+            overflow-x: auto; padding-bottom: 8px;
+            margin-bottom: 16px;
+            scrollbar-width: thin;
+        }
+        .fc-hourly-scroll::-webkit-scrollbar { height: 4px; }
+        .fc-hourly-scroll::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 2px; }
+        .fc-hour {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 4px; padding: 8px 10px;
+            background: var(--glass-hover);
+            border-radius: 10px;
+            min-width: 58px;
+            flex-shrink: 0;
+            font-size: 11px;
+            transition: background 0.15s;
+        }
+        .fc-hour:first-child { background: rgba(56,189,248,0.15); }
+        .fc-hour-time { color: var(--text-muted); font-weight: 600; font-size: 10px; }
+        .fc-hour-icon { font-size: 20px; line-height: 1; }
+        .fc-hour-temp { font-weight: 700; font-size: 13px; }
+        .fc-hour-precip { font-size: 9px; color: var(--accent); }
+
+        /* 7-day forecast */
+        .fc-daily { display: flex; flex-direction: column; gap: 2px; }
+        .fc-day {
+            display: grid; grid-template-columns: 80px 28px 1fr 44px 44px;
+            align-items: center; gap: 6px;
+            padding: 8px 10px;
+            background: var(--glass-hover);
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .fc-day-name { font-weight: 600; }
+        .fc-day-icon { font-size: 18px; text-align: center; }
+        .fc-day-bar {
+            height: 6px;
+            background: linear-gradient(90deg, var(--accent), var(--danger));
+            border-radius: 3px;
+            position: relative;
+        }
+        .fc-day-bar-track {
+            height: 6px;
+            background: var(--glass-hover);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .fc-day-hi { font-weight: 700; text-align: right; }
+        .fc-day-lo { color: var(--text-muted); text-align: right; }
+
+        .fc-loading {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 40px 0;
+            gap: 12px;
+        }
+        .fc-loading-spinner {
+            width: 28px; height: 28px;
+            border: 2px solid var(--glass-border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .fc-loading-text { font-size: 13px; color: var(--text-muted); }
+
+        /* Forecast click marker */
+        .forecast-marker {
+            width: 20px; height: 20px;
+            background: var(--accent);
+            border: 3px solid #fff;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4), 0 0 0 4px rgba(56,189,248,0.3);
+            cursor: pointer;
+        }
+
+        .fc-powered {
+            text-align: center;
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--glass-border);
+        }
+        .fc-powered a { color: var(--accent); text-decoration: none; }
+
+        @media (max-width: 768px) {
+            .forecast-panel { width: 100%; border-radius: 16px 16px 0 0; }
+            .fc-current-temp { font-size: 36px; }
+            .fc-current-icon { font-size: 36px; }
+            .fc-day { grid-template-columns: 60px 24px 1fr 38px 38px; font-size: 12px; }
+        }
+
+        /* ==================== QUICK ACCESS TOOLBAR ==================== */
+        .quick-toolbar {
+            position: absolute;
+            bottom: 140px; left: 50%;
+            transform: translateX(-50%);
+            display: flex; gap: 4px;
+            padding: 5px;
+            z-index: 950;
+            border-radius: 28px;
+        }
+        .qt-btn {
+            display: flex; align-items: center; gap: 5px;
+            padding: 7px 12px;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 20px;
+            color: var(--text-dim);
+            font-size: 11px; font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .qt-btn:hover { background: var(--glass-hover); color: var(--text); }
+        .qt-btn.active { background: rgba(56,189,248,0.18); color: var(--accent); border-color: rgba(56,189,248,0.3); }
+        .qt-btn .qt-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            opacity: 0.6;
+        }
+        .qt-btn.active .qt-dot { opacity: 1; }
+        .qt-btn .qt-badge {
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 8px;
+            background: var(--danger);
+            color: #fff;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+        .qt-btn .qt-badge:empty { display: none; }
+        .qt-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; flex-shrink: 0; }
+
+        @media (max-width: 768px) {
+            .quick-toolbar { 
+                bottom: auto; top: 74px;
+                left: 8px; right: 8px;
+                transform: none;
+                justify-content: center;
+                padding: 3px;
+                overflow-x: auto;
+                scrollbar-width: none;
+            }
+            .quick-toolbar::-webkit-scrollbar { display: none; }
+            .qt-btn { padding: 5px 8px; font-size: 10px; }
+            .qt-btn span.qt-label { display: none; }
+        }
+
+        /* ==================== IMPROVED MOBILE SHEET ==================== */
+        .sheet-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--glass-border);
+            padding: 0 12px;
+            flex-shrink: 0;
+        }
+        .sheet-tab {
+            flex: 1;
+            padding: 10px 8px;
+            background: none; border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-dim);
+            font-size: 12px; font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+        .sheet-tab:hover { color: var(--text); }
+        .sheet-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+        .sheet-tab-content { display: none; }
+        .sheet-tab-content.active { display: block; }
+
+        /* Alert count badge on layer chips */
+        .layer-chip .alert-count {
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 8px;
+            background: var(--danger);
+            color: #fff;
+            font-weight: 700;
+            line-height: 1.3;
+            flex-shrink: 0;
+        }
+        .layer-chip .alert-count:empty { display: none; }
+
         .layer-legend {
             display: flex; flex-wrap: wrap; gap: 4px 8px;
             padding: 5px 0 0 0;
@@ -1115,7 +1393,7 @@
             <img src="https://raw.githubusercontent.com/SysAdminDoc/StormviewRadar/refs/heads/main/logo/StormView-192x192.png" alt="StormView">
         </div>
         <div class="loading-title">StormView Pro</div>
-        <div class="loading-sub">v4 Enhanced</div>
+        <div class="loading-sub">v5 Forecast Edition</div>
         <div class="loading-spinner"></div>
         <div class="loading-text">Initializing radar systems...</div>
     </div>
@@ -1190,6 +1468,7 @@
                 <button class="source-tab active" data-source="hrrr" title="18hr Forecast!">HRRR</button>
                 <button class="source-tab" data-source="rainviewer">RainViewer</button>
                 <button class="source-tab" data-source="mrms">MRMS</button>
+                <button class="source-tab" data-source="nowcoast" title="NOAA 1km WMS">NOAA</button>
             </div>
         </div>
         
@@ -1242,6 +1521,7 @@
                     <div class="layer-chip active" data-layer="alerts">
                         <span class="dot" style="background: var(--danger)"></span>
                         <span class="layer-name">Alerts</span>
+                        <span class="alert-count"></span>
                     </div>
                     <div class="layer-chip active" data-layer="spcOutlook">
                         <span class="dot" style="background: var(--warning)"></span>
@@ -1458,6 +1738,35 @@
         </div>
     </aside>
 
+    <!-- Quick Access Toolbar -->
+    <div class="quick-toolbar glass" id="quickToolbar">
+        <button class="qt-btn active" data-qt="radar">
+            <span class="qt-dot" style="background: var(--accent)"></span>
+            <span class="qt-label">Radar</span>
+        </button>
+        <button class="qt-btn active" data-qt="alerts">
+            <span class="qt-dot" style="background: var(--danger)"></span>
+            <span class="qt-label">Alerts</span>
+            <span class="qt-badge" id="qtAlertCount"></span>
+        </button>
+        <button class="qt-btn" data-qt="lightning">
+            <span class="qt-dot" style="background: #ffff00"></span>
+            <span class="qt-label">Lightning</span>
+        </button>
+        <button class="qt-btn" data-qt="satellite">
+            <span class="qt-dot" style="background: #00ffff"></span>
+            <span class="qt-label">Satellite</span>
+        </button>
+        <button class="qt-btn active" data-qt="spcOutlook">
+            <span class="qt-dot" style="background: var(--warning)"></span>
+            <span class="qt-label">SPC</span>
+        </button>
+        <button class="qt-btn" data-qt="stormReports">
+            <span class="qt-dot" style="background: var(--purple)"></span>
+            <span class="qt-label">Reports</span>
+        </button>
+    </div>
+
     <!-- Legend -->
     <div class="legend glass" id="legend">
         <div class="legend-gradient"></div>
@@ -1475,6 +1784,27 @@
 
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Forecast Panel -->
+    <div class="forecast-overlay" id="fcOverlay"></div>
+    <div class="forecast-panel" id="fcPanel">
+        <div class="fc-handle"></div>
+        <div class="fc-header">
+            <div>
+                <div class="fc-location" id="fcLocation">Loading...</div>
+                <div class="fc-coords" id="fcCoords"></div>
+            </div>
+            <button class="fc-close" id="fcClose">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="fc-body" id="fcBody">
+            <div class="fc-loading">
+                <div class="fc-loading-spinner"></div>
+                <div class="fc-loading-text">Fetching forecast...</div>
+            </div>
+        </div>
+    </div>
 
     <!-- Playback Controls -->
     <div class="playback glass" id="playback">
@@ -1690,11 +2020,20 @@
     <div class="sheet-overlay" id="sheetOverlay"></div>
     <div class="bottom-sheet" id="bottomSheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-content" id="mobileContent"></div>
+        <div class="sheet-tabs">
+            <button class="sheet-tab active" data-sheet-tab="layers">Layers</button>
+            <button class="sheet-tab" data-sheet-tab="sources">Sources</button>
+            <button class="sheet-tab" data-sheet-tab="map">Map</button>
+        </div>
+        <div class="sheet-content" id="mobileContent">
+            <div class="sheet-tab-content active" data-sheet-content="layers" id="mobileLayersTab"></div>
+            <div class="sheet-tab-content" data-sheet-content="sources" id="mobileSourcesTab"></div>
+            <div class="sheet-tab-content" data-sheet-content="map" id="mobileMapTab"></div>
+        </div>
     </div>
 
     <!-- Data Credit -->
-    <div class="data-credit">Data: NWS, RainViewer, SPC, IEM, USGS, NHC, Blitzortung, NOAA/GOES, Aviation Weather</div>
+    <div class="data-credit">Data: NWS, Open-Meteo, RainViewer, SPC, IEM, USGS, NHC, Blitzortung, NOAA/GOES, Aviation Weather</div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
@@ -1935,6 +2274,8 @@
             setupZoomHandler();
             initRadarSystem();
             initUI();
+            initForecastPanel();
+            initQuickToolbar();
             updatePlaybackVisibility();
             loadRadarData();
             
@@ -1948,10 +2289,10 @@
             startAutoRefresh();
             
             // Show keyboard hints on first visit
-            if (!localStorage.getItem('stormview_welcomed')) {
+            if (!localStorage.getItem('stormview_welcomed_v5')) {
                 setTimeout(() => {
-                    showToast('Tip: Space = play/pause, Arrow keys = step frames, R = refresh', 'info', 6000);
-                    localStorage.setItem('stormview_welcomed', '1');
+                    showToast('Tip: Click anywhere on the map for a 7-day forecast! Space = play/pause, Arrows = step frames', 'info', 6000);
+                    localStorage.setItem('stormview_welcomed_v5', '1');
                 }, 2500);
             }
         }
@@ -2424,6 +2765,8 @@
                     await loadMRMS();
                 } else if (settings.source === 'hrrr') {
                     await loadHRRR();
+                } else if (settings.source === 'nowcoast') {
+                    await loadNowCOAST();
                 }
             } catch(e) {
                 console.error('Radar error:', e);
@@ -2545,7 +2888,7 @@
             hideLoadProgress();
             updateLegend();
             // Auto-play if source supports animation
-            if (settings.source !== 'mrms' && frames.length > 1) {
+            if (settings.source !== 'mrms' && settings.source !== 'nowcoast' && frames.length > 1) {
                 play();
             }
         }
@@ -2583,6 +2926,38 @@
             updateTimestamp();
             updateTimelineUI();
             hideLoadProgress();
+        }
+        
+        // ==================== NOAA nowCOAST WMS RADAR ====================
+        async function loadNowCOAST() {
+            clearAllFrameLayers();
+            
+            const layer = L.tileLayer.wms('https://nowcoast.noaa.gov/geoserver/observations/weather_radar/ows', {
+                layers: 'weather_radar',
+                format: 'image/png',
+                transparent: true,
+                version: '1.3.0',
+                crs: L.CRS.EPSG3857,
+                opacity: settings.opacity,
+                pane: 'radarPane',
+                className: 'radar-layer radar-cached',
+                maxZoom: 18,
+                keepBuffer: 2,
+                updateWhenZooming: false,
+                updateWhenIdle: true
+            });
+            layer.addTo(map);
+            frameLayers.push(layer);
+            
+            frames = [{ time: Date.now() / 1000, path: 'nowcoast' }];
+            lastPastFrame = 0;
+            currentFrame = 0;
+            framesReady = true;
+            lastRefreshTime = Date.now();
+            updateTimestamp();
+            updateTimelineUI();
+            hideLoadProgress();
+            showToast('NOAA 1km WMS radar loaded', 'success');
         }
         
         // ==================== HRRR FORECAST RADAR ====================
@@ -3519,6 +3894,13 @@
                 });
 
                 if (settings.layers.alerts) layerRefs.alerts.addTo(map);
+                
+                // Update alert count badges
+                const warningCount = features.filter(f => {
+                    const evt = (f.properties?.event || '').toLowerCase();
+                    return evt.includes('warning') || evt.includes('tornado') || evt.includes('severe');
+                }).length;
+                updateAlertCount(warningCount || features.length);
             } catch(e) {
                 console.error('Alerts error:', e);
             }
@@ -3876,8 +4258,8 @@
         function updatePlaybackVisibility() {
             const playback = document.getElementById('playback');
             if (!playback) return;
-            // MRMS is single-frame with no animation support
-            if (settings.source === 'mrms') {
+            // MRMS and nowCOAST are single-frame with no animation support
+            if (settings.source === 'mrms' || settings.source === 'nowcoast') {
                 playback.style.display = 'none';
             } else {
                 playback.style.display = '';
@@ -3925,12 +4307,12 @@
             if (!sourceEl || !frameEl) return;
             
             // Source label
-            const sourceNames = { hrrr: 'HRRR', rainviewer: 'RainViewer', mrms: 'MRMS' };
+            const sourceNames = { hrrr: 'HRRR', rainviewer: 'RainViewer', mrms: 'MRMS', nowcoast: 'NOAA WMS' };
             sourceEl.textContent = sourceNames[settings.source] || settings.source;
             sourceEl.classList.toggle('forecast', isForecast);
             
             // Frame info
-            if (settings.source === 'mrms') {
+            if (settings.source === 'mrms' || settings.source === 'nowcoast') {
                 frameEl.textContent = 'Real-time';
             } else if (settings.source === 'hrrr') {
                 const hour = frames[currentFrame]?.mins ? Math.round(frames[currentFrame].mins / 60) : currentFrame;
@@ -4107,6 +4489,286 @@
             document.getElementById('loading').classList.add('hidden');
         }
 
+        // ==================== CLICK-TO-FORECAST (Open-Meteo) ====================
+        let forecastMarker = null;
+        let forecastAbort = null;
+
+        const WMO_CODES = {
+            0: { text: 'Clear Sky', icon: '\u2600\uFE0F', night: '\uD83C\uDF19' },
+            1: { text: 'Mainly Clear', icon: '\uD83C\uDF24\uFE0F', night: '\uD83C\uDF19' },
+            2: { text: 'Partly Cloudy', icon: '\u26C5', night: '\uD83C\uDF19' },
+            3: { text: 'Overcast', icon: '\u2601\uFE0F', night: '\u2601\uFE0F' },
+            45: { text: 'Fog', icon: '\uD83C\uDF2B\uFE0F', night: '\uD83C\uDF2B\uFE0F' },
+            48: { text: 'Rime Fog', icon: '\uD83C\uDF2B\uFE0F', night: '\uD83C\uDF2B\uFE0F' },
+            51: { text: 'Light Drizzle', icon: '\uD83C\uDF26\uFE0F', night: '\uD83C\uDF26\uFE0F' },
+            53: { text: 'Drizzle', icon: '\uD83C\uDF27\uFE0F', night: '\uD83C\uDF27\uFE0F' },
+            55: { text: 'Heavy Drizzle', icon: '\uD83C\uDF27\uFE0F', night: '\uD83C\uDF27\uFE0F' },
+            56: { text: 'Freezing Drizzle', icon: '\uD83C\uDF28\uFE0F', night: '\uD83C\uDF28\uFE0F' },
+            57: { text: 'Heavy Fzg Drizzle', icon: '\uD83C\uDF28\uFE0F', night: '\uD83C\uDF28\uFE0F' },
+            61: { text: 'Light Rain', icon: '\uD83C\uDF26\uFE0F', night: '\uD83C\uDF26\uFE0F' },
+            63: { text: 'Rain', icon: '\uD83C\uDF27\uFE0F', night: '\uD83C\uDF27\uFE0F' },
+            65: { text: 'Heavy Rain', icon: '\uD83C\uDF27\uFE0F', night: '\uD83C\uDF27\uFE0F' },
+            66: { text: 'Freezing Rain', icon: '\uD83C\uDF28\uFE0F', night: '\uD83C\uDF28\uFE0F' },
+            67: { text: 'Heavy Fzg Rain', icon: '\uD83C\uDF28\uFE0F', night: '\uD83C\uDF28\uFE0F' },
+            71: { text: 'Light Snow', icon: '\uD83C\uDF28\uFE0F', night: '\uD83C\uDF28\uFE0F' },
+            73: { text: 'Snow', icon: '\u2744\uFE0F', night: '\u2744\uFE0F' },
+            75: { text: 'Heavy Snow', icon: '\u2744\uFE0F', night: '\u2744\uFE0F' },
+            77: { text: 'Snow Grains', icon: '\u2744\uFE0F', night: '\u2744\uFE0F' },
+            80: { text: 'Light Showers', icon: '\uD83C\uDF26\uFE0F', night: '\uD83C\uDF26\uFE0F' },
+            81: { text: 'Showers', icon: '\uD83C\uDF27\uFE0F', night: '\uD83C\uDF27\uFE0F' },
+            82: { text: 'Heavy Showers', icon: '\uD83C\uDF27\uFE0F', night: '\uD83C\uDF27\uFE0F' },
+            85: { text: 'Snow Showers', icon: '\uD83C\uDF28\uFE0F', night: '\uD83C\uDF28\uFE0F' },
+            86: { text: 'Heavy Snow Shwrs', icon: '\u2744\uFE0F', night: '\u2744\uFE0F' },
+            95: { text: 'Thunderstorm', icon: '\u26C8\uFE0F', night: '\u26C8\uFE0F' },
+            96: { text: 'T-Storm w/ Hail', icon: '\u26C8\uFE0F', night: '\u26C8\uFE0F' },
+            99: { text: 'Severe T-Storm', icon: '\u26C8\uFE0F', night: '\u26C8\uFE0F' }
+        };
+
+        function getWeatherIcon(code, isNight = false) {
+            const entry = WMO_CODES[code] || WMO_CODES[0];
+            return isNight ? (entry.night || entry.icon) : entry.icon;
+        }
+        function getWeatherText(code) {
+            return (WMO_CODES[code] || WMO_CODES[0]).text;
+        }
+        function windDirection(deg) {
+            const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+            return dirs[Math.round(deg / 22.5) % 16];
+        }
+
+        function initForecastPanel() {
+            const overlay = document.getElementById('fcOverlay');
+            const panel = document.getElementById('fcPanel');
+            const closeBtn = document.getElementById('fcClose');
+
+            function closePanel() {
+                overlay.classList.remove('open');
+                panel.classList.remove('open');
+                if (forecastAbort) { forecastAbort.abort(); forecastAbort = null; }
+            }
+
+            closeBtn.addEventListener('click', closePanel);
+            overlay.addEventListener('click', closePanel);
+
+            // Map click handler
+            map.on('click', (e) => {
+                // Don't trigger if clicking on a popup, marker, or UI element
+                if (e.originalEvent.target.closest('.leaflet-popup, .leaflet-marker-icon, .leaflet-interactive')) return;
+                
+                const { lat, lng } = e.latlng;
+                openForecast(lat, lng);
+            });
+        }
+
+        async function openForecast(lat, lng) {
+            const overlay = document.getElementById('fcOverlay');
+            const panel = document.getElementById('fcPanel');
+            const body = document.getElementById('fcBody');
+            const locEl = document.getElementById('fcLocation');
+            const coordsEl = document.getElementById('fcCoords');
+
+            // Cancel any in-flight requests
+            if (forecastAbort) forecastAbort.abort();
+            forecastAbort = new AbortController();
+            const signal = forecastAbort.signal;
+
+            // Place/update marker
+            if (forecastMarker) {
+                forecastMarker.setLatLng([lat, lng]);
+            } else {
+                forecastMarker = L.marker([lat, lng], {
+                    icon: L.divIcon({ className: 'forecast-marker', iconSize: [20, 20], iconAnchor: [10, 10] }),
+                    zIndexOffset: 1000
+                }).addTo(map);
+            }
+
+            // Show panel with loading state
+            locEl.textContent = 'Loading...';
+            coordsEl.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            body.innerHTML = '<div class="fc-loading"><div class="fc-loading-spinner"></div><div class="fc-loading-text">Fetching forecast...</div></div>';
+            overlay.classList.add('open');
+            panel.classList.add('open');
+
+            try {
+                // Parallel fetch: Open-Meteo forecast + NWS point metadata + NWS alerts for point
+                const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+                    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure,precipitation,is_day` +
+                    `&hourly=temperature_2m,weather_code,precipitation_probability,is_day` +
+                    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max` +
+                    `&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto&forecast_days=7`;
+
+                const nwsUrl = `https://api.weather.gov/points/${lat.toFixed(4)},${lng.toFixed(4)}`;
+                const nwsAlertUrl = `https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lng.toFixed(4)}&limit=3`;
+
+                const [omResp, nwsResp, alertResp] = await Promise.allSettled([
+                    fetch(omUrl, { signal }),
+                    fetch(nwsUrl, { signal, headers: { 'User-Agent': 'StormViewPro/5.0' } }),
+                    fetch(nwsAlertUrl, { signal, headers: { 'User-Agent': 'StormViewPro/5.0' } })
+                ]);
+
+                if (signal.aborted) return;
+
+                // Parse Open-Meteo
+                if (omResp.status !== 'fulfilled' || !omResp.value.ok) {
+                    throw new Error('Open-Meteo API unavailable');
+                }
+                const om = await omResp.value.json();
+
+                // Parse NWS location name
+                let locationName = `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+                if (nwsResp.status === 'fulfilled' && nwsResp.value.ok) {
+                    const nws = await nwsResp.value.json();
+                    const city = nws.properties?.relativeLocation?.properties?.city || '';
+                    const state = nws.properties?.relativeLocation?.properties?.state || '';
+                    if (city && state) locationName = `${city}, ${state}`;
+                    else if (city) locationName = city;
+                }
+
+                // Parse active alerts
+                let alerts = [];
+                if (alertResp.status === 'fulfilled' && alertResp.value.ok) {
+                    const alertData = await alertResp.value.json();
+                    alerts = (alertData.features || []).map(f => f.properties?.event).filter(Boolean);
+                }
+
+                locEl.textContent = locationName;
+                coordsEl.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)} \u2022 ${om.timezone || ''}`;
+                renderForecast(om, alerts);
+
+            } catch(e) {
+                if (e.name === 'AbortError') return;
+                console.error('Forecast error:', e);
+                body.innerHTML = `<div class="fc-loading"><div class="fc-loading-text" style="color:var(--danger)">Failed to load forecast. Try another location.</div></div>`;
+            }
+        }
+
+        function renderForecast(om, alerts) {
+            const body = document.getElementById('fcBody');
+            const cur = om.current;
+            const hourly = om.hourly;
+            const daily = om.daily;
+            const isNight = !cur.is_day;
+
+            let html = '';
+
+            // Active alerts banner
+            if (alerts.length > 0) {
+                html += `<div class="fc-alert-banner">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    ${alerts.slice(0, 3).join(' \u2022 ')}
+                </div>`;
+            }
+
+            // Current conditions
+            html += `<div class="fc-current">
+                <div class="fc-current-icon">${getWeatherIcon(cur.weather_code, isNight)}</div>
+                <div class="fc-current-temp">${Math.round(cur.temperature_2m)}\u00B0</div>
+                <div class="fc-current-details">
+                    <div class="fc-condition">${getWeatherText(cur.weather_code)}</div>
+                    <div class="fc-stats">
+                        <div><span class="fc-stat-label">Feels </span>${Math.round(cur.apparent_temperature)}\u00B0F</div>
+                        <div><span class="fc-stat-label">Humidity </span>${cur.relative_humidity_2m}%</div>
+                        <div><span class="fc-stat-label">Wind </span>${windDirection(cur.wind_direction_10m)} ${Math.round(cur.wind_speed_10m)} mph</div>
+                        <div><span class="fc-stat-label">Gusts </span>${Math.round(cur.wind_gusts_10m)} mph</div>
+                        <div><span class="fc-stat-label">Pressure </span>${(cur.surface_pressure * 0.02953).toFixed(2)} inHg</div>
+                        <div><span class="fc-stat-label">Precip </span>${cur.precipitation}" /hr</div>
+                    </div>
+                </div>
+            </div>`;
+
+            // Hourly forecast (next 24h)
+            if (hourly && hourly.time) {
+                html += `<div class="fc-section-title">Hourly Forecast</div>`;
+                html += `<div class="fc-hourly-scroll">`;
+                const now = new Date();
+                const startIdx = hourly.time.findIndex(t => new Date(t) >= now);
+                const start = Math.max(0, startIdx);
+                for (let i = start; i < Math.min(start + 24, hourly.time.length); i++) {
+                    const d = new Date(hourly.time[i]);
+                    const hr = d.getHours();
+                    const ampm = hr >= 12 ? 'p' : 'a';
+                    const hr12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
+                    const isHourNight = !hourly.is_day[i];
+                    const label = i === start ? 'Now' : `${hr12}${ampm}`;
+                    const precip = hourly.precipitation_probability?.[i];
+                    html += `<div class="fc-hour">
+                        <div class="fc-hour-time">${label}</div>
+                        <div class="fc-hour-icon">${getWeatherIcon(hourly.weather_code[i], isHourNight)}</div>
+                        <div class="fc-hour-temp">${Math.round(hourly.temperature_2m[i])}\u00B0</div>
+                        ${precip > 0 ? `<div class="fc-hour-precip">${precip}%</div>` : ''}
+                    </div>`;
+                }
+                html += `</div>`;
+            }
+
+            // 7-day forecast
+            if (daily && daily.time) {
+                html += `<div class="fc-section-title">7-Day Forecast</div>`;
+                html += `<div class="fc-daily">`;
+
+                // Find overall temp range for bar scaling
+                const allHi = daily.temperature_2m_max;
+                const allLo = daily.temperature_2m_min;
+                const rangeMin = Math.min(...allLo);
+                const rangeMax = Math.max(...allHi);
+                const rangeDelta = rangeMax - rangeMin || 1;
+
+                for (let i = 0; i < daily.time.length; i++) {
+                    const d = new Date(daily.time[i] + 'T12:00:00');
+                    const dayName = i === 0 ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                    const hi = Math.round(allHi[i]);
+                    const lo = Math.round(allLo[i]);
+                    
+                    // Bar position within range
+                    const barLeft = ((allLo[i] - rangeMin) / rangeDelta) * 100;
+                    const barWidth = Math.max(8, ((allHi[i] - allLo[i]) / rangeDelta) * 100);
+
+                    html += `<div class="fc-day">
+                        <div class="fc-day-name">${dayName}</div>
+                        <div class="fc-day-icon">${getWeatherIcon(daily.weather_code[i])}</div>
+                        <div class="fc-day-bar-track"><div class="fc-day-bar" style="margin-left:${barLeft}%;width:${barWidth}%"></div></div>
+                        <div class="fc-day-lo">${lo}\u00B0</div>
+                        <div class="fc-day-hi">${hi}\u00B0</div>
+                    </div>`;
+                }
+                html += `</div>`;
+            }
+
+            html += `<div class="fc-powered">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> &amp; <a href="https://www.weather.gov/" target="_blank" rel="noopener">NWS</a></div>`;
+
+            body.innerHTML = html;
+        }
+
+        // ==================== QUICK ACCESS TOOLBAR ====================
+        function initQuickToolbar() {
+            document.querySelectorAll('.qt-btn[data-qt]').forEach(btn => {
+                const layer = btn.dataset.qt;
+                btn.classList.toggle('active', settings.layers[layer]);
+                
+                btn.addEventListener('click', () => {
+                    const on = btn.classList.toggle('active');
+                    settings.layers[layer] = on;
+                    saveSettings();
+                    handleLayerToggle(layer, on);
+                    
+                    // Sync sidebar and mobile sheet chips
+                    document.querySelectorAll(`[data-layer="${layer}"]`).forEach(el => {
+                        el.classList.toggle('active', on);
+                    });
+                });
+            });
+        }
+        
+        // Update alert count badge on quick toolbar and sidebar
+        function updateAlertCount(count) {
+            const badge = document.getElementById('qtAlertCount');
+            if (badge) badge.textContent = count > 0 ? count : '';
+            
+            // Also update sidebar alert chip
+            const sidebarBadge = document.querySelector('[data-layer="alerts"] .alert-count');
+            if (sidebarBadge) sidebarBadge.textContent = count > 0 ? count : '';
+        }
+
         // ==================== UI INITIALIZATION ====================
         function initUI() {
             // Panel collapsing
@@ -4114,34 +4776,35 @@
                 header.addEventListener('click', () => header.closest('.panel-section').classList.toggle('collapsed'));
             });
 
-            // Layer toggles
-            document.querySelectorAll('[data-layer]').forEach(el => {
+            // Layer toggles (sidebar only - scoped to .sidebar)
+            document.querySelectorAll('.sidebar [data-layer]').forEach(el => {
                 const layer = el.dataset.layer;
                 el.classList.toggle('active', settings.layers[layer]);
                 el.addEventListener('click', () => {
                     const on = el.classList.toggle('active');
                     handleLayerToggle(layer, on);
+                    // Sync quick toolbar
+                    document.querySelector(`.qt-btn[data-qt="${layer}"]`)?.classList.toggle('active', on);
                 });
             });
 
-            // Source tabs
-            document.querySelectorAll('[data-source]').forEach(el => {
+            // Source tabs (sidebar only)
+            document.querySelectorAll('.sidebar [data-source]').forEach(el => {
                 el.classList.toggle('active', el.dataset.source === settings.source);
                 el.addEventListener('click', () => {
-                    document.querySelectorAll('[data-source]').forEach(e => e.classList.remove('active'));
+                    document.querySelectorAll('.sidebar [data-source]').forEach(e => e.classList.remove('active'));
                     el.classList.add('active');
                     settings.source = el.dataset.source;
                     saveSettings();
                     pause();
-                    // Show/hide playback bar based on source animation support
                     updatePlaybackVisibility();
                     updateLegend();
                     loadRadarData();
                 });
             });
             
-            // Radar product tabs
-            document.querySelectorAll('[data-product]').forEach(el => {
+            // Radar product tabs (sidebar only)
+            document.querySelectorAll('.sidebar [data-product]').forEach(el => {
                 el.classList.toggle('active', el.dataset.product === settings.radarProduct);
                 el.addEventListener('click', () => {
                     document.querySelectorAll('[data-product]').forEach(e => e.classList.remove('active'));
@@ -4161,8 +4824,8 @@
                 });
             });
 
-            // Basemap buttons
-            document.querySelectorAll('[data-basemap]').forEach(el => {
+            // Basemap buttons (sidebar only)
+            document.querySelectorAll('.sidebar [data-basemap]').forEach(el => {
                 el.classList.toggle('active', el.dataset.basemap === settings.basemap);
                 el.addEventListener('click', () => setBasemap(el.dataset.basemap));
             });
@@ -4515,18 +5178,49 @@
             const fab = document.getElementById('mobileFab');
             const overlay = document.getElementById('sheetOverlay');
             const sheet = document.getElementById('bottomSheet');
-            const content = document.getElementById('mobileContent');
+            const layersTab = document.getElementById('mobileLayersTab');
+            const sourcesTab = document.getElementById('mobileSourcesTab');
+            const mapTab = document.getElementById('mobileMapTab');
             
-            // Clone sidebar content for mobile
-            content.innerHTML = document.getElementById('sidebar').innerHTML;
+            // Distribute sidebar panels into mobile tabs
+            const sidebar = document.getElementById('sidebar');
+            const panels = sidebar.querySelectorAll('.panel-section');
+            
+            panels.forEach(panel => {
+                const title = panel.querySelector('.panel-title')?.textContent?.trim() || '';
+                const clone = panel.cloneNode(true);
+                
+                if (title.includes('Radar Source') || title.includes('Radar Products')) {
+                    sourcesTab.appendChild(clone);
+                } else if (title.includes('Map Overlays') || title.includes('Base Map') || title.includes('Model Data')) {
+                    mapTab.appendChild(clone);
+                } else {
+                    // Weather Layers, SPC, Satellite, Aviation, etc
+                    layersTab.appendChild(clone);
+                }
+            });
 
-            // Reinit mobile layer toggles
+            // Tab switching
+            document.querySelectorAll('.sheet-tab[data-sheet-tab]').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.sheet-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.sheet-tab-content').forEach(c => c.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.querySelector(`[data-sheet-content="${tab.dataset.sheetTab}"]`)?.classList.add('active');
+                });
+            });
+
+            // Wire up all interactive elements in the sheet
+            const content = document.getElementById('mobileContent');
+
             content.querySelectorAll('[data-layer]').forEach(el => {
                 const layer = el.dataset.layer;
                 el.classList.toggle('active', settings.layers[layer]);
                 el.addEventListener('click', () => {
                     const on = el.classList.toggle('active');
+                    // Sync sidebar + quick toolbar
                     document.querySelector(`.sidebar [data-layer="${layer}"]`)?.classList.toggle('active', on);
+                    document.querySelector(`.qt-btn[data-qt="${layer}"]`)?.classList.toggle('active', on);
                     handleLayerToggle(layer, on);
                 });
             });
@@ -4542,6 +5236,7 @@
                     saveSettings();
                     pause();
                     updatePlaybackVisibility();
+                    updateLegend();
                     loadRadarData();
                 });
             });
@@ -4549,6 +5244,34 @@
             content.querySelectorAll('[data-basemap]').forEach(el => {
                 el.classList.toggle('active', el.dataset.basemap === settings.basemap);
                 el.addEventListener('click', () => setBasemap(el.dataset.basemap));
+            });
+            
+            content.querySelectorAll('[data-product]').forEach(el => {
+                el.classList.toggle('active', el.dataset.product === settings.radarProduct);
+                el.addEventListener('click', () => {
+                    content.querySelectorAll('[data-product]').forEach(e => e.classList.remove('active'));
+                    document.querySelectorAll('.sidebar [data-product]').forEach(e => e.classList.remove('active'));
+                    el.classList.add('active');
+                    document.querySelector(`.sidebar [data-product="${el.dataset.product}"]`)?.classList.add('active');
+                    settings.radarProduct = el.dataset.product;
+                    saveSettings();
+                    if (settings.source !== 'mrms') {
+                        settings.source = 'mrms';
+                        content.querySelectorAll('[data-source]').forEach(e => e.classList.remove('active'));
+                        content.querySelector('[data-source="mrms"]')?.classList.add('active');
+                        document.querySelectorAll('.sidebar [data-source]').forEach(e => e.classList.remove('active'));
+                        document.querySelector('.sidebar [data-source="mrms"]')?.classList.add('active');
+                        updatePlaybackVisibility();
+                    }
+                    pause();
+                    updateLegend();
+                    loadRadarData();
+                });
+            });
+            
+            // Panel collapsing in mobile
+            content.querySelectorAll('.panel-header').forEach(header => {
+                header.addEventListener('click', () => header.closest('.panel-section').classList.toggle('collapsed'));
             });
 
             fab.addEventListener('click', () => {
