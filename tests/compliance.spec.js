@@ -69,3 +69,21 @@ test('Nominatim search is identified and serialized to one request per second', 
   expect(requests[1].url.searchParams.get('limit')).toBe('5');
   expect(requests[1].url.searchParams.get('email')).toBe('matt_parker@outlook.com');
 });
+
+test('runtime assets are local and CSP blocks an unapproved connection origin', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('link[rel="stylesheet"]')).toHaveAttribute('href', 'vendor/leaflet/leaflet.css');
+  await expect(page.locator('script[src="vendor/leaflet/leaflet.js"]')).toHaveCount(1);
+  await expect(page.locator('script[src="vendor/topojson/topojson-client.min.js"]')).toHaveCount(1);
+  await expect.poll(() => page.evaluate(() => typeof window.L === 'object' && typeof window.topojson === 'object')).toBe(true);
+
+  const unapprovedRequestSucceeded = await page.evaluate(async () => {
+    try {
+      await fetch('https://example.com/stormview-csp-probe');
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  expect(unapprovedRequestSucceeded).toBe(false);
+});

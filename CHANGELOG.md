@@ -21,6 +21,8 @@ All notable changes to StormviewRadar will be documented in this file.
 - Added reduced-motion and forced-colors styles plus automated WCAG A/AA, keyboard, focus, and 390px light-theme checks.
 - Added a versioned settings schema with legacy basemap/source migration and validation for future imports.
 - Removed API keys from settings exports, masked key inputs, documented browser-profile exposure, and surfaced quota/import recovery errors.
+- Vendored exact Leaflet and TopoJSON runtime assets, added CSP origin controls, lockfile drift checks, weekly dependency updates, and high-severity advisory gating.
+- Corrected the test server's CSS content type and strengthened forced-colors contrast and mobile settings-panel behavior.
 
 ## [v0.1.0] - %Y->- (HEAD -> main, origin/main, origin/HEAD)
 

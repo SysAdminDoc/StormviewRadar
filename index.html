@@ -5,6 +5,7 @@
     <meta property="og:image" content="logo/StormView-512x512.png">
     <meta name="theme-color" content="#1e1e2e">
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.open-meteo.com https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://server.arcgisonline.com https://stamen-tiles.a.ssl.fastly.net https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:; upgrade-insecure-requests">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StormView Pro v5 - Forecast Edition</title>
     
@@ -17,7 +18,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="logo/StormView-192x192.png">
     <link rel="apple-touch-icon" sizes="192x192" href="logo/StormView-192x192.png">
     
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
     <style>
         :root {
             --glass-bg: rgba(15, 23, 42, 0.92);
@@ -26,7 +27,7 @@
             --panel-bg: rgba(15, 23, 42, 0.98);
             --text: #f1f5f9;
             --text-dim: #94a3b8;
-            --text-muted: #64748b;
+            --text-muted: #94a3b8;
             --accent: #38bdf8;
             --accent-glow: rgba(56, 189, 248, 0.4);
             --success: #4ade80;
@@ -47,7 +48,7 @@
             --panel-bg: rgba(255, 255, 255, 0.98);
             --text: #0f172a;
             --text-dim: #475569;
-            --text-muted: #94a3b8;
+            --text-muted: #475569;
             --accent: #0284c7;
             --accent-glow: rgba(2, 132, 199, 0.3);
         }
@@ -276,7 +277,7 @@
             cursor: pointer; 
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            opacity: 0.7;
+            opacity: 1;
             transition: opacity 0.15s;
         }
         .timestamp-tz:hover { opacity: 1; }
@@ -718,11 +719,14 @@
             background: var(--panel-bg);
             border-left: 1px solid var(--glass-border);
             z-index: 2001;
-            transform: translateX(100%);
-            transition: transform 0.3s ease;
+            transform: translateX(0);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
             display: flex; flex-direction: column;
         }
-        .settings-panel.open { transform: translateX(0); }
+        .settings-panel.open { opacity: 1; visibility: visible; pointer-events: auto; }
 
         .settings-header {
             display: flex; align-items: center; justify-content: space-between;
@@ -961,6 +965,23 @@
         }
 
         @media (forced-colors: active) {
+            :root, .light-theme {
+                --glass-bg: Canvas;
+                --glass-border: CanvasText;
+                --glass-hover: Canvas;
+                --panel-bg: Canvas;
+                --text: CanvasText;
+                --text-dim: CanvasText;
+                --text-muted: CanvasText;
+                --accent: LinkText;
+                --accent-glow: transparent;
+            }
+            html, body, .glass, .status-chip, .layer-chip, .source-tab, .toggle, .btn,
+            .search-box, .search-results, .playback, .bottom-sheet, .settings-panel, .forecast-panel {
+                background: Canvas !important;
+                color: CanvasText !important;
+            }
+            a, .data-credit a { color: LinkText !important; }
             .glass, .status-chip, .layer-chip, .source-tab, .toggle, .btn {
                 border: 1px solid ButtonText;
             }
@@ -1387,7 +1408,7 @@
         }
         .frame-indicator .fi-refreshed {
             font-size: 10px;
-            opacity: 0.6;
+            color: var(--text-dim);
         }
         
         /* Timeline tick marks for hour positions */
@@ -2230,8 +2251,8 @@
         <a href="https://aviationweather.gov/" target="_blank" rel="noopener">Aviation Weather</a>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+    <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="vendor/topojson/topojson-client.min.js"></script>
     <script>
     (function() {
         'use strict';

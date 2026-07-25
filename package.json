@@ -5,10 +5,14 @@
   "type": "module",
   "scripts": {
     "test": "npm run test:static && playwright test",
-    "test:static": "node scripts/check-static.mjs"
+    "test:static": "node scripts/check-vendor.mjs && node scripts/check-static.mjs"
+  },
+  "dependencies": {
+    "leaflet": "1.9.4",
+    "topojson-client": "3.1.0"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.12.1",
+    "@axe-core/playwright": "4.12.1",
     "@playwright/test": "1.62.0"
   }
 }

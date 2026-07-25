@@ -46,7 +46,7 @@ test.beforeEach(async ({ page }) => {
         },
         geometry: {
           type: 'Polygon',
-          coordinates: [[[-97, 38], [-95, 38], [-95, 40], [-97, 40], [-97, 38]]]
+          coordinates: [[[-125, 24], [-66, 24], [-66, 50], [-125, 50], [-125, 24]]]
         }
       }]
     }
@@ -68,7 +68,7 @@ test('hostile provider, bookmark, and search strings render only as text', async
   await page.locator('#searchInput').fill('test');
   await expect(page.locator('.search-item-name')).toHaveText(hostile);
 
-  await page.locator('#map').click({ position: { x: 640, y: 400 } });
+  await page.locator('#map').click({ position: { x: 640, y: 360 } });
   await expect(page.locator('.leaflet-popup-content')).toContainText(hostile);
 
   await expect(page.locator('[data-xss]')).toHaveCount(0);

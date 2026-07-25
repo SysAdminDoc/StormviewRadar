@@ -60,7 +60,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 
 1. **Download** or clone the repository
 2. **Open** `index.html` in any modern browser
-3. **Done!** — No build process or dependencies required
+3. **Done!** — Runtime dependencies are bundled; no build step is required
 
 ```bash
 git clone https://github.com/sysadmindoc/StormviewRadar.git
@@ -118,10 +118,25 @@ Location searches use the public [Nominatim](https://nominatim.openstreetmap.org
 ## Technology Stack
 
 - **Leaflet** — Interactive mapping
+- **TopoJSON Client** — Bundled boundary conversion
 - **OpenStreetMap** — Base map tiles and geocoding
 - **Vanilla JS** — No frameworks, no build tools
 - **CSS Variables** — Dynamic theming
 - **LocalStorage** — Settings persistence
+
+Leaflet 1.9.4 and TopoJSON Client 3.1.0 are vendored from exact npm package
+versions. A Content Security Policy blocks unapproved executable, style, and
+network origins. To verify a change locally:
+
+```bash
+npm ci
+npx playwright install chromium
+npm test
+npm audit --audit-level=high
+```
+
+The static checks compare vendored files with the lockfile-installed packages.
+Dependabot checks npm dependencies weekly.
 
 ## Performance Optimizations
 
@@ -157,6 +172,10 @@ Access the settings panel (⚙️) to customize:
 ```
 StormviewRadar/
 ├── index.html          # Single-file application
+├── package.json        # Locked test and vendored-runtime dependencies
+├── scripts/            # Static and vendor integrity checks
+├── tests/              # Deterministic Playwright browser tests
+├── vendor/             # Pinned Leaflet and TopoJSON runtime assets
 ├── README.md           # Documentation
 ├── LICENSE             # MIT License
 └── logo/               # App icons and favicons

@@ -87,7 +87,7 @@ test('RainViewer preserves provider frame timestamps and global coverage', async
   await setSource(page, 'rainviewer');
   await page.route('https://api.rainviewer.com/public/weather-maps.json', route => route.fulfill({
     json: {
-      host: 'https://mock.rainviewer.test',
+      host: 'https://tilecache.rainviewer.com',
       radar: {
         past: [
           { time: 1785012000, path: '/v2/radar/1785012000' },
@@ -96,7 +96,7 @@ test('RainViewer preserves provider frame timestamps and global coverage', async
       }
     }
   }));
-  await page.route('https://mock.rainviewer.test/**', route => route.fulfill({
+  await page.route('https://tilecache.rainviewer.com/**', route => route.fulfill({
     status: 200,
     contentType: 'image/png',
     body: transparentPng
