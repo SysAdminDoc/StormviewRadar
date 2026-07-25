@@ -23,6 +23,7 @@ All notable changes to StormviewRadar will be documented in this file.
 - Removed API keys from settings exports, masked key inputs, documented browser-profile exposure, and surfaced quota/import recovery errors.
 - Vendored exact Leaflet and TopoJSON runtime assets, added CSP origin controls, lockfile drift checks, weekly dependency updates, and high-severity advisory gating.
 - Corrected the test server's CSS content type and strengthened forced-colors contrast and mobile settings-panel behavior.
+- Added deterministic failed-provider fallback coverage and gated GitHub Pages deployment on the complete browser and advisory suite.
 
 ## [v0.1.0] - %Y->- (HEAD -> main, origin/main, origin/HEAD)
 

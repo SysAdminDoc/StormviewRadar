@@ -109,6 +109,32 @@ test('RainViewer preserves provider frame timestamps and global coverage', async
   await expect(page.locator('#coverageStatus')).toHaveAttribute('data-state', 'global');
 });
 
+test('failed providers fall back to MRMS with an actionable status', async ({ page }) => {
+  await setSource(page, 'rainviewer');
+  await page.route('https://api.rainviewer.com/public/weather-maps.json', route => route.fulfill({
+    status: 503,
+    json: { error: 'provider unavailable' }
+  }));
+  await page.route('https://mesonet.agron.iastate.edu/data/gis/images/4326/USCOMP/n0q_0.json', route => route.fulfill({
+    json: { meta: { valid: '2026-07-25T20:55:00Z', product: 'N0Q' } }
+  }));
+  await page.route('https://mesonet.agron.iastate.edu/cache/tile.py/**', route => route.fulfill({
+    status: 200,
+    contentType: 'image/png',
+    body: transparentPng
+  }));
+
+  await page.goto('/');
+  const status = page.locator('#dataStatus');
+  await expect(status).toHaveAttribute('data-state', 'fallback');
+  await expect(page.locator('#dataStatusText')).toHaveText('MRMS fallback: RainViewer failed');
+  await expect(status).toHaveClass(/retryable/);
+  await expect(status).toHaveAttribute('title', /Activate to retry/);
+  await expect(page.locator('.sidebar .source-tab.active')).toHaveText('MRMS');
+  await expect(page.locator('#timestampBox')).toHaveAttribute('data-source', 'mrms');
+  await expect(page.locator('#timestampBox')).toHaveAttribute('data-provider-time', '2026-07-25T20:55:00.000Z');
+});
+
 test('nowCOAST reads the default valid time from WMS capabilities', async ({ page }) => {
   await setSource(page, 'nowcoast');
   await page.route('https://nowcoast.noaa.gov/geoserver/observations/weather_radar/ows?**', route => {

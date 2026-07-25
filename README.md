@@ -131,12 +131,12 @@ network origins. To verify a change locally:
 ```bash
 npm ci
 npx playwright install chromium
-npm test
-npm audit --audit-level=high
+npm run release:check
 ```
 
 The static checks compare vendored files with the lockfile-installed packages.
-Dependabot checks npm dependencies weekly.
+Dependabot checks npm dependencies weekly. GitHub Pages deployment runs only
+after the complete browser suite and advisory check pass for `main`.
 
 ## Performance Optimizations
 
