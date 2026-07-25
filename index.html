@@ -1501,6 +1501,32 @@
         .mesh-legend-swatch { width: 12px; height: 8px; border-radius: 2px; }
         .mesh-legend-note { margin-top: 4px; max-width: 170px; color: var(--text-muted); }
         .leaflet-bottom .mesh-legend { margin-bottom: 112px; }
+        .alert-age-legend {
+            width: 154px;
+            padding: 9px 11px;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            background: var(--glass-heavy);
+            color: var(--text);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(14px);
+            font-size: 10px;
+            line-height: 1.35;
+        }
+        .alert-age-legend strong { display: block; margin-bottom: 5px; font-size: 11px; }
+        .alert-age-gradient {
+            height: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 999px;
+            background: linear-gradient(90deg, rgba(255, 102, 0, 0.9), rgba(255, 102, 0, 0.25));
+        }
+        .alert-age-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 3px;
+            color: var(--text-dim);
+        }
+        .alert-age-note { margin-top: 5px; color: var(--text-muted); }
         .satellite-ir-sandwich {
             mix-blend-mode: screen;
             filter: contrast(1.35) saturate(1.65);
@@ -2819,6 +2845,8 @@
         let meshWorkerSequence = 0;
         let meshLegendControl = null;
         let meshMaximumMm = 0;
+        let alertAgeLegendControl = null;
+        let alertFillToolsPromise = null;
         let stormTrackToolsPromise = null;
         let stormTrackHistoryHydrated = false;
         let currentStormCells = [];
@@ -2922,6 +2950,13 @@
                 activeWeatherAlert: 'Active weather alert',
                 viewAlert: 'View',
                 dismissAlert: 'Dismiss alert',
+                alertAgeTitle: 'Warning age',
+                alertAgeNew: 'New',
+                alertAgeOld: '3h+',
+                alertAgeNote: 'Fill fades with time since issue; border color identifies the hazard.',
+                alertIssuedJustNow: 'just issued',
+                alertIssuedMinutesAgo: '{value}m since issue',
+                alertIssuedHoursAgo: '{value}h since issue',
                 stormTopsLoading: 'Loading storm cells…',
                 stormTopsCount: '{value} storm top(s) in the current map view',
                 stormTopsScale: 'Display height scale: {value}×.',
@@ -2985,6 +3020,13 @@
                 activeWeatherAlert: 'Alerta meteorológica activa',
                 viewAlert: 'Ver',
                 dismissAlert: 'Descartar alerta',
+                alertAgeTitle: 'Antigüedad de la alerta',
+                alertAgeNew: 'Nueva',
+                alertAgeOld: '3 h+',
+                alertAgeNote: 'El relleno se desvanece desde la emisión; el borde identifica el peligro.',
+                alertIssuedJustNow: 'recién emitida',
+                alertIssuedMinutesAgo: '{value} min desde la emisión',
+                alertIssuedHoursAgo: '{value} h desde la emisión',
                 stormTopsLoading: 'Cargando celdas de tormenta…',
                 stormTopsCount: '{value} cima(s) de tormenta en la vista actual',
                 stormTopsScale: 'Escala de altura visual: {value}×.',
@@ -3175,6 +3217,14 @@
         function applyLanguage() {
             document.documentElement.lang = languageCode();
             localizeTextTree();
+            if (alertAgeLegendControl && currentAlertFeatures.length) {
+                const referenceTime = replayMode && frames[currentFrame]
+                    ? frames[currentFrame].time * 1000
+                    : Date.now();
+                alertFillTools()
+                    .then(tools => showAlertAgeLegend(currentAlertFeatures, tools, referenceTime))
+                    .catch(error => console.warn('Alert age legend unavailable:', error));
+            }
             const stormTopButton = document.getElementById('stormTop3dBtn');
             const stormTopView = document.getElementById('cesiumView');
             const stormTopLegend = document.querySelector('.storm-3d-legend');
@@ -6209,6 +6259,10 @@
                 meshLegendControl = null;
                 meshMaximumMm = 0;
             }
+            if (name === 'alerts' && alertAgeLegendControl) {
+                map.removeControl(alertAgeLegendControl);
+                alertAgeLegendControl = null;
+            }
             setLayerFeatureCount(name, 0);
         }
 
@@ -6269,9 +6323,76 @@
             if (exitButton) exitButton.disabled = !replayMode;
         }
 
+        function alertFillTools() {
+            if (!alertFillToolsPromise) alertFillToolsPromise = import('./src/alert-fill.js');
+            return alertFillToolsPromise;
+        }
+
+        function formatAlertIssueAge(ageMinutes) {
+            if (!Number.isFinite(ageMinutes) || ageMinutes < 0) return '';
+            if (ageMinutes < 1) return t('alertIssuedJustNow');
+            if (ageMinutes < 60) return t('alertIssuedMinutesAgo', { value: ageMinutes });
+            return t('alertIssuedHoursAgo', { value: Math.round(ageMinutes / 60) });
+        }
+
+        function alertPolygonPresentation(feature, tools, referenceTime) {
+            const event = safeText(feature.properties?.event || feature.properties?.ps, 120).toLowerCase();
+            const profile = tools.alertIssuanceProfile(feature, referenceTime);
+            const color = tools.alertHazardColor(feature);
+            return {
+                profile,
+                style: {
+                    color,
+                    weight: profile.lineWeight,
+                    fillColor: color,
+                    fillOpacity: profile.fillOpacity,
+                    dashArray: event.includes('watch') ? '5, 5' : null
+                }
+            };
+        }
+
+        function showAlertAgeLegend(features, tools, referenceTime) {
+            if (alertAgeLegendControl) {
+                map.removeControl(alertAgeLegendControl);
+                alertAgeLegendControl = null;
+            }
+            const hasWarning = features.some(feature => (
+                alertPolygonPresentation(feature, tools, referenceTime).profile.bucket !== 'static'
+            ));
+            if (!hasWarning) return;
+
+            alertAgeLegendControl = L.control({ position: 'bottomleft' });
+            alertAgeLegendControl.onAdd = () => {
+                const container = L.DomUtil.create('div', 'alert-age-legend');
+                container.setAttribute('role', 'img');
+                container.setAttribute('aria-label', `${t('alertAgeTitle')}. ${t('alertAgeNote')}`);
+                const title = document.createElement('strong');
+                title.textContent = t('alertAgeTitle');
+                const gradient = document.createElement('div');
+                gradient.className = 'alert-age-gradient';
+                const labels = document.createElement('div');
+                labels.className = 'alert-age-labels';
+                const newer = document.createElement('span');
+                newer.textContent = t('alertAgeNew');
+                const older = document.createElement('span');
+                older.textContent = t('alertAgeOld');
+                labels.append(newer, older);
+                const note = document.createElement('div');
+                note.className = 'alert-age-note';
+                note.textContent = t('alertAgeNote');
+                container.append(title, gradient, labels, note);
+                L.DomEvent.disableClickPropagation(container);
+                return container;
+            };
+            alertAgeLegendControl.addTo(map);
+        }
+
         async function renderReplayAlerts(timestamp) {
             if (!replayMode) return;
-            const tools = await historicalReplayTools();
+            const [tools, alertTools] = await Promise.all([
+                historicalReplayTools(),
+                alertFillTools()
+            ]);
             removeLayer('alerts');
             const activeWarnings = replayWarnings
                 .filter(feature => tools.warningActiveAt(feature, timestamp))
@@ -6281,16 +6402,12 @@
             if (!settings.layers.alerts) return;
             layerRefs.alerts = L.geoJSON({ type: 'FeatureCollection', features: activeWarnings }, {
                 pane: 'alertPane',
-                style: feature => {
-                    const phenomena = safeText(feature.properties?.phenomena, 4).toUpperCase();
-                    const color = phenomena === 'TO' ? '#ff0000'
-                        : phenomena === 'SV' ? '#ff6600'
-                            : phenomena === 'FF' ? '#00cc66' : '#ffcc00';
-                    return { color, weight: 2, fillColor: color, fillOpacity: 0.2 };
-                },
+                style: feature => alertPolygonPresentation(feature, alertTools, timestamp).style,
                 onEachFeature: (feature, layer) => {
                     const properties = feature.properties || {};
                     const event = properties.ps || 'Historical warning';
+                    const profile = alertTools.alertIssuanceProfile(feature, timestamp);
+                    const issueAge = formatAlertIssueAge(profile.ageMinutes);
                     const tags = [
                         properties.max_windtag ? `${properties.max_windtag} mph wind` : '',
                         properties.max_hailtag ? `${properties.max_hailtag} in hail` : '',
@@ -6302,11 +6419,12 @@
                             <h4>${escapeHTML(event, 120)}</h4>
                             <p><strong>WFO:</strong> ${escapeHTML(properties.wfo || 'N/A', 8)}</p>
                             ${tags ? `<p>${escapeHTML(tags, 120)}</p>` : ''}
-                            <div class="meta">Issued: ${escapeHTML(formatExternalDate(properties.issue))}<br>Polygon valid to: ${escapeHTML(formatExternalDate(properties.polygon_end || properties.expire_utc))}</div>
+                            <div class="meta">Issued: ${escapeHTML(formatExternalDate(properties.issue))}${issueAge ? ` · ${escapeHTML(issueAge)}` : ''}<br>Polygon valid to: ${escapeHTML(formatExternalDate(properties.polygon_end || properties.expire_utc))}</div>
                         </div>
                     `);
                 }
             }).addTo(map);
+            showAlertAgeLegend(activeWarnings, alertTools, timestamp);
             setLayerFeatureCount('alerts', activeWarnings.length);
             updateAlertCount(activeWarnings.length);
         }
@@ -6563,31 +6681,29 @@
             updateMobileAlertBanner([]);
             const controller = beginLayerRequest('alerts');
             try {
-                const resp = await fetchWithTimeout(DATA_URLS.nwsAlerts, { signal: controller.signal });
+                const [resp, tools] = await Promise.all([
+                    fetchWithTimeout(DATA_URLS.nwsAlerts, { signal: controller.signal }),
+                    alertFillTools()
+                ]);
                 const data = await resp.json();
                 if (controller.signal.aborted || !settings.layers.alerts) return;
                 const features = featureList(data, MAX_ALERT_FEATURES);
+                const referenceTime = Date.now();
 
                 layerRefs.alerts = L.geoJSON(features, {
                     pane: 'alertPane',
-                    style: (f) => {
-                        const evt = safeText(f.properties?.event, 120).toLowerCase();
-                        let color = '#6699ff';
-                        if (evt.includes('tornado')) color = '#ff0000';
-                        else if (evt.includes('severe thunderstorm')) color = '#ff6600';
-                        else if (evt.includes('flash flood')) color = '#00ff00';
-                        else if (evt.includes('flood')) color = '#00aa00';
-                        else if (evt.includes('winter') || evt.includes('blizzard')) color = '#ff69b4';
-                        else if (evt.includes('warning')) color = '#ff6600';
-                        else if (evt.includes('watch')) color = '#ffcc00';
-                        return { color, weight: 2, fillColor: color, fillOpacity: 0.2, dashArray: evt.includes('watch') ? '5, 5' : null };
-                    },
+                    style: feature => alertPolygonPresentation(feature, tools, referenceTime).style,
                     onEachFeature: (f, layer) => {
                         const p = f.properties || {};
                         const evt = safeText(p.event || 'Alert', 120);
                         const headline = escapeHTML(p.headline || '', 300);
                         const desc = escapeHTML(p.description || '', 300);
                         const expires = escapeHTML(formatExternalDate(p.expires, 'N/A'));
+                        const profile = tools.alertIssuanceProfile(f, referenceTime);
+                        const issued = profile.issuedAt === null
+                            ? 'N/A'
+                            : escapeHTML(formatExternalDate(profile.issuedAt, 'N/A'));
+                        const issueAge = formatAlertIssueAge(profile.ageMinutes);
                         let badgeClass = 'info';
                         if (evt.toLowerCase().includes('warning')) badgeClass = 'danger';
                         else if (evt.toLowerCase().includes('watch')) badgeClass = 'warning';
@@ -6597,13 +6713,14 @@
                                 <h4><span class="badge ${badgeClass}">${escapeHTML(evt, 120)}</span></h4>
                                 <p><strong>${headline}</strong></p>
                                 <p>${desc}${desc.length >= 300 ? '...' : ''}</p>
-                                <div class="meta">Expires: ${expires}</div>
+                                <div class="meta">Issued: ${issued}${issueAge ? ` · ${escapeHTML(issueAge)}` : ''}<br>Expires: ${expires}</div>
                             </div>
                         `, { maxWidth: 300 });
                     }
                 });
 
                 if (settings.layers.alerts) layerRefs.alerts.addTo(map);
+                showAlertAgeLegend(features, tools, referenceTime);
                 setLayerFeatureCount('alerts', features.length);
                 
                 // Update alert count badges

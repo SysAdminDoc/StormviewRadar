@@ -34,7 +34,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Smart Tile Caching** — Optimized loading with rate limit protection
 
 ### Weather Layers
-- **NWS Alerts** — Real-time watches, warnings, and advisories with color-coded polygons
+- **NWS Alerts** — Real-time watches, warnings, and advisories with hazard-colored borders and warning fills that fade by time since issuance
 - **Alert Sounds** — Opt in to synthesized tones for newly issued alerts, filtered by NWS severity, event type, and distance from the map center
 - **Private Geofences** — Save up to 20 named local alert radii at the map center, display them as optional overlays, and match alert sounds against their polygon intersections
 - **SPC Outlooks** — Storm Prediction Center convective outlooks
