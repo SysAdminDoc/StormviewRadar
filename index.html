@@ -919,6 +919,10 @@
             gap: 6px;
         }
         .status-chip.show { display: flex; }
+        button.status-chip { cursor: default; font-family: inherit; text-align: left; }
+        button.status-chip.retryable { cursor: pointer; }
+        button.status-chip.retryable:hover,
+        button.status-chip.retryable:focus-visible { border-color: var(--accent); color: var(--text); }
         .status-chip .dot {
             width: 6px; height: 6px;
             border-radius: 50%;
@@ -927,6 +931,10 @@
         .status-chip .dot.green { background: var(--success); }
         .status-chip .dot.blue { background: var(--accent); }
         .status-chip .dot.yellow { background: var(--warning); }
+        .status-chip .dot.red { background: var(--danger); }
+        .status-chip[data-state="current"] .dot,
+        .status-chip[data-state="stale"] .dot,
+        .status-chip[data-state="error"] .dot { animation: none; }
 
         @keyframes pulse {
             0%, 100% { opacity: 0.4; transform: scale(0.8); }
@@ -1999,7 +2007,7 @@
     <!-- Status Bar -->
     <div class="status-bar">
         <div class="status-chip" id="tileStatus"><span class="dot blue"></span><span id="tileStatusText">Caching...</span></div>
-        <div class="status-chip" id="dataStatus"><span class="dot green"></span><span id="dataStatusText">Data loaded</span></div>
+        <button class="status-chip" id="dataStatus" type="button" aria-live="polite"><span class="dot green"></span><span id="dataStatusText">Data loaded</span></button>
     </div>
 
     <!-- Location Button -->
@@ -2288,6 +2296,51 @@
         let speedMult = 1;
         let searchTimeout = null;
         let lastRefreshTime = null;
+        let radarLoadGeneration = 0;
+        let radarAbortController = null;
+        const REQUEST_TIMEOUT_MS = 15000;
+        const activeRequests = new Map();
+
+        async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+            const controller = new AbortController();
+            const requestKey = typeof input === 'string' ? input : input.url;
+            activeRequests.get(requestKey)?.abort(new DOMException('Superseded request', 'AbortError'));
+            activeRequests.set(requestKey, controller);
+            const callerSignal = init.signal;
+            const abortFromCaller = () => controller.abort(callerSignal.reason);
+            if (callerSignal?.aborted) abortFromCaller();
+            else callerSignal?.addEventListener('abort', abortFromCaller, { once: true });
+
+            const timeoutId = setTimeout(() => {
+                controller.abort(new DOMException(`Request timed out after ${timeoutMs}ms`, 'TimeoutError'));
+            }, timeoutMs);
+
+            try {
+                const response = await window.fetch(input, { ...init, signal: controller.signal });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status} ${response.statusText || 'request failed'}`);
+                }
+                return response;
+            } finally {
+                clearTimeout(timeoutId);
+                callerSignal?.removeEventListener('abort', abortFromCaller);
+                if (activeRequests.get(requestKey) === controller) activeRequests.delete(requestKey);
+            }
+        }
+
+        function abortableDelay(ms, signal) {
+            return new Promise((resolve, reject) => {
+                if (signal?.aborted) {
+                    reject(signal.reason || new DOMException('Request cancelled', 'AbortError'));
+                    return;
+                }
+                const timeoutId = setTimeout(resolve, ms);
+                signal?.addEventListener('abort', () => {
+                    clearTimeout(timeoutId);
+                    reject(signal.reason || new DOMException('Request cancelled', 'AbortError'));
+                }, { once: true });
+            });
+        }
         
         // Advanced Hybrid Radar System with Smart Caching
         const radarSystem = {
@@ -2919,51 +2972,140 @@
         }
 
         // ==================== RADAR ====================
+        function captureRadarState() {
+            if (!frameLayers.length || !frames.length) return null;
+            return {
+                source: settings.source,
+                frameLayers: [...frameLayers],
+                frames: frames.map(frame => ({ ...frame })),
+                currentFrame,
+                lastPastFrame,
+                framesLoaded,
+                framesTotal,
+                framesReady,
+                lastRefreshTime,
+                rainviewerData,
+                hrrrInitTime,
+                hrrrFrames: [...hrrrFrames]
+            };
+        }
+
+        function restoreRadarState(snapshot) {
+            if (!snapshot) return false;
+            clearAllFrameLayers();
+            settings.source = snapshot.source;
+            frameLayers = snapshot.frameLayers;
+            frames = snapshot.frames;
+            currentFrame = Math.min(snapshot.currentFrame, frameLayers.length - 1);
+            lastPastFrame = snapshot.lastPastFrame;
+            framesLoaded = snapshot.framesLoaded;
+            framesTotal = snapshot.framesTotal;
+            framesReady = snapshot.framesReady;
+            lastRefreshTime = snapshot.lastRefreshTime;
+            rainviewerData = snapshot.rainviewerData;
+            hrrrInitTime = snapshot.hrrrInitTime;
+            hrrrFrames = snapshot.hrrrFrames;
+
+            const layer = frameLayers[currentFrame];
+            if (layer && !map.hasLayer(layer)) layer.addTo(map);
+            layer?.setOpacity(settings.opacity);
+            syncRadarCapabilities();
+            updatePlaybackVisibility();
+            updateLegend();
+            updateTimestamp();
+            updateTimelineUI();
+            hideLoadProgress();
+            return true;
+        }
+
+        function ensureCurrentRadarLoad(generation, signal) {
+            if (signal?.aborted || generation !== radarLoadGeneration) {
+                throw signal?.reason || new DOMException('Superseded radar request', 'AbortError');
+            }
+        }
+
         async function loadRadarData() {
+            const generation = ++radarLoadGeneration;
+            radarAbortController?.abort(new DOMException('Superseded radar request', 'AbortError'));
+            radarAbortController = new AbortController();
+            const { signal } = radarAbortController;
+            const requestedSource = settings.source;
+            const previousState = captureRadarState();
+            const capability = RADAR_CAPABILITIES[requestedSource] || RADAR_CAPABILITIES.mrms;
+
             try {
                 pause();
                 clearAllFrameLayers();
                 framesReady = false;
+                setProviderStatus('loading', `${capability.label}: loading…`);
                 
-                if (settings.source === 'rainviewer') {
-                    await loadRainViewerPreloaded();
-                } else if (settings.source === 'mrms') {
-                    await loadMRMS();
-                } else if (settings.source === 'hrrr') {
-                    await loadHRRR();
-                } else if (settings.source === 'nowcoast') {
-                    await loadNowCOAST();
+                if (requestedSource === 'rainviewer') {
+                    await loadRainViewerPreloaded(signal, generation);
+                } else if (requestedSource === 'mrms') {
+                    await loadMRMS(signal, generation);
+                } else if (requestedSource === 'hrrr') {
+                    await loadHRRR(signal, generation);
+                } else if (requestedSource === 'nowcoast') {
+                    await loadNowCOAST(signal, generation);
                 }
+                ensureCurrentRadarLoad(generation, signal);
+                lastRefreshTime = Date.now();
+                setProviderStatus('current', `${capability.label}: current`);
             } catch(e) {
+                if (signal.aborted || generation !== radarLoadGeneration || e?.name === 'AbortError') return;
                 console.error('Radar error:', e);
-                
-                // If RainViewer fails (CORS when running locally), fallback to MRMS
-                if (settings.source === 'rainviewer') {
-                    showToast('RainViewer unavailable, switching to MRMS', 'warn');
+
+                if (requestedSource !== 'mrms') {
+                    showToast(`${capability.label} unavailable; using MRMS fallback`, 'warn');
                     settings.source = 'mrms';
-                    
-                    // Update UI to show MRMS selected
-                    document.querySelectorAll('[data-source]').forEach(el => {
-                        el.classList.toggle('active', el.dataset.source === 'mrms');
-                    });
-                    
+                    syncRadarCapabilities();
+                    saveSettings();
                     try {
-                        await loadMRMS();
+                        clearAllFrameLayers();
+                        await loadMRMS(signal, generation);
+                        ensureCurrentRadarLoad(generation, signal);
+                        lastRefreshTime = Date.now();
+                        setProviderStatus(
+                            'fallback',
+                            `MRMS fallback: ${capability.label} failed`,
+                            () => {
+                                settings.source = requestedSource;
+                                syncRadarCapabilities();
+                                saveSettings();
+                                loadRadarData();
+                            }
+                        );
                     } catch(e2) {
+                        if (signal.aborted || generation !== radarLoadGeneration || e2?.name === 'AbortError') return;
                         console.error('MRMS fallback error:', e2);
+                        const restored = restoreRadarState(previousState);
+                        setProviderStatus(
+                            restored ? 'stale' : 'error',
+                            restored ? `${capability.label}: stale; refresh failed` : `${capability.label}: unavailable`,
+                            loadRadarData
+                        );
                     }
+                } else {
+                    const restored = restoreRadarState(previousState);
+                    setProviderStatus(
+                        restored ? 'stale' : 'error',
+                        restored ? 'MRMS: stale; refresh failed' : 'MRMS: unavailable',
+                        loadRadarData
+                    );
                 }
+            } finally {
+                if (generation === radarLoadGeneration) hideLoadProgress();
             }
         }
 
-        async function loadRainViewerPreloaded() {
+        async function loadRainViewerPreloaded(signal, generation) {
             showLoadProgress();
             loadAborted = false;
             rateLimiter.reset();
             
-            const resp = await fetch('https://api.rainviewer.com/public/weather-maps.json');
-            if (!resp.ok) throw new Error('RainViewer API error');
+            const resp = await fetchWithTimeout('https://api.rainviewer.com/public/weather-maps.json', { signal });
             rainviewerData = await resp.json();
+            ensureCurrentRadarLoad(generation, signal);
 
             frames = Array.isArray(rainviewerData.radar?.past)
                 ? rainviewerData.radar.past.map(frame => ({ ...frame, kind: 'past' }))
@@ -2996,11 +3138,11 @@
             const BATCH_DELAY = 200;
             
             for (let batchStart = 0; batchStart < frames.length; batchStart += BATCH_SIZE) {
-                if (loadAborted) break;
+                ensureCurrentRadarLoad(generation, signal);
                 
                 while (rateLimiter.isPaused) {
-                    await new Promise(r => setTimeout(r, 500));
-                    if (loadAborted) break;
+                    await abortableDelay(500, signal);
+                    ensureCurrentRadarLoad(generation, signal);
                 }
                 
                 const batchEnd = Math.min(batchStart + BATCH_SIZE, frames.length);
@@ -3028,15 +3170,11 @@
                 }
                 
                 if (batchStart > 0) {
-                    await new Promise(r => setTimeout(r, BATCH_DELAY));
+                    await abortableDelay(BATCH_DELAY, signal);
                 }
             }
 
-            // Add remaining layers to map lazily (on demand)
-            // They get added when animation reaches them
-            setTimeout(() => {
-                onAllFramesLoaded();
-            }, 500);
+            onAllFramesLoaded(generation, signal);
         }
 
         function buildRadarUrl(frame) {
@@ -3046,7 +3184,8 @@
             return `${rainviewerData.host}${frame.path}/256/{z}/{x}/{y}/${color}/${smooth}_${snow}.png`;
         }
 
-        function onAllFramesLoaded() {
+        function onAllFramesLoaded(generation, signal) {
+            ensureCurrentRadarLoad(generation, signal);
             framesReady = true;
             lastRefreshTime = Date.now();
             hideLoadProgress();
@@ -3057,7 +3196,8 @@
             }
         }
 
-        async function loadMRMS() {
+        async function loadMRMS(signal, generation) {
+            ensureCurrentRadarLoad(generation, signal);
             clearAllFrameLayers();
             
             // Get the appropriate product URL
@@ -3082,6 +3222,7 @@
             });
             layer.addTo(map);
             frameLayers.push(layer);
+            ensureCurrentRadarLoad(generation, signal);
             
             frames = [{ time: Date.now() / 1000, path: 'mrms' }];
             lastPastFrame = 0;
@@ -3093,7 +3234,8 @@
         }
         
         // ==================== NOAA nowCOAST WMS RADAR ====================
-        async function loadNowCOAST() {
+        async function loadNowCOAST(signal, generation) {
+            ensureCurrentRadarLoad(generation, signal);
             clearAllFrameLayers();
             
             const layer = L.tileLayer.wms('https://nowcoast.noaa.gov/geoserver/observations/weather_radar/ows', {
@@ -3112,6 +3254,7 @@
             });
             layer.addTo(map);
             frameLayers.push(layer);
+            ensureCurrentRadarLoad(generation, signal);
             
             frames = [{ time: Date.now() / 1000, path: 'nowcoast' }];
             lastPastFrame = 0;
@@ -3125,14 +3268,14 @@
         }
         
         // ==================== HRRR FORECAST RADAR ====================
-        async function loadHRRR() {
+        async function loadHRRR(signal, generation) {
             showLoadProgress();
             loadAborted = false;
-            
-            try {
+
                 // Get latest HRRR run info
-                const metaResp = await fetch(DATA_URLS.hrrrLatest);
+                const metaResp = await fetchWithTimeout(DATA_URLS.hrrrLatest, { signal });
                 const meta = await metaResp.json();
+                ensureCurrentRadarLoad(generation, signal);
                 // Convert ISO time to YYYYMMDDHHMM format for tile URL
                 if (meta.model_init_utc) {
                     const d = new Date(meta.model_init_utc);
@@ -3183,7 +3326,7 @@
                 const BATCH_DELAY = 150;
                 
                 for (let batchStart = 0; batchStart < frames.length; batchStart += BATCH_SIZE) {
-                    if (loadAborted) break;
+                    ensureCurrentRadarLoad(generation, signal);
                     
                     const batchEnd = Math.min(batchStart + BATCH_SIZE, frames.length);
                     
@@ -3211,24 +3354,12 @@
                     }
                     
                     if (batchStart > 0) {
-                        await new Promise(r => setTimeout(r, BATCH_DELAY));
+                        await abortableDelay(BATCH_DELAY, signal);
                     }
                 }
                 
-                setTimeout(() => {
-                    onAllFramesLoaded();
-                    showToast('HRRR 18-hour forecast loaded', 'success');
-                }, 500);
-                
-            } catch(e) {
-                console.error('HRRR load error:', e);
-                // Fallback to MRMS
-                settings.source = 'mrms';
-                document.querySelectorAll('[data-source]').forEach(el => {
-                    el.classList.toggle('active', el.dataset.source === 'mrms');
-                });
-                await loadMRMS();
-            }
+                onAllFramesLoaded(generation, signal);
+                showToast('HRRR 18-hour forecast loaded', 'success');
         }
         
         // ==================== LIGHTNING (Blitzortung) ====================
@@ -3371,7 +3502,7 @@
                 
                 for (const layerId of layers) {
                     try {
-                        const resp = await fetch(`${NHC_SERVICES.atlantic}/${layerId}/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson`);
+                        const resp = await fetchWithTimeout(`${NHC_SERVICES.atlantic}/${layerId}/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson`);
                         const data = await resp.json();
                         
                         if (data.features && data.features.length > 0) {
@@ -3448,7 +3579,7 @@
             }
             
             try {
-                const resp = await fetch(DATA_URLS.spcWatches, {
+                const resp = await fetchWithTimeout(DATA_URLS.spcWatches, {
                     headers: { 'User-Agent': 'StormViewPro/4.0' }
                 });
                 const data = await resp.json();
@@ -3495,7 +3626,7 @@
             }
             
             try {
-                const resp = await fetch(DATA_URLS.spcMCD, {
+                const resp = await fetchWithTimeout(DATA_URLS.spcMCD, {
                     headers: { 'User-Agent': 'StormViewPro/4.0' }
                 });
                 const data = await resp.json();
@@ -3551,7 +3682,7 @@
             }
             
             try {
-                const resp = await fetch(urls[type]);
+                const resp = await fetchWithTimeout(urls[type]);
                 const data = await resp.json();
                 
                 // Filter out features with empty geometries
@@ -3620,7 +3751,7 @@
             
             try {
                 // Use NWS API for aviation hazard alerts (CORS-friendly)
-                const resp = await fetch(DATA_URLS.pireps, {
+                const resp = await fetchWithTimeout(DATA_URLS.pireps, {
                     headers: { 'User-Agent': 'StormViewPro/4.0' }
                 });
                 const data = await resp.json();
@@ -3669,7 +3800,7 @@
             }
             
             try {
-                const resp = await fetch(DATA_URLS.sigmets, {
+                const resp = await fetchWithTimeout(DATA_URLS.sigmets, {
                     headers: { 'User-Agent': 'StormViewPro/4.0' }
                 });
                 const data = await resp.json();
@@ -4014,7 +4145,7 @@
         // NWS Alerts
         async function loadAlerts() {
             try {
-                const resp = await fetch(DATA_URLS.nwsAlerts, {
+                const resp = await fetchWithTimeout(DATA_URLS.nwsAlerts, {
                     headers: { 'User-Agent': 'StormViewPro/3.0' }
                 });
                 const data = await resp.json();
@@ -4073,7 +4204,7 @@
         // SPC Outlook
         async function loadSPCOutlook() {
             try {
-                const resp = await fetch(DATA_URLS.spcOutlookDay1);
+                const resp = await fetchWithTimeout(DATA_URLS.spcOutlookDay1);
                 const data = await resp.json();
 
                 removeLayer('spcOutlook');
@@ -4128,7 +4259,7 @@
         // Storm Reports (IEM)
         async function loadStormReports() {
             try {
-                const resp = await fetch(DATA_URLS.iemLSR);
+                const resp = await fetchWithTimeout(DATA_URLS.iemLSR);
                 const data = await resp.json();
 
                 removeLayer('stormReports');
@@ -4219,7 +4350,7 @@
                 removeLayer('riverGauges');
                 
                 // Using simplified bounding box for CONUS
-                const resp = await fetch('https://waterservices.usgs.gov/nwis/iv/?format=json&bBox=-125,24,-66,50&parameterCd=00065&siteStatus=active&siteType=ST');
+                const resp = await fetchWithTimeout('https://waterservices.usgs.gov/nwis/iv/?format=json&bBox=-125,24,-66,50&parameterCd=00065&siteStatus=active&siteType=ST');
                 const data = await resp.json();
                 
                 layerRefs.riverGauges = L.layerGroup();
@@ -4270,7 +4401,7 @@
             try {
                 removeLayer('surfaceObs');
                 
-                const resp = await fetch('https://mesonet.agron.iastate.edu/api/1/currents.geojson?network=AWOS');
+                const resp = await fetchWithTimeout('https://mesonet.agron.iastate.edu/api/1/currents.geojson?network=AWOS');
                 const data = await resp.json();
                 
                 layerRefs.surfaceObs = L.geoJSON(data, {
@@ -4341,7 +4472,7 @@
         async function loadStates() {
             try {
                 if (!dataCache.statesGeo) {
-                    const resp = await fetch(DATA_URLS.states);
+                    const resp = await fetchWithTimeout(DATA_URLS.states);
                     const topology = await resp.json();
                     dataCache.statesGeo = topojson.feature(topology, topology.objects.states);
                 }
@@ -4367,7 +4498,7 @@
         async function loadCounties() {
             try {
                 if (!dataCache.countiesGeo) {
-                    const resp = await fetch(DATA_URLS.counties);
+                    const resp = await fetchWithTimeout(DATA_URLS.counties);
                     const topology = await resp.json();
                     dataCache.countiesGeo = topojson.feature(topology, topology.objects.counties);
                 }
@@ -4594,9 +4725,28 @@
             document.getElementById('loadProgressText').textContent = Math.round(pct) + '%';
         }
 
-        function showDataStatus(msg) {
+        function setProviderStatus(state, message, retry = null) {
             const el = document.getElementById('dataStatus');
-            document.getElementById('dataStatusText').textContent = msg;
+            const dot = el.querySelector('.dot');
+            const colors = {
+                loading: 'blue',
+                current: 'green',
+                stale: 'yellow',
+                fallback: 'yellow',
+                error: 'red'
+            };
+            dot.className = `dot ${colors[state] || 'blue'}`;
+            document.getElementById('dataStatusText').textContent = message;
+            el.dataset.state = state;
+            el.classList.add('show');
+            el.classList.toggle('retryable', typeof retry === 'function');
+            el.title = retry ? `${message}. Activate to retry.` : message;
+            el.onclick = typeof retry === 'function' ? retry : null;
+        }
+
+        function showDataStatus(msg) {
+            const el = document.getElementById('tileStatus');
+            document.getElementById('tileStatusText').textContent = msg;
             el.classList.add('show');
             setTimeout(() => el.classList.remove('show'), 3000);
         }
@@ -4770,9 +4920,9 @@
                 const nwsAlertUrl = `https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lng.toFixed(4)}&limit=3`;
 
                 const [omResp, nwsResp, alertResp] = await Promise.allSettled([
-                    fetch(omUrl, { signal }),
-                    fetch(nwsUrl, { signal, headers: { 'User-Agent': 'StormViewPro/5.0' } }),
-                    fetch(nwsAlertUrl, { signal, headers: { 'User-Agent': 'StormViewPro/5.0' } })
+                    fetchWithTimeout(omUrl, { signal }),
+                    fetchWithTimeout(nwsUrl, { signal }),
+                    fetchWithTimeout(nwsAlertUrl, { signal })
                 ]);
 
                 if (signal.aborted) return;
@@ -5507,7 +5657,7 @@
                 
                 searchTimeout = setTimeout(async () => {
                     try {
-                        const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&q=${encodeURIComponent(q)}&limit=5`);
+                        const resp = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&q=${encodeURIComponent(q)}&limit=5`);
                         const data = await resp.json();
                         
                         if (data.length === 0) {
