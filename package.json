@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "npm run test:static && playwright test",
-    "test:static": "node scripts/check-vendor.mjs && node scripts/check-static.mjs",
+    "test:static": "node scripts/check-version.mjs && node scripts/check-vendor.mjs && node scripts/check-static.mjs",
     "release:check": "npm test && npm audit --audit-level=high"
   },
   "dependencies": {

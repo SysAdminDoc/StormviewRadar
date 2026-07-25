@@ -7,10 +7,11 @@ A modern, feature-rich weather radar visualization application built with vanill
 ### ⛈️ [**Launch StormView Radar**](https://sysadmindoc.github.io/StormviewRadar/) ⛈️
 
 [![Live Demo](https://img.shields.io/badge/🔴_LIVE-View_Demo-blue?style=for-the-badge&logoColor=white)](https://sysadmindoc.github.io/StormviewRadar/)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/SysAdminDoc/StormviewRadar/releases)
 
 </div>
 
-<img width="1399" height="1092" alt="StormView Pro v3 Screenshot" src="https://github.com/user-attachments/assets/e2937d6a-ec98-4a53-a7be-621b676701ad" />
+<img width="1399" height="1092" alt="StormView Radar screenshot" src="https://github.com/user-attachments/assets/e2937d6a-ec98-4a53-a7be-621b676701ad" />
 
 
 ## Features
@@ -60,16 +61,17 @@ A modern, feature-rich weather radar visualization application built with vanill
 ## Quick Start
 
 1. **Download** or clone the repository
-2. **Open** `index.html` in any modern browser
-3. **Done!** — Runtime dependencies are bundled; no build step is required
+2. **Serve** the repository with any static HTTP server
+3. **Open** the local URL — runtime dependencies are bundled; no build step is required
 
 ```bash
 git clone https://github.com/sysadmindoc/StormviewRadar.git
 cd StormviewRadar
-# Open index.html in your browser
+python -m http.server 8000
+# Open http://127.0.0.1:8000/
 ```
 
-> **Note:** When running locally from `file://`, RainViewer may be unavailable due to CORS restrictions. The app automatically falls back to MRMS radar in this case. For full functionality, serve via a local web server or use the hosted version.
+> **Note:** Direct `file://` use is not supported because weather providers enforce CORS. Use a local HTTP server or the hosted version.
 
 ## Keyboard Shortcuts
 
@@ -111,10 +113,12 @@ Location searches use the public [Nominatim](https://nominatim.openstreetmap.org
 
 ## Browser Support
 
-- Chrome 80+
-- Firefox 75+
-- Safari 13+
-- Edge 80+
+- Current stable Chrome, Edge, and Firefox on desktop
+- Current stable Safari on macOS and iOS
+- Current stable Chrome on Android
+
+Automated release coverage runs in current Chromium at desktop and 390px mobile
+viewports. Firefox and Safari remain supported manual-test targets.
 
 ## Technology Stack
 
@@ -137,7 +141,8 @@ npm run release:check
 
 The static checks compare vendored files with the lockfile-installed packages.
 Dependabot checks npm dependencies weekly. GitHub Pages deployment runs only
-after the complete browser suite and advisory check pass for `main`.
+after the complete browser suite and advisory check pass for `main`; the deploy
+then verifies the hosted commit, version, social image, and runtime asset types.
 
 ## Performance Optimizations
 

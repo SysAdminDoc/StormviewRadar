@@ -25,8 +25,9 @@ All notable changes to StormviewRadar will be documented in this file.
 - Corrected the test server's CSS content type and strengthened forced-colors contrast and mobile settings-panel behavior.
 - Added deterministic failed-provider fallback coverage and gated GitHub Pages deployment on the complete browser and advisory suite.
 - Added a live diagnostics view with provider freshness, coverage, fallback/retry state, resource counts, redacted request history, and copyable secret-free reports.
+- Unified the v0.1.0 identity across package, page metadata, loading UI, diagnostics, README, and release notes, with automated drift and hosted-commit checks.
 
-## [v0.1.0] - %Y->- (HEAD -> main, origin/main, origin/HEAD)
+## [v0.1.0] - 2026-07-25
 
 - Added: Add files via upload
 - Added: Add files via upload

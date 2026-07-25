@@ -20,3 +20,4 @@ CONTINUATION_PROMPT.md
 node_modules/
 test-results/
 playwright-report/
+deployment.json

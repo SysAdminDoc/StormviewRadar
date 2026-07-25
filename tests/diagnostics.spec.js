@@ -50,6 +50,7 @@ test('diagnostics expose freshness and failures without secrets or coordinates',
 
   await page.locator('#settingsBtn').click();
   await page.locator('.settings-tab[data-tab="diagnostics"]').click();
+  await expect(page.locator('#diagVersion')).toHaveText('0.1.0');
   await expect(page.locator('#diagProvider')).toHaveText('MRMS / reflectivity');
   await expect(page.locator('#diagState')).toContainText('fallback: MRMS fallback: RainViewer failed');
   await expect(page.locator('#diagFreshness')).toContainText('min old');
