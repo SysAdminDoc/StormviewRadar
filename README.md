@@ -20,6 +20,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Five Radar Sources** — Switch between HRRR forecast guidance, RainViewer global history, MRMS US products, NOAA nowCOAST, and native NEXRAD Level II
 - **NEXRAD Level II** — Select the nearest or a named CONUS site and render current 0.5° reflectivity, velocity, ZDR, or correlation coefficient directly from the NOAA/Unidata AWS archive
 - **Rotation Candidates** — Overlay up to 20 clustered, reflectivity-backed velocity couplets with explicit automated-heuristic and not-a-warning labeling
+- **MESH Hail Size** — Decode NOAA's current 2-minute MRMS MESH grid off-thread and overlay color-scaled hail-size estimates with metric/US legends
 - **Hybrid High-Res Mode** — Automatic MRMS enhancement at high zoom levels (US only)
 - **Smooth Animation** — Play, pause, and step through radar frames with customizable speed (0.5x–3x)
 - **Model Forecast** — View HRRR reflectivity guidance through 18 hours
@@ -104,6 +105,7 @@ API keys are stored unencrypted in the current browser profile and sent directly
 | Global radar history | [RainViewer](https://www.rainviewer.com/) | Provider dependent |
 | HRRR forecast radar | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/) | Model cycle |
 | MRMS | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/) | ~2 minutes |
+| MRMS MESH | [NOAA Open Data on AWS](https://registry.opendata.aws/noaa-mrms-pds/) | ~2 minutes |
 | NOAA radar mosaic | [nowCOAST](https://nowcoast.noaa.gov/) | Provider dependent |
 | NEXRAD Level II | [NOAA / NSF Unidata on AWS](https://registry.opendata.aws/noaa-nexrad/) | Per volume scan |
 | Alerts | [NWS API](https://www.weather.gov/documentation/services-web-api) | Real-time |

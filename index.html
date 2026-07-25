@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#1e1e2e">
     <meta charset="UTF-8">
     <meta name="application-version" content="0.1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.open-meteo.com https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://server.arcgisonline.com https://stamen-tiles.a.ssl.fastly.net https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:; upgrade-insecure-requests">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.open-meteo.com https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://server.arcgisonline.com https://stamen-tiles.a.ssl.fastly.net https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:; upgrade-insecure-requests">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StormView Radar 0.1.0</title>
     
@@ -1373,6 +1373,22 @@
             border-top: 1px solid var(--glass-border);
             margin-top: 5px;
         }
+        .mesh-legend {
+            padding: 9px 11px;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            background: var(--glass-heavy);
+            color: var(--text);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(14px);
+            font-size: 10px;
+            line-height: 1.45;
+        }
+        .mesh-legend strong { display: block; margin-bottom: 4px; font-size: 11px; }
+        .mesh-legend-row { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+        .mesh-legend-swatch { width: 12px; height: 8px; border-radius: 2px; }
+        .mesh-legend-note { margin-top: 4px; max-width: 170px; color: var(--text-muted); }
+        .leaflet-bottom .mesh-legend { margin-bottom: 112px; }
         .legend-item {
             display: flex; align-items: center; gap: 4px;
             font-size: 9px; color: var(--text-muted);
@@ -1807,6 +1823,11 @@
                     <div class="layer-chip" data-layer="stormReports">
                         <span class="dot" style="background: var(--purple)"></span>
                         <span class="layer-name">Reports</span>
+                    </div>
+                    <div class="layer-chip" data-layer="hailMesh">
+                        <span class="dot" style="background: #f97316"></span>
+                        <span class="layer-name">Hail Size</span>
+                        <span class="badge">MESH</span>
                     </div>
                     <div class="layer-chip" data-layer="lightning">
                         <span class="dot" style="background: #ffff00"></span>
@@ -2362,6 +2383,9 @@
         // ==================== CONFIGURATION ====================
         const OSM_CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
         const IEM_ATTRIBUTION = '<a href="https://mesonet.agron.iastate.edu/">Iowa Environmental Mesonet</a>';
+        const NOAA_MRMS_ATTRIBUTION = '<a href="https://registry.opendata.aws/noaa-mrms-pds/">NOAA MRMS</a>';
+        const MRMS_MESH_BUCKET = 'https://noaa-mrms-pds.s3.amazonaws.com/';
+        const MRMS_MESH_PREFIX = 'CONUS/MESH_00.50/';
         const BASEMAPS = {
             dark: {
                 url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
@@ -2498,9 +2522,15 @@
         let level2LoadedKey = null;
         let level2Sites = [];
         let level2Couplets = [];
+        let meshWorker = null;
+        let meshWorkerSequence = 0;
+        let meshLegendControl = null;
+        let meshMaximumMm = 0;
+        const meshWorkerRequests = new Map();
         const level2WorkerRequests = new Map();
         const REQUEST_TIMEOUT_MS = 15000;
         const LEVEL2_MAX_BYTES = 80 * 1024 * 1024;
+        const MESH_MAX_BYTES = 5 * 1024 * 1024;
         const NOMINATIM_CONTACT = 'matt_parker@outlook.com';
         const NOMINATIM_REQUEST_INTERVAL_MS = 1250;
         const MAX_ALERT_FEATURES = 750;
@@ -2560,7 +2590,9 @@
                 rotationCandidate: 'Rotation candidate',
                 gateShear: 'Gate-to-gate shear',
                 radarRange: 'Radar range',
-                automationCaution: 'Automated heuristic, not a warning. Confirm threats with official NWS products.'
+                automationCaution: 'Automated heuristic, not a warning. Confirm threats with official NWS products.',
+                hailSize: 'Estimated hail size',
+                meshCaution: 'Radar estimate, not a ground report or warning.'
             },
             es: {
                 loading: 'Cargando...',
@@ -2601,7 +2633,9 @@
                 rotationCandidate: 'Candidato de rotación',
                 gateShear: 'Cizalladura entre compuertas',
                 radarRange: 'Distancia del radar',
-                automationCaution: 'Heurística automatizada, no es una alerta. Confirma las amenazas con productos oficiales del NWS.'
+                automationCaution: 'Heurística automatizada, no es una alerta. Confirma las amenazas con productos oficiales del NWS.',
+                hailSize: 'Tamaño estimado del granizo',
+                meshCaution: 'Estimación de radar; no es un reporte en tierra ni una alerta.'
             }
         };
         const SPANISH_EXACT_TEXT = {
@@ -2639,6 +2673,7 @@
             'Velocity': 'Velocidad',
             'Correlation': 'Correlación',
             'Rotation Candidates': 'Candidatos de rotación',
+            'Hail Size': 'Tamaño del granizo',
             'Weather Layers': 'Capas meteorológicas',
             'Map Overlays': 'Capas del mapa',
             'Model Data': 'Datos del modelo',
@@ -3250,7 +3285,7 @@
 
         const layerRefs = {
             // Weather
-            alerts: null, spcOutlook: null, stormReports: null, couplets: null,
+            alerts: null, spcOutlook: null, stormReports: null, couplets: null, hailMesh: null,
             lightning: null, satellite: null, riverGauges: null, surfaceObs: null,
             temp: null, wind: null, clouds: null, pressure: null,
             
@@ -3296,7 +3331,7 @@
             borderOpacity: 0.6,
             layers: {
                 // Core weather
-                radar: true, alerts: true, spcOutlook: true, stormReports: false, couplets: true,
+                radar: true, alerts: true, spcOutlook: true, stormReports: false, couplets: true, hailMesh: false,
                 lightning: false, satellite: false, riverGauges: false, surfaceObs: false,
                 
                 // Model data (requires API)
@@ -3452,6 +3487,9 @@
             
             map.createPane('radarPane');
             map.getPane('radarPane').style.zIndex = 250;
+
+            map.createPane('hailPane');
+            map.getPane('hailPane').style.zIndex = 300;
             
             map.createPane('boundaryPane');
             map.getPane('boundaryPane').style.zIndex = 350;
@@ -3919,6 +3957,170 @@
         }
 
         // ==================== RADAR ====================
+        function disposeMeshWorker(reason = new DOMException('MESH worker stopped', 'AbortError')) {
+            meshWorker?.terminate();
+            meshWorker = null;
+            meshWorkerRequests.forEach(request => request.reject(reason));
+            meshWorkerRequests.clear();
+        }
+
+        function getMeshWorker() {
+            if (meshWorker) return meshWorker;
+            meshWorker = new Worker('src/mesh-worker.js', { type: 'module' });
+            meshWorker.addEventListener('message', event => {
+                const request = meshWorkerRequests.get(event.data?.id);
+                if (!request) return;
+                clearTimeout(request.timeoutId);
+                request.signal?.removeEventListener('abort', request.abort);
+                meshWorkerRequests.delete(event.data.id);
+                if (event.data.type === 'error') request.reject(new Error(event.data.message));
+                else request.resolve(event.data);
+            });
+            meshWorker.addEventListener('error', event => {
+                disposeMeshWorker(new Error(event.message || 'MESH worker failed'));
+            });
+            return meshWorker;
+        }
+
+        function requestMeshRender(buffer, signal) {
+            const worker = getMeshWorker();
+            const id = ++meshWorkerSequence;
+            return new Promise((resolve, reject) => {
+                const abort = () => {
+                    const request = meshWorkerRequests.get(id);
+                    if (!request) return;
+                    clearTimeout(request.timeoutId);
+                    meshWorkerRequests.delete(id);
+                    reject(signal.reason || new DOMException('MESH request cancelled', 'AbortError'));
+                    disposeMeshWorker();
+                };
+                const timeoutId = setTimeout(() => {
+                    meshWorkerRequests.delete(id);
+                    reject(new DOMException('MESH processing timed out after 45 seconds', 'TimeoutError'));
+                    disposeMeshWorker();
+                }, 45000);
+                meshWorkerRequests.set(id, { resolve, reject, timeoutId, signal, abort });
+                signal?.addEventListener('abort', abort, { once: true });
+                worker.postMessage({ id, type: 'render', buffer }, [buffer]);
+            });
+        }
+
+        function utcDateKey(date) {
+            return `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, '0')}${String(date.getUTCDate()).padStart(2, '0')}`;
+        }
+
+        async function findLatestMeshObject(signal) {
+            for (let dayOffset = 0; dayOffset <= 1; dayOffset += 1) {
+                const date = new Date(Date.now() - dayOffset * 86400000);
+                const dateKey = utcDateKey(date);
+                const prefix = `${MRMS_MESH_PREFIX}${dateKey}/`;
+                const listingUrl = `${MRMS_MESH_BUCKET}?list-type=2&prefix=${encodeURIComponent(prefix)}&max-keys=1000`;
+                const response = await fetchWithTimeout(listingUrl, { signal }, 20000);
+                const xml = new DOMParser().parseFromString(await response.text(), 'application/xml');
+                if (xml.querySelector('parsererror')) throw new Error('The NOAA MRMS archive returned invalid XML');
+                const objects = [...xml.getElementsByTagName('Contents')].flatMap(node => {
+                    const key = node.getElementsByTagName('Key')[0]?.textContent || '';
+                    const size = Number(node.getElementsByTagName('Size')[0]?.textContent);
+                    return /^CONUS\/MESH_00\.50\/\d{8}\/MRMS_MESH_00\.50_\d{8}-\d{6}\.grib2\.gz$/.test(key)
+                        ? [{ key, size }]
+                        : [];
+                }).sort((left, right) => left.key.localeCompare(right.key));
+                if (!objects.length) continue;
+                const latest = objects.at(-1);
+                if (latest.size > MESH_MAX_BYTES) throw new Error('The latest MESH file exceeds the safety limit');
+                return { ...latest, url: `${MRMS_MESH_BUCKET}${latest.key}` };
+            }
+            throw new Error('No current NOAA MRMS MESH file is available');
+        }
+
+        async function downloadMeshObject(object, signal) {
+            const response = await fetchWithTimeout(object.url, { signal }, 30000);
+            const declaredLength = Number(response.headers.get('content-length')) || object.size;
+            if (declaredLength > MESH_MAX_BYTES) throw new Error('The MESH file exceeds the safety limit');
+            const buffer = await response.arrayBuffer();
+            if (buffer.byteLength > MESH_MAX_BYTES) throw new Error('The MESH file exceeds the safety limit');
+            return buffer;
+        }
+
+        function formatHailSize(millimeters) {
+            if (settings.units === 'metric') return `${Math.round(millimeters)} mm`;
+            const inches = millimeters / 25.4;
+            const decimals = Number.isInteger(Math.round(inches * 100) / 10) ? 1 : 2;
+            return `${inches.toFixed(decimals)} in`;
+        }
+
+        function showMeshLegend() {
+            if (meshLegendControl) map.removeControl(meshLegendControl);
+            const breaks = [
+                [6.35, '#22d3ee'],
+                [12.7, '#3b82f6'],
+                [25.4, '#22c55e'],
+                [44.45, '#facc15'],
+                [63.5, '#f97316'],
+                [101.6, '#ef4444']
+            ];
+            meshLegendControl = L.control({ position: 'bottomright' });
+            meshLegendControl.onAdd = () => {
+                const container = L.DomUtil.create('div', 'mesh-legend');
+                const title = document.createElement('strong');
+                title.textContent = `${t('hailSize')} (MESH)`;
+                container.appendChild(title);
+                breaks.forEach(([millimeters, color]) => {
+                    const row = document.createElement('div');
+                    row.className = 'mesh-legend-row';
+                    const swatch = document.createElement('span');
+                    swatch.className = 'mesh-legend-swatch';
+                    swatch.style.background = color;
+                    const label = document.createElement('span');
+                    label.textContent = `${formatHailSize(millimeters)}+`;
+                    row.append(swatch, label);
+                    container.appendChild(row);
+                });
+                const note = document.createElement('div');
+                note.className = 'mesh-legend-note';
+                note.textContent = `${t('meshCaution')} Max: ${formatHailSize(meshMaximumMm)}`;
+                container.appendChild(note);
+                return container;
+            };
+            meshLegendControl.addTo(map);
+        }
+
+        async function loadHailMesh() {
+            removeLayer('hailMesh');
+            const controller = beginLayerRequest('hailMesh');
+            try {
+                const object = await findLatestMeshObject(controller.signal);
+                const buffer = await downloadMeshObject(object, controller.signal);
+                const rendered = await requestMeshRender(buffer, controller.signal);
+                if (controller.signal.aborted || !settings.layers.hailMesh) return;
+                if (!(rendered.blob instanceof Blob) || !Array.isArray(rendered.bounds)) {
+                    throw new Error('MESH worker returned an invalid image');
+                }
+                const imageUrl = URL.createObjectURL(rendered.blob);
+                const layer = L.imageOverlay(imageUrl, rendered.bounds, {
+                    opacity: Math.min(0.92, settings.opacity),
+                    pane: 'hailPane',
+                    className: 'hail-mesh-layer',
+                    alt: `NOAA MRMS MESH hail size estimate; maximum ${formatHailSize(rendered.maximumMm)}`
+                });
+                layer.getAttribution = () => NOAA_MRMS_ATTRIBUTION;
+                layer._stormviewObjectUrl = imageUrl;
+                layerRefs.hailMesh = layer.addTo(map);
+                meshMaximumMm = Number(rendered.maximumMm) || 0;
+                setLayerFeatureCount('hailMesh', rendered.hailPixels);
+                showMeshLegend();
+            } catch (error) {
+                if (error?.name === 'AbortError') return;
+                console.error('MESH error:', error);
+                showToast(`Hail-size layer unavailable: ${safeText(error.message, 120)}`, 'error', 5000);
+                settings.layers.hailMesh = false;
+                document.querySelectorAll('[data-layer="hailMesh"]').forEach(element => element.classList.remove('active'));
+                saveSettings();
+            } finally {
+                finishLayerRequest('hailMesh', controller);
+            }
+        }
+
         const LEVEL2_FALLBACK_SITES = Object.freeze([
             { id: 'KTLX', name: 'Oklahoma City, OK', lat: 35.3334, lng: -97.2779 },
             { id: 'KFTG', name: 'Denver, CO', lat: 39.7866, lng: -104.5458 },
@@ -5246,6 +5448,9 @@
                 case 'stormReports':
                     on ? loadStormReports() : removeLayer('stormReports');
                     break;
+                case 'hailMesh':
+                    on ? loadHailMesh() : removeLayer('hailMesh');
+                    break;
                 case 'lightning':
                     if (on) {
                         loadLightning();
@@ -5331,10 +5536,16 @@
                 layerRequests.delete(name);
             }
             if (layerRefs[name]) {
+                if (layerRefs[name]._stormviewObjectUrl) URL.revokeObjectURL(layerRefs[name]._stormviewObjectUrl);
                 map.removeLayer(layerRefs[name]);
                 layerRefs[name].off?.();
                 layerRefs[name].clearLayers?.();
                 layerRefs[name] = null;
+            }
+            if (name === 'hailMesh' && meshLegendControl) {
+                map.removeControl(meshLegendControl);
+                meshLegendControl = null;
+                meshMaximumMm = 0;
             }
             setLayerFeatureCount(name, 0);
         }
@@ -5355,7 +5566,7 @@
         function getLayerName(key) {
             const names = {
                 radar: 'Radar', alerts: 'NWS Alerts', spcOutlook: 'SPC Outlook',
-                stormReports: 'Storm Reports', lightning: 'Lightning', satellite: 'Satellite',
+                stormReports: 'Storm Reports', hailMesh: 'MRMS Hail Size', lightning: 'Lightning', satellite: 'Satellite',
                 satelliteIR: 'Infrared Sat', satelliteWV: 'Water Vapor',
                 riverGauges: 'River Gauges', surfaceObs: 'Surface Obs',
                 temp: 'Temperature', wind: 'Wind', clouds: 'Clouds', pressure: 'Pressure',
@@ -6832,6 +7043,7 @@
                 if (settings.layers.alerts) loadAlerts();
                 if (settings.layers.spcOutlook) loadSPCOutlook();
                 if (settings.layers.stormReports) loadStormReports();
+                if (settings.layers.hailMesh) loadHailMesh();
                 if (settings.layers.spcWatches) loadSPCWatches();
                 if (settings.layers.spcMCD) loadSPCMCD();
                 if (settings.layers.tropical) loadTropical();
@@ -6928,6 +7140,7 @@
                 saveSettings();
                 applyLanguage();
                 showToast(t('languageUpdated'), 'success', 2200);
+                if (layerRefs.hailMesh) showMeshLegend();
                 if (currentForecastLocation) openForecast(currentForecastLocation.lat, currentForecastLocation.lng);
             });
 
@@ -6941,6 +7154,7 @@
                 if (settings.layers.surfaceObs) loadSurfaceObs();
                 if (settings.layers.riverGauges) loadRiverGauges();
                 if (layerRefs.couplets) renderLevel2Couplets();
+                if (layerRefs.hailMesh) showMeshLegend();
                 if (currentForecastLocation) openForecast(currentForecastLocation.lat, currentForecastLocation.lng);
             });
 

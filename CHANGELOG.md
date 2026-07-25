@@ -30,6 +30,7 @@ All notable changes to StormviewRadar will be documented in this file.
 - Added schema v3 language and unit preferences, Spanish UI/forecast localization, locale-aware dates, metric provider requests, and converted observation/radar units with English fallback.
 - Added schema v4 NEXRAD Level II single-site mode with nearest-site selection, NOAA/Unidata archive discovery, off-thread bzip decoding, and native reflectivity, velocity, ZDR, and correlation-coefficient rendering.
 - Added a bounded Level II rotation-candidate overlay that requires sustained adjacent-gate shear inside precipitation, clusters nearby detections, and labels every result as an automated heuristic rather than a warning.
+- Added an optional NOAA MRMS MESH hail-size overlay with direct S3 discovery, worker-based GRIB2/PNG decoding, safety limits, localized units, and explicit estimate-not-warning guidance.
 
 ## [v0.1.0] - 2026-07-25
 
