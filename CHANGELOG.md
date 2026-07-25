@@ -13,6 +13,8 @@ All notable changes to StormviewRadar will be documented in this file.
 - Added bounded settings/bookmark validation and deterministic Playwright security tests in CI.
 - Restored visible, clickable basemap and data-provider attribution and switched core identity images to bundled assets.
 - Made Nominatim search requests cancellable, identified, and compliant with the public service's one-request-per-second limit.
+- Scoped USGS river requests to the visible map, spatially sampled point overlays, and enforced hard feature budgets.
+- Added cancellable overlay loads and deterministic teardown checks; removed the unused, leaky Blitzortung WebSocket implementation.
 
 ## [v0.1.0] - %Y->- (HEAD -> main, origin/main, origin/HEAD)
 

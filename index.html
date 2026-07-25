@@ -2199,7 +2199,6 @@
         <a href="https://mesonet.agron.iastate.edu/" target="_blank" rel="noopener">IEM</a>,
         <a href="https://www.usgs.gov/" target="_blank" rel="noopener">USGS</a>,
         <a href="https://www.nhc.noaa.gov/" target="_blank" rel="noopener">NHC</a>,
-        <a href="https://www.blitzortung.org/" target="_blank" rel="noopener">Blitzortung</a>,
         <a href="https://www.noaa.gov/" target="_blank" rel="noopener">NOAA/GOES</a>,
         <a href="https://aviationweather.gov/" target="_blank" rel="noopener">Aviation Weather</a>
     </div>
@@ -2343,7 +2342,12 @@
         let radarAbortController = null;
         const REQUEST_TIMEOUT_MS = 15000;
         const NOMINATIM_CONTACT = 'matt_parker@outlook.com';
+        const NOMINATIM_REQUEST_INTERVAL_MS = 1250;
+        const MAX_ALERT_FEATURES = 750;
+        const MAX_POINT_FEATURES = 500;
+        const MAX_RIVER_GAUGES = 250;
         const activeRequests = new Map();
+        const layerRequests = new Map();
         const MAX_SETTINGS_BYTES = 32768;
 
         function safeText(value, maxLength = 500) {
@@ -2375,6 +2379,42 @@
             return Array.isArray(payload?.features)
                 ? payload.features.filter(feature => feature && typeof feature === 'object').slice(0, maxItems)
                 : [];
+        }
+
+        function pointFeaturesInView(payload, maxItems = MAX_POINT_FEATURES) {
+            const bounds = map?.getBounds();
+            const cells = new Set();
+            const cellSize = Math.max(0.1, 8 / Math.max(map?.getZoom() || 5, 1));
+            return featureList(payload, maxItems * 4).flatMap(feature => {
+                if (feature.geometry?.type !== 'Point' || !Array.isArray(feature.geometry.coordinates)) return [];
+                const [lon, lat] = feature.geometry.coordinates.map(Number);
+                if (!Number.isFinite(lat) || !Number.isFinite(lon) || !bounds?.contains([lat, lon])) return [];
+                const cell = `${Math.floor(lat / cellSize)}:${Math.floor(lon / cellSize)}`;
+                if (cells.has(cell)) return [];
+                cells.add(cell);
+                return [feature];
+            }).slice(0, maxItems);
+        }
+
+        function beginLayerRequest(name) {
+            layerRequests.get(name)?.abort(new DOMException('Layer request superseded', 'AbortError'));
+            const controller = new AbortController();
+            layerRequests.set(name, controller);
+            return controller;
+        }
+
+        function finishLayerRequest(name, controller) {
+            if (layerRequests.get(name) === controller) layerRequests.delete(name);
+        }
+
+        function conusViewportBbox() {
+            const bounds = map.getBounds();
+            const west = Math.max(-125, bounds.getWest());
+            const south = Math.max(24, bounds.getSouth());
+            const east = Math.min(-66, bounds.getEast());
+            const north = Math.min(50, bounds.getNorth());
+            const values = west < east && south < north ? [west, south, east, north] : [-125, 24, -66, 50];
+            return values.map(value => value.toFixed(4)).join(',');
         }
 
         function validateSettingsPayload(candidate) {
@@ -2469,7 +2509,7 @@
         async function searchNominatim(query, signal) {
             const waitMs = Math.max(0, nextNominatimRequestAt - Date.now());
             if (waitMs) await abortableDelay(waitMs, signal);
-            nextNominatimRequestAt = Date.now() + 1000;
+            nextNominatimRequestAt = Date.now() + NOMINATIM_REQUEST_INTERVAL_MS;
 
             const params = new URLSearchParams({
                 format: 'jsonv2',
@@ -2541,13 +2581,6 @@
         };
 
         const dataCache = { statesGeo: null, countiesGeo: null };
-        
-        // Lightning state
-        let lightningSocket = null;
-        let lightningStrikes = [];
-        let lightningLayer = null;
-        const LIGHTNING_MAX_AGE = 20 * 60 * 1000; // 20 minutes
-        const LIGHTNING_MAX_STRIKES = 5000;
         
         // HRRR state
         let hrrrInitTime = null;
@@ -3519,154 +3552,25 @@
                 showToast('HRRR 18-hour forecast loaded', 'success');
         }
         
-        // ==================== LIGHTNING (Blitzortung) ====================
-        function startLightning() {
-            if (lightningSocket) return;
-            
-            // Create layer group for strikes
-            if (!lightningLayer) {
-                lightningLayer = L.layerGroup().addTo(map);
-                lightningLayer.setZIndex(600);
-            }
-            
-            try {
-                // Connect to Blitzortung WebSocket
-                lightningSocket = new WebSocket('wss://ws1.blitzortung.org:443/');
-                
-                lightningSocket.onopen = () => {
-                    console.log('[Lightning] Connected to Blitzortung');
-                    // Request strikes for viewing area
-                    const bounds = map.getBounds();
-                    lightningSocket.send(JSON.stringify({
-                        west: bounds.getWest(),
-                        east: bounds.getEast(),
-                        north: bounds.getNorth(),
-                        south: bounds.getSouth()
-                    }));
-                    showDataStatus('Lightning connected');
-                };
-                
-                lightningSocket.onmessage = (event) => {
-                    try {
-                        if (typeof event.data !== 'string' || event.data.length > 10000) return;
-                        const data = JSON.parse(event.data);
-                        const lat = Number(data?.lat);
-                        const lon = Number(data?.lon);
-                        if (Number.isFinite(lat) && lat >= -90 && lat <= 90 && Number.isFinite(lon) && lon >= -180 && lon <= 180) {
-                            addLightningStrike({ lat, lon });
-                        }
-                    } catch(e) {}
-                };
-                
-                lightningSocket.onerror = (e) => {
-                    console.error('[Lightning] WebSocket error:', e);
-                };
-                
-                lightningSocket.onclose = () => {
-                    console.log('[Lightning] Disconnected');
-                    lightningSocket = null;
-                    // Reconnect after delay if still enabled
-                    if (settings.layers.lightning) {
-                        setTimeout(startLightning, 5000);
-                    }
-                };
-                
-                // Update bounds on map move
-                map.on('moveend', updateLightningBounds);
-                
-                // Cleanup old strikes periodically
-                setInterval(cleanupOldStrikes, 30000);
-                
-            } catch(e) {
-                console.error('[Lightning] Failed to connect:', e);
-            }
-        }
-        
-        function stopLightning() {
-            if (lightningSocket) {
-                lightningSocket.close();
-                lightningSocket = null;
-            }
-            map.off('moveend', updateLightningBounds);
-            if (lightningLayer) {
-                lightningLayer.clearLayers();
-            }
-            lightningStrikes = [];
-        }
-        
-        function updateLightningBounds() {
-            if (!lightningSocket || lightningSocket.readyState !== WebSocket.OPEN) return;
-            const bounds = map.getBounds();
-            lightningSocket.send(JSON.stringify({
-                west: bounds.getWest(),
-                east: bounds.getEast(),
-                north: bounds.getNorth(),
-                south: bounds.getSouth()
-            }));
-        }
-        
-        function addLightningStrike(data) {
-            const strike = {
-                lat: data.lat,
-                lon: data.lon,
-                time: Date.now(),
-                marker: null
-            };
-            
-            // Create marker with custom icon
-            const icon = L.divIcon({
-                className: 'lightning-strike',
-                iconSize: [8, 8]
-            });
-            
-            strike.marker = L.marker([data.lat, data.lon], { 
-                icon: icon,
-                interactive: false
-            });
-            
-            lightningLayer.addLayer(strike.marker);
-            lightningStrikes.push(strike);
-            
-            // Limit total strikes
-            while (lightningStrikes.length > LIGHTNING_MAX_STRIKES) {
-                const old = lightningStrikes.shift();
-                if (old.marker) lightningLayer.removeLayer(old.marker);
-            }
-        }
-        
-        function cleanupOldStrikes() {
-            const now = Date.now();
-            lightningStrikes = lightningStrikes.filter(strike => {
-                if (now - strike.time > LIGHTNING_MAX_AGE) {
-                    if (strike.marker) lightningLayer.removeLayer(strike.marker);
-                    return false;
-                }
-                return true;
-            });
-        }
-        
         // ==================== TROPICAL / HURRICANES ====================
         async function loadTropical() {
-            if (layerRefs.tropical) {
-                map.removeLayer(layerRefs.tropical);
-            }
-            
+            removeLayer('tropical');
+            const controller = beginLayerRequest('tropical');
             layerRefs.tropical = L.layerGroup().addTo(map);
             
             try {
-                // Load from NHC MapServer
-                const atlUrl = `${NHC_SERVICES.atlantic}/query?where=1%3D1&outFields=*&f=geojson`;
-                
                 // Load forecast cones, tracks, and points
                 const layers = [2, 3, 4, 5]; // Forecast points, track, cone, watch/warning
+                let featureCount = 0;
                 
                 for (const layerId of layers) {
                     try {
-                        const resp = await fetchWithTimeout(`${NHC_SERVICES.atlantic}/${layerId}/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson`);
+                        const resp = await fetchWithTimeout(`${NHC_SERVICES.atlantic}/${layerId}/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson`, { signal: controller.signal });
                         const data = await resp.json();
-                        
-                        if (data.features && data.features.length > 0) {
-                            const layer = L.geoJSON(data, {
+                        if (controller.signal.aborted || !settings.layers.tropical) return;
+                        const features = featureList(data, MAX_POINT_FEATURES);
+                        if (features.length > 0) {
+                            const layer = L.geoJSON({ type: 'FeatureCollection', features }, {
                                 style: getTropicalStyle(layerId),
                                 pointToLayer: (feature, latlng) => {
                                     return L.circleMarker(latlng, getTropicalPointStyle(feature));
@@ -3688,15 +3592,21 @@
                                 }
                             });
                             layerRefs.tropical.addLayer(layer);
+                            featureCount += features.length;
                         }
                     } catch(e) {
+                        if (e?.name === 'AbortError') return;
                         console.warn(`Failed to load tropical layer ${layerId}:`, e);
                     }
                 }
                 
+                setLayerFeatureCount('tropical', featureCount);
                 showDataStatus('Tropical data loaded');
             } catch(e) {
+                if (e?.name === 'AbortError') return;
                 console.error('Tropical load error:', e);
+            } finally {
+                finishLayerRequest('tropical', controller);
             }
         }
         
@@ -4274,10 +4184,24 @@
         }
 
         function removeLayer(name) {
+            const request = layerRequests.get(name);
+            if (request) {
+                request.abort(new DOMException('Layer disabled', 'AbortError'));
+                layerRequests.delete(name);
+            }
             if (layerRefs[name]) {
                 map.removeLayer(layerRefs[name]);
+                layerRefs[name].off?.();
+                layerRefs[name].clearLayers?.();
                 layerRefs[name] = null;
             }
+            setLayerFeatureCount(name, 0);
+        }
+
+        function setLayerFeatureCount(name, count) {
+            document.querySelectorAll(`[data-layer="${name}"]`).forEach(element => {
+                element.dataset.featureCount = String(Math.max(0, Number(count) || 0));
+            });
         }
 
         function getLayerName(key) {
@@ -4297,12 +4221,13 @@
 
         // NWS Alerts
         async function loadAlerts() {
+            removeLayer('alerts');
+            const controller = beginLayerRequest('alerts');
             try {
-                const resp = await fetchWithTimeout(DATA_URLS.nwsAlerts);
+                const resp = await fetchWithTimeout(DATA_URLS.nwsAlerts, { signal: controller.signal });
                 const data = await resp.json();
-                const features = featureList(data);
-
-                removeLayer('alerts');
+                if (controller.signal.aborted || !settings.layers.alerts) return;
+                const features = featureList(data, MAX_ALERT_FEATURES);
 
                 layerRefs.alerts = L.geoJSON(features, {
                     pane: 'alertPane',
@@ -4340,6 +4265,7 @@
                 });
 
                 if (settings.layers.alerts) layerRefs.alerts.addTo(map);
+                setLayerFeatureCount('alerts', features.length);
                 
                 // Update alert count badges
                 const warningCount = features.filter(f => {
@@ -4348,7 +4274,10 @@
                 }).length;
                 updateAlertCount(warningCount || features.length);
             } catch(e) {
+                if (e?.name === 'AbortError') return;
                 console.error('Alerts error:', e);
+            } finally {
+                finishLayerRequest('alerts', controller);
             }
         }
 
@@ -4409,11 +4338,13 @@
 
         // Storm Reports (IEM)
         async function loadStormReports() {
+            removeLayer('stormReports');
+            const controller = beginLayerRequest('stormReports');
             try {
-                const resp = await fetchWithTimeout(DATA_URLS.iemLSR);
+                const resp = await fetchWithTimeout(DATA_URLS.iemLSR, { signal: controller.signal });
                 const data = await resp.json();
-
-                removeLayer('stormReports');
+                if (controller.signal.aborted || !settings.layers.stormReports) return;
+                const reports = pointFeaturesInView(data);
 
                 const typeColors = {
                     'TORNADO': '#ff0000',
@@ -4424,7 +4355,7 @@
                     'FUNNEL CLOUD': '#ff6600'
                 };
 
-                layerRefs.stormReports = L.geoJSON(data, {
+                layerRefs.stormReports = L.geoJSON({ type: 'FeatureCollection', features: reports }, {
                     pane: 'markerPane',
                     pointToLayer: (f, latlng) => {
                         const type = f.properties?.typetext || '';
@@ -4452,8 +4383,12 @@
                 });
 
                 if (settings.layers.stormReports) layerRefs.stormReports.addTo(map);
+                setLayerFeatureCount('stormReports', reports.length);
             } catch(e) {
+                if (e?.name === 'AbortError') return;
                 console.error('Storm reports error:', e);
+            } finally {
+                finishLayerRequest('stormReports', controller);
             }
         }
 
@@ -4474,6 +4409,7 @@
                 });
 
                 if (settings.layers.lightning) layerRefs.lightning.addTo(map);
+                setLayerFeatureCount('lightning', settings.layers.lightning ? 1 : 0);
             } catch(e) {
                 console.error('Lightning error:', e);
             }
@@ -4499,17 +4435,35 @@
 
         // River Gauges (USGS)
         async function loadRiverGauges() {
+            removeLayer('riverGauges');
+            const controller = beginLayerRequest('riverGauges');
             try {
-                removeLayer('riverGauges');
-                
-                // Using simplified bounding box for CONUS
-                const resp = await fetchWithTimeout('https://waterservices.usgs.gov/nwis/iv/?format=json&bBox=-125,24,-66,50&parameterCd=00065&siteStatus=active&siteType=ST');
+                const params = new URLSearchParams({
+                    format: 'json',
+                    bBox: conusViewportBbox(),
+                    parameterCd: '00065',
+                    siteStatus: 'active',
+                    siteType: 'ST'
+                });
+                const resp = await fetchWithTimeout(`https://waterservices.usgs.gov/nwis/iv/?${params}`, { signal: controller.signal });
                 const data = await resp.json();
-                
+                if (controller.signal.aborted || !settings.layers.riverGauges) return;
                 layerRefs.riverGauges = L.layerGroup();
                 
-                const sites = data.value?.timeSeries || [];
-                const limitedSites = sites.slice(0, 500); // Limit for performance
+                const bounds = map.getBounds();
+                const occupiedCells = new Set();
+                const cellSize = Math.max(0.1, 8 / Math.max(map.getZoom(), 1));
+                const sites = Array.isArray(data.value?.timeSeries) ? data.value.timeSeries : [];
+                const limitedSites = sites.flatMap(site => {
+                    const geo = site?.sourceInfo?.geoLocation?.geogLocation;
+                    const lat = Number(geo?.latitude);
+                    const lon = Number(geo?.longitude);
+                    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !bounds.contains([lat, lon])) return [];
+                    const cell = `${Math.floor(lat / cellSize)}:${Math.floor(lon / cellSize)}`;
+                    if (occupiedCells.has(cell)) return [];
+                    occupiedCells.add(cell);
+                    return [site];
+                }).slice(0, MAX_RIVER_GAUGES);
                 
                 limitedSites.forEach(site => {
                     try {
@@ -4544,20 +4498,25 @@
                 });
 
                 if (settings.layers.riverGauges) layerRefs.riverGauges.addTo(map);
+                setLayerFeatureCount('riverGauges', limitedSites.length);
             } catch(e) {
+                if (e?.name === 'AbortError') return;
                 console.error('River gauges error:', e);
+            } finally {
+                finishLayerRequest('riverGauges', controller);
             }
         }
 
         // Surface Observations (IEM)
         async function loadSurfaceObs() {
+            removeLayer('surfaceObs');
+            const controller = beginLayerRequest('surfaceObs');
             try {
-                removeLayer('surfaceObs');
-                
-                const resp = await fetchWithTimeout('https://mesonet.agron.iastate.edu/api/1/currents.geojson?network=AWOS');
+                const resp = await fetchWithTimeout('https://mesonet.agron.iastate.edu/api/1/currents.geojson?network=AWOS', { signal: controller.signal });
                 const data = await resp.json();
-                
-                layerRefs.surfaceObs = L.geoJSON(data, {
+                if (controller.signal.aborted || !settings.layers.surfaceObs) return;
+                const observations = pointFeaturesInView(data);
+                layerRefs.surfaceObs = L.geoJSON({ type: 'FeatureCollection', features: observations }, {
                     pane: 'markerPane',
                     pointToLayer: (f, latlng) => {
                         return L.circleMarker(latlng, {
@@ -4584,8 +4543,12 @@
                 });
 
                 if (settings.layers.surfaceObs) layerRefs.surfaceObs.addTo(map);
+                setLayerFeatureCount('surfaceObs', observations.length);
             } catch(e) {
+                if (e?.name === 'AbortError') return;
                 console.error('Surface obs error:', e);
+            } finally {
+                finishLayerRequest('surfaceObs', controller);
             }
         }
 

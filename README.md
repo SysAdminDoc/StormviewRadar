@@ -127,6 +127,7 @@ StormView includes several optimizations for smooth performance:
 - **Custom Cached TileLayer** — Extended Leaflet TileLayer with intelligent caching
 - **Seamless Zoom** — Tiles remain visible during zoom, new tiles load in background
 - **Memory Management** — Only nearby frames kept in memory during animation
+- **Bounded Overlays** — River requests follow the visible map area; report and observation markers are spatially sampled with hard limits
 - **Graceful Error Handling** — Failed tiles display transparently without broken image icons
 
 ## Configuration Options
