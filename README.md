@@ -38,7 +38,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Alert Sounds** — Opt in to synthesized tones for newly issued alerts, filtered by NWS severity, event type, and distance from the map center
 - **Private Geofences** — Save up to 20 named local alert radii at the map center, display them as optional overlays, and match alert sounds against their polygon intersections
 - **SPC Outlooks** — Storm Prediction Center convective outlooks
-- **Storm Reports** — View tornado, hail, and wind damage reports
+- **Storm Reports** — Cluster the latest IEM tornado, hail, wind, and flood reports at overview zooms, then expand to individual report pins at zoom 9+
 - **Storm Tracks** — Plot current NEXRAD storm cells with an hour of observed positions, 30/60-minute motion projections, and TVS, mesocyclone, hail, VIL, and echo-top details
 - **3D Storm Tops** — Toggle a Cesium globe that extrudes current IEM NEXRAD echo-top estimates, prioritizes threat cells, labels measured heights, and discloses its zoom-dependent display scale
 - **Lightning** — Near real-time lightning strike data

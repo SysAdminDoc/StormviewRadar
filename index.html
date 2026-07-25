@@ -1540,6 +1540,29 @@
             border-radius: 50%;
             flex-shrink: 0;
         }
+        .storm-report-cluster-icon {
+            display: grid;
+            place-items: center;
+            border: 0;
+            background: transparent;
+        }
+        .storm-report-cluster-icon span {
+            display: grid;
+            place-items: center;
+            width: 100%;
+            height: 100%;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            background: color-mix(in srgb, var(--cluster-color, #f97316) 82%, #111827);
+            color: #fff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+            font-size: 11px;
+            font-weight: 800;
+        }
+        .storm-report-cluster-icon:focus span {
+            outline: 3px solid var(--accent);
+            outline-offset: 2px;
+        }
 
         @media (max-width: 768px) {
             .sidebar { display: none; }
@@ -2862,6 +2885,9 @@
         let currentAlertFeatures = [];
         let mobileAlertBannerToolsPromise = null;
         let mobileAlertBannerSelection = null;
+        let stormReportPayload = null;
+        let stormReportClusterToolsPromise = null;
+        let stormReportRenderGeneration = 0;
         const dismissedMobileAlertIds = new Set();
         let geofences = [];
         const seenAlertIds = new Set();
@@ -4127,6 +4153,9 @@
             setBasemap(settings.basemap);
             map.on('moveend', updateCoverageStatus);
             map.on('moveend', () => updateMobileAlertBanner(currentAlertFeatures));
+            map.on('moveend', () => {
+                if (settings.layers.stormReports && stormReportPayload) renderStormReports();
+            });
             updateCoverageStatus();
         }
 
@@ -6263,6 +6292,14 @@
                 map.removeControl(alertAgeLegendControl);
                 alertAgeLegendControl = null;
             }
+            if (name === 'stormReports') {
+                stormReportPayload = null;
+                stormReportRenderGeneration += 1;
+                document.querySelectorAll('[data-layer="stormReports"]').forEach(element => {
+                    element.dataset.renderedCount = '0';
+                    element.dataset.clusterCount = '0';
+                });
+            }
             setLayerFeatureCount(name, 0);
         }
 
@@ -6795,6 +6832,141 @@
         }
 
         // Storm Reports (IEM)
+        function stormReportClusterTools() {
+            if (!stormReportClusterToolsPromise) {
+                stormReportClusterToolsPromise = import('./src/storm-report-clusters.js');
+            }
+            return stormReportClusterToolsPromise;
+        }
+
+        function stormReportFeaturesInView(payload) {
+            const bounds = map.getBounds();
+            return featureList(payload, 5000)
+                .filter(feature => {
+                    if (feature.geometry?.type !== 'Point' || !Array.isArray(feature.geometry.coordinates)) return false;
+                    const longitude = Number(feature.geometry.coordinates[0]);
+                    const latitude = Number(feature.geometry.coordinates[1]);
+                    return Number.isFinite(latitude)
+                        && Number.isFinite(longitude)
+                        && bounds.contains([latitude, longitude]);
+                })
+                .sort((left, right) => (
+                    new Date(right.properties?.valid || 0).getTime()
+                    - new Date(left.properties?.valid || 0).getTime()
+                ))
+                .slice(0, 1000);
+        }
+
+        function stormReportColor(type) {
+            const colors = {
+                'TORNADO': '#ff0000',
+                'HAIL': '#00cc66',
+                'TSTM WND DMG': '#0099ff',
+                'TSTM WND GST': '#0099ff',
+                'FLASH FLOOD': '#00aa00',
+                'FUNNEL CLOUD': '#ff6600'
+            };
+            return colors[type] || '#ff6600';
+        }
+
+        function bindStormReportPopup(feature, layer) {
+            const properties = feature.properties || {};
+            layer.bindPopup(`
+                <div class="popup-content">
+                    <h4>${escapeHTML(properties.typetext || 'Report', 80)}</h4>
+                    <p><strong>${escapeHTML(properties.city || '', 80)}, ${escapeHTML(properties.state || '', 40)}</strong></p>
+                    ${properties.magnitude ? `<p>Magnitude: ${escapeHTML(properties.magnitude, 30)}</p>` : ''}
+                    <p>${escapeHTML(properties.remark || '', 500)}</p>
+                    <div class="meta">${escapeHTML(properties.valid || '', 80)}</div>
+                </div>
+            `);
+        }
+
+        async function renderStormReports() {
+            if (!settings.layers.stormReports || !stormReportPayload) return;
+            const generation = ++stormReportRenderGeneration;
+            const tools = await stormReportClusterTools();
+            if (generation !== stormReportRenderGeneration || !settings.layers.stormReports) return;
+            const reports = stormReportFeaturesInView(stormReportPayload);
+            const rendered = tools.clusterStormReports(reports, map.getZoom(), {
+                individualZoom: 9,
+                gridSize: 72,
+                maxReports: 1000
+            });
+            const group = L.layerGroup();
+            let clusterCount = 0;
+
+            for (const item of rendered) {
+                if (item.kind === 'cluster') {
+                    clusterCount += 1;
+                    const typeCounts = tools.stormReportTypeCounts(item.features);
+                    const dominantType = typeCounts[0]?.[0] || 'Report';
+                    const summary = typeCounts.slice(0, 4)
+                        .map(([type, count]) => `${type}: ${count}`)
+                        .join(' · ');
+                    const diameter = Math.max(32, Math.min(52, 28 + Math.sqrt(item.count) * 3));
+                    const marker = L.marker([item.latitude, item.longitude], {
+                        pane: 'markerPane',
+                        keyboard: true,
+                        icon: L.divIcon({
+                            className: 'storm-report-cluster-icon',
+                            html: `<span style="--cluster-color:${stormReportColor(dominantType)}">${item.count > 999 ? '999+' : item.count}</span>`,
+                            iconSize: [diameter, diameter],
+                            iconAnchor: [diameter / 2, diameter / 2]
+                        })
+                    });
+                    const label = `${item.count} storm reports. ${summary}. Zoom in for individual reports.`;
+                    marker.bindTooltip(escapeHTML(label, 300), { direction: 'top' });
+                    marker.on('add', () => {
+                        const element = marker.getElement();
+                        if (element) {
+                            element.setAttribute('aria-label', label);
+                            element.setAttribute('role', 'button');
+                        }
+                    });
+                    marker.on('click', () => {
+                        map.flyTo(
+                            [item.latitude, item.longitude],
+                            Math.min(9, map.getZoom() + 2),
+                            { animate: !matchMedia('(prefers-reduced-motion: reduce)').matches }
+                        );
+                    });
+                    group.addLayer(marker);
+                    continue;
+                }
+
+                const feature = item.features[0];
+                const type = safeText(feature.properties?.typetext, 80);
+                const marker = L.circleMarker([item.latitude, item.longitude], {
+                    pane: 'markerPane',
+                    radius: type === 'TORNADO' ? 8 : 6,
+                    fillColor: stormReportColor(type),
+                    color: '#fff',
+                    weight: 2,
+                    fillOpacity: 0.9
+                });
+                marker.bindTooltip(escapeHTML(type || 'Storm report', 80), { direction: 'top' });
+                bindStormReportPopup(feature, marker);
+                group.addLayer(marker);
+            }
+
+            if (generation !== stormReportRenderGeneration || !settings.layers.stormReports) {
+                group.clearLayers();
+                return;
+            }
+            if (layerRefs.stormReports) {
+                map.removeLayer(layerRefs.stormReports);
+                layerRefs.stormReports.off?.();
+                layerRefs.stormReports.clearLayers?.();
+            }
+            layerRefs.stormReports = group.addTo(map);
+            setLayerFeatureCount('stormReports', reports.length);
+            document.querySelectorAll('[data-layer="stormReports"]').forEach(element => {
+                element.dataset.renderedCount = String(rendered.length);
+                element.dataset.clusterCount = String(clusterCount);
+            });
+        }
+
         async function loadStormReports() {
             removeLayer('stormReports');
             const controller = beginLayerRequest('stormReports');
@@ -6802,46 +6974,8 @@
                 const resp = await fetchWithTimeout(DATA_URLS.iemLSR, { signal: controller.signal });
                 const data = await resp.json();
                 if (controller.signal.aborted || !settings.layers.stormReports) return;
-                const reports = pointFeaturesInView(data);
-
-                const typeColors = {
-                    'TORNADO': '#ff0000',
-                    'HAIL': '#00ff00',
-                    'TSTM WND DMG': '#0099ff',
-                    'TSTM WND GST': '#0099ff',
-                    'FLASH FLOOD': '#00aa00',
-                    'FUNNEL CLOUD': '#ff6600'
-                };
-
-                layerRefs.stormReports = L.geoJSON({ type: 'FeatureCollection', features: reports }, {
-                    pane: 'markerPane',
-                    pointToLayer: (f, latlng) => {
-                        const type = f.properties?.typetext || '';
-                        const color = typeColors[type] || '#ff6600';
-                        return L.circleMarker(latlng, {
-                            radius: type === 'TORNADO' ? 8 : 6,
-                            fillColor: color,
-                            color: '#fff',
-                            weight: 2,
-                            fillOpacity: 0.9
-                        });
-                    },
-                    onEachFeature: (f, layer) => {
-                        const p = f.properties || {};
-                        layer.bindPopup(`
-                            <div class="popup-content">
-                                <h4>${escapeHTML(p.typetext || 'Report', 80)}</h4>
-                                <p><strong>${escapeHTML(p.city || '', 80)}, ${escapeHTML(p.state || '', 40)}</strong></p>
-                                ${p.magnitude ? `<p>Magnitude: ${escapeHTML(p.magnitude, 30)}</p>` : ''}
-                                <p>${escapeHTML(p.remark || '', 500)}</p>
-                                <div class="meta">${escapeHTML(p.valid || '', 80)}</div>
-                            </div>
-                        `);
-                    }
-                });
-
-                if (settings.layers.stormReports) layerRefs.stormReports.addTo(map);
-                setLayerFeatureCount('stormReports', reports.length);
+                stormReportPayload = data;
+                await renderStormReports();
             } catch(e) {
                 if (e?.name === 'AbortError') return;
                 console.error('Storm reports error:', e);

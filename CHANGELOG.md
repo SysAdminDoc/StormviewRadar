@@ -40,6 +40,7 @@ All notable changes to StormviewRadar will be documented in this file.
 - Added a mobile-first visible-map alert banner with threat prioritization, session dismissal, polygon focus, accessible touch targets, and reduced-motion behavior.
 - Added an on-demand Cesium 3D storm-top globe with measured IEM echo-top labels, threat-prioritized columns, explicit display scaling, local imagery, and CSP-safe teardown.
 - Added issuance-age warning fills that fade over three hours while preserving hazard-colored borders, issued/expires popup times, a localized age legend, and historical-replay timing.
+- Added bounded, type-aware storm-report clustering at overview zooms with keyboard-labeled zoom-in markers and automatic individual-pin rendering at zoom 9.
 
 ## [v0.1.0] - 2026-07-25
 
