@@ -21,6 +21,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **NEXRAD Level II** — Select the nearest or a named CONUS site and render current 0.5° reflectivity, velocity, ZDR, or correlation coefficient directly from the NOAA/Unidata AWS archive
 - **Rotation Candidates** — Overlay up to 20 clustered, reflectivity-backed velocity couplets with explicit automated-heuristic and not-a-warning labeling
 - **MESH Hail Size** — Decode NOAA's current 2-minute MRMS MESH grid off-thread and overlay color-scaled hail-size estimates with metric/US legends
+- **Satellite Enhancements** — Layer NOAA/NESDIS GeoColor or a GeoColor + enhanced Band 13 IR sandwich alongside visible, infrared, and water-vapor channels
 - **Hybrid High-Res Mode** — Automatic MRMS enhancement at high zoom levels (US only)
 - **Smooth Animation** — Play, pause, and step through radar frames with customizable speed (0.5x–3x)
 - **Model Forecast** — View HRRR reflectivity guidance through 18 hours

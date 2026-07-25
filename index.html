@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#1e1e2e">
     <meta charset="UTF-8">
     <meta name="application-version" content="0.1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.open-meteo.com https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://server.arcgisonline.com https://stamen-tiles.a.ssl.fastly.net https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:; upgrade-insecure-requests">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.open-meteo.com https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://stamen-tiles.a.ssl.fastly.net https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:; upgrade-insecure-requests">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StormView Radar 0.1.0</title>
     
@@ -1389,6 +1389,10 @@
         .mesh-legend-swatch { width: 12px; height: 8px; border-radius: 2px; }
         .mesh-legend-note { margin-top: 4px; max-width: 170px; color: var(--text-muted); }
         .leaflet-bottom .mesh-legend { margin-bottom: 112px; }
+        .satellite-ir-sandwich {
+            mix-blend-mode: screen;
+            filter: contrast(1.35) saturate(1.65);
+        }
         .legend-item {
             display: flex; align-items: center; gap: 4px;
             font-size: 9px; color: var(--text-muted);
@@ -1916,6 +1920,15 @@
                     <div class="layer-chip" data-layer="satelliteWV">
                         <span class="dot" style="background: #66ccff"></span>
                         <span class="layer-name">Water Vapor</span>
+                    </div>
+                    <div class="layer-chip" data-layer="satelliteGeoColor">
+                        <span class="dot" style="background: #22c55e"></span>
+                        <span class="layer-name">GeoColor</span>
+                    </div>
+                    <div class="layer-chip full-width" data-layer="satelliteSandwich">
+                        <span class="dot" style="background: #f43f5e"></span>
+                        <span class="layer-name">IR Sandwich</span>
+                        <span class="badge">NOAA</span>
                     </div>
                 </div>
             </div>
@@ -2488,6 +2501,8 @@
             visible: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes_east_conus_ch02/{z}/{x}/{y}.png',
             ir: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes_east_conus_ch13/{z}/{x}/{y}.png',
             waterVapor: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes_east_conus_ch09/{z}/{x}/{y}.png',
+            geoColor: 'https://satellitemaps.nesdis.noaa.gov/arcgis/rest/services/MERGEDGC_current/ImageServer/tile/{z}/{y}/{x}',
+            enhancedIR: 'https://satellitemaps.nesdis.noaa.gov/arcgis/rest/services/ABI13_current/ImageServer/tile/{z}/{y}/{x}'
         };
         
         // NHC Tropical Services
@@ -2674,6 +2689,8 @@
             'Correlation': 'Correlación',
             'Rotation Candidates': 'Candidatos de rotación',
             'Hail Size': 'Tamaño del granizo',
+            'GeoColor': 'GeoColor',
+            'IR Sandwich': 'Sándwich IR',
             'Weather Layers': 'Capas meteorológicas',
             'Map Overlays': 'Capas del mapa',
             'Model Data': 'Datos del modelo',
@@ -3286,7 +3303,8 @@
         const layerRefs = {
             // Weather
             alerts: null, spcOutlook: null, stormReports: null, couplets: null, hailMesh: null,
-            lightning: null, satellite: null, riverGauges: null, surfaceObs: null,
+            lightning: null, satellite: null, satelliteIR: null, satelliteWV: null,
+            satelliteGeoColor: null, satelliteSandwich: null, riverGauges: null, surfaceObs: null,
             temp: null, wind: null, clouds: null, pressure: null,
             
             // New layers
@@ -3351,7 +3369,7 @@
                 pireps: false, sigmets: false,
                 
                 // Satellite channels
-                satelliteIR: false, satelliteWV: false,
+                satelliteIR: false, satelliteWV: false, satelliteGeoColor: false, satelliteSandwich: false,
                 
                 // Map overlays
                 states: true, counties: true, labels: true, highways: false
@@ -5125,26 +5143,52 @@
         
         // ==================== SATELLITE LAYERS ====================
         function loadSatelliteLayer(type) {
-            const layerKey = type === 'visible' ? 'satellite' : `satellite${type.charAt(0).toUpperCase() + type.slice(1)}`;
-            
-            if (layerRefs[layerKey]) {
-                map.removeLayer(layerRefs[layerKey]);
-            }
-            
+            const layerKeys = {
+                visible: 'satellite',
+                ir: 'satelliteIR',
+                wv: 'satelliteWV',
+                geocolor: 'satelliteGeoColor',
+                sandwich: 'satelliteSandwich'
+            };
+            const layerKey = layerKeys[type] || 'satellite';
+            removeLayer(layerKey);
             const urls = {
                 visible: SATELLITE_LAYERS.visible,
                 ir: SATELLITE_LAYERS.ir,
-                wv: SATELLITE_LAYERS.waterVapor
+                wv: SATELLITE_LAYERS.waterVapor,
+                geocolor: SATELLITE_LAYERS.geoColor
             };
-            
-            layerRefs[layerKey] = L.tileLayer(urls[type] || urls.visible, {
-                opacity: 0.7,
+            const classNames = {
+                visible: 'satellite-layer-visible',
+                ir: 'satellite-layer-infrared',
+                wv: 'satellite-layer-water-vapor',
+                geocolor: 'satellite-geocolor'
+            };
+            const createLayer = (url, className, opacity = 0.72, attribution = IEM_ATTRIBUTION) => L.tileLayer.cached(url, {
+                opacity,
                 pane: 'satellitePane',
                 maxNativeZoom: 8,
                 maxZoom: 18,
-                className: 'radar-cached',
-                attribution: IEM_ATTRIBUTION
-            }).addTo(map);
+                className,
+                attribution
+            });
+
+            if (type === 'sandwich') {
+                const geoColor = createLayer(SATELLITE_LAYERS.geoColor, 'satellite-geocolor', 0.68, 'NOAA / NESDIS');
+                const enhancedIR = createLayer(SATELLITE_LAYERS.enhancedIR, 'satellite-ir-sandwich', 0.78, 'NOAA / NESDIS');
+                layerRefs[layerKey] = L.layerGroup([geoColor, enhancedIR]).addTo(map);
+                setLayerFeatureCount(layerKey, 2);
+                return;
+            }
+
+            const isNesdis = type === 'geocolor';
+            layerRefs[layerKey] = createLayer(
+                urls[type] || urls.visible,
+                classNames[type] || classNames.visible,
+                0.7,
+                isNesdis ? 'NOAA / NESDIS' : IEM_ATTRIBUTION
+            ).addTo(map);
+            setLayerFeatureCount(layerKey, 1);
         }
         
         // ==================== AVIATION WEATHER ====================
@@ -5468,6 +5512,12 @@
                 case 'satelliteWV':
                     on ? loadSatelliteLayer('wv') : removeLayer('satelliteWV');
                     break;
+                case 'satelliteGeoColor':
+                    on ? loadSatelliteLayer('geocolor') : removeLayer('satelliteGeoColor');
+                    break;
+                case 'satelliteSandwich':
+                    on ? loadSatelliteLayer('sandwich') : removeLayer('satelliteSandwich');
+                    break;
                 case 'riverGauges':
                     on ? loadRiverGauges() : removeLayer('riverGauges');
                     break;
@@ -5568,6 +5618,7 @@
                 radar: 'Radar', alerts: 'NWS Alerts', spcOutlook: 'SPC Outlook',
                 stormReports: 'Storm Reports', hailMesh: 'MRMS Hail Size', lightning: 'Lightning', satellite: 'Satellite',
                 satelliteIR: 'Infrared Sat', satelliteWV: 'Water Vapor',
+                satelliteGeoColor: 'NOAA GeoColor', satelliteSandwich: 'IR Sandwich',
                 riverGauges: 'River Gauges', surfaceObs: 'Surface Obs',
                 temp: 'Temperature', wind: 'Wind', clouds: 'Clouds', pressure: 'Pressure',
                 spcWatches: 'SPC Watches', spcMCD: 'Mesoscale Discussions',
@@ -7044,6 +7095,11 @@
                 if (settings.layers.spcOutlook) loadSPCOutlook();
                 if (settings.layers.stormReports) loadStormReports();
                 if (settings.layers.hailMesh) loadHailMesh();
+                if (settings.layers.satellite) loadSatelliteLayer('visible');
+                if (settings.layers.satelliteIR) loadSatelliteLayer('ir');
+                if (settings.layers.satelliteWV) loadSatelliteLayer('wv');
+                if (settings.layers.satelliteGeoColor) loadSatelliteLayer('geocolor');
+                if (settings.layers.satelliteSandwich) loadSatelliteLayer('sandwich');
                 if (settings.layers.spcWatches) loadSPCWatches();
                 if (settings.layers.spcMCD) loadSPCMCD();
                 if (settings.layers.tropical) loadTropical();
