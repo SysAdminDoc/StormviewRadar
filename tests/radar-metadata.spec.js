@@ -44,6 +44,8 @@ test('HRRR frames derive valid time from model initialization metadata', async (
   await page.goto('/');
   await expect(page.locator('#dataStatusText')).toHaveText('HRRR: current');
   await page.locator('#playBtn').click();
+  await page.locator('#timeline').focus();
+  await page.locator('#timeline').press('Home');
 
   const timestamp = page.locator('#timestampBox');
   await expect(timestamp).toHaveAttribute('data-provider-time', '2026-07-25T12:00:00.000Z');

@@ -17,6 +17,8 @@ All notable changes to StormviewRadar will be documented in this file.
 - Added cancellable overlay loads and deterministic teardown checks; removed the unused, leaky Blitzortung WebSocket implementation.
 - Replaced client-clock radar timestamps with HRRR, MRMS, RainViewer, and nowCOAST provider metadata.
 - Added model initialization, forecast lead, data age, timezone, capability-driven playback, and explicit global/CONUS coverage status.
+- Added named keyboard controls, switch/radio state, accessible search suggestions, range labels, and focus-managed dialogs/sheets.
+- Added reduced-motion and forced-colors styles plus automated WCAG A/AA, keyboard, focus, and 390px light-theme checks.
 
 ## [v0.1.0] - %Y->- (HEAD -> main, origin/main, origin/HEAD)
 
