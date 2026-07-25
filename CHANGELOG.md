@@ -35,6 +35,7 @@ All notable changes to StormviewRadar will be documented in this file.
 - Added a combined current GOES-East M1/M2 mesoscale-sector overlay with lifecycle diagnostics and full resource cleanup.
 - Added current NEXRAD storm-cell tracks with one-hour archived history, bounded live updates, 30/60-minute motion projections, threat-aware styling, and explicit automated-guidance labeling.
 - Added opt-in Web Audio alert tones with silent first-load priming, unseen-alert deduplication, urgency patterns, and configurable severity, event-type, and map-center distance filters.
+- Added named local geofences with bounded validation, optional map overlays, persistent browser-only storage, and polygon-distance alert-audio matching.
 
 ## [v0.1.0] - 2026-07-25
 

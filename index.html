@@ -837,6 +837,20 @@
         .setting-row:last-child { border-bottom: none; }
         .setting-label { font-size: 14px; }
         .setting-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .geofence-form { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 8px; }
+        .geofence-form .btn { grid-column: 1 / -1; justify-content: center; }
+        .geofence-list { display: grid; gap: 8px; margin-top: 12px; }
+        .geofence-item {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            padding: 10px; border-radius: 9px; background: var(--glass-hover);
+        }
+        .geofence-item-info { min-width: 0; }
+        .geofence-item-name { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+        .geofence-item-meta { color: var(--text-muted); font-size: 10px; margin-top: 2px; }
+        .geofence-delete {
+            border: 0; border-radius: 7px; padding: 7px 9px; flex: 0 0 auto;
+            background: rgba(239, 68, 68, 0.14); color: var(--danger); cursor: pointer;
+        }
 
         .toggle {
             width: 48px; height: 26px;
@@ -1994,6 +2008,11 @@
                         <span class="dot" style="background: var(--orange)"></span>
                         <span class="layer-name">Roads</span>
                     </div>
+                    <div class="layer-chip full-width" data-layer="geofences">
+                        <span class="dot" style="background: var(--accent)"></span>
+                        <span class="layer-name">Geofences</span>
+                        <span class="badge">LOCAL</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2366,9 +2385,31 @@
                             <option value="0">Any distance</option>
                         </select>
                     </div>
+                    <div class="setting-row">
+                        <label class="setting-label" for="alertAreaSelect">Match Around</label>
+                        <select class="api-input" id="alertAreaSelect" style="width:160px;padding:8px;">
+                            <option value="mapCenter">Map center</option>
+                            <option value="geofences">Saved geofences</option>
+                        </select>
+                    </div>
                 </div>
                 <p class="setting-hint" role="note">The first alert load is always silent. Keep the map centered on the area you care about; alerts without polygons only match “Any distance.” Browsers may require Test Sound once per tab.</p>
                 <button class="btn" id="testAlertSoundBtn" type="button" style="width:100%;margin-top:16px;">Test Sound</button>
+                <div class="settings-section" style="margin-top:24px;">
+                    <div class="settings-section-title">Saved Geofences</div>
+                    <p class="setting-hint" role="note" style="margin-bottom:10px;">Add a private alert radius at the current map center. Geofences stay only in this browser profile.</p>
+                    <div class="geofence-form">
+                        <input class="api-input" id="geofenceNameInput" maxlength="80" placeholder="Name (for example, Home)" aria-label="Geofence name">
+                        <select class="api-input" id="geofenceRadiusSelect" aria-label="Geofence radius">
+                            <option value="5">5 mi</option>
+                            <option value="10" selected>10 mi</option>
+                            <option value="25">25 mi</option>
+                            <option value="50">50 mi</option>
+                        </select>
+                        <button class="btn" id="addGeofenceBtn" type="button">Add at Map Center</button>
+                    </div>
+                    <div class="geofence-list" id="geofenceList" aria-live="polite"></div>
+                </div>
             </div>
             <!-- API Tab -->
             <div class="settings-tab-content" data-tab-content="api" style="display:none;">
@@ -2608,6 +2649,7 @@
         let alertAudioUnlocked = false;
         let alertAudioPrimed = false;
         let currentAlertFeatures = [];
+        let geofences = [];
         const seenAlertIds = new Set();
         const meshWorkerRequests = new Map();
         const level2WorkerRequests = new Map();
@@ -2624,6 +2666,8 @@
         const MAX_SETTINGS_BYTES = 32768;
         const SETTINGS_SCHEMA_VERSION = 4;
         const SETTINGS_STORAGE_KEY = 'stormview_settings';
+        const GEOFENCE_STORAGE_KEY = 'stormview_geofences';
+        const MAX_GEOFENCES = 20;
         const LEGACY_SETTINGS_KEYS = ['stormview_pro_v3'];
         const WELCOME_STORAGE_KEY = 'stormview_welcomed';
         const LEGACY_WELCOME_KEYS = ['stormview_welcomed_v5'];
@@ -2787,6 +2831,9 @@
             'Minimum Severity': 'Gravedad mínima',
             'Alert Type': 'Tipo de alerta',
             'Map Center Radius': 'Radio desde el centro',
+            'Match Around': 'Coincidir alrededor de',
+            'Map center': 'Centro del mapa',
+            'Saved geofences': 'Geocercas guardadas',
             'Test Sound': 'Probar sonido',
             'Extreme': 'Extrema',
             'Severe': 'Severa',
@@ -2798,6 +2845,13 @@
             'Watches + warnings': 'Vigilancias y alertas',
             'All alerts': 'Todas las alertas',
             'Any distance': 'Cualquier distancia',
+            'Saved Geofences': 'Geocercas guardadas',
+            'Add a private alert radius at the current map center. Geofences stay only in this browser profile.': 'Añade un radio privado de alertas en el centro actual del mapa. Las geocercas permanecen solo en este perfil del navegador.',
+            'Add at Map Center': 'Añadir en el centro del mapa',
+            'Geofences': 'Geocercas',
+            'Delete': 'Eliminar',
+            'local only': 'solo local',
+            'No saved geofences.': 'No hay geocercas guardadas.',
             'The first alert load is always silent. Keep the map centered on the area you care about; alerts without polygons only match “Any distance.” Browsers may require Test Sound once per tab.': 'La primera carga de alertas siempre es silenciosa. Mantén el mapa centrado en el área de interés; las alertas sin polígonos solo coinciden con “Cualquier distancia”. El navegador puede requerir Probar sonido una vez por pestaña.',
             'Reports': 'Informes',
             'Storm Tracks': 'Trayectorias de tormentas',
@@ -2894,6 +2948,13 @@
         function applyLanguage() {
             document.documentElement.lang = languageCode();
             localizeTextTree();
+            const geofenceNameInput = document.getElementById('geofenceNameInput');
+            if (geofenceNameInput) {
+                geofenceNameInput.placeholder = languageCode() === 'es'
+                    ? 'Nombre (por ejemplo, Casa)'
+                    : 'Name (for example, Home)';
+            }
+            renderGeofenceList();
             updateTimestamp();
             renderDiagnostics();
         }
@@ -3226,7 +3287,8 @@
                 language: ['en', 'es'],
                 units: ['us', 'metric'],
                 alertAudioSeverity: ['extreme', 'severe', 'moderate', 'minor', 'unknown'],
-                alertAudioType: ['tornado', 'warnings', 'watchesWarnings', 'all']
+                alertAudioType: ['tornado', 'warnings', 'watchesWarnings', 'all'],
+                alertAudioArea: ['mapCenter', 'geofences']
             };
             Object.entries(enumFields).forEach(([key, allowed]) => {
                 if (typeof candidate[key] === 'string' && allowed.includes(candidate[key])) result[key] = candidate[key];
@@ -3426,7 +3488,7 @@
             satelliteIR: null, satelliteWV: null,
             
             // Map overlays
-            states: null, counties: null, labels: null, highways: null
+            states: null, counties: null, labels: null, highways: null, geofences: null
         };
 
         const dataCache = { statesGeo: null, countiesGeo: null };
@@ -3456,6 +3518,7 @@
             alertAudioSeverity: 'severe',
             alertAudioType: 'warnings',
             alertAudioDistanceMiles: 100,
+            alertAudioArea: 'mapCenter',
             owmKey: '',
             useLocalTime: true,
             stateBorderWidth: 2,
@@ -3487,7 +3550,7 @@
                 satelliteSandwich: false, satelliteMesoscale: false,
                 
                 // Map overlays
-                states: true, counties: true, labels: true, highways: false
+                states: true, counties: true, labels: true, highways: false, geofences: false
             }
         };
 
@@ -3534,6 +3597,7 @@
             loadSettings();
             applyTheme();
             initMap();
+            loadStoredGeofences();
             setupZoomHandler();
             initRadarSystem();
             initUI();
@@ -3598,6 +3662,147 @@
                 if (document.body) showToast('Settings could not be saved. Free browser storage or export and reset settings.', 'error', 6000);
                 return false;
             }
+        }
+
+        function normalizeGeofence(value) {
+            const latitude = Number(value?.latitude);
+            const longitude = Number(value?.longitude);
+            const radiusMiles = Number(value?.radiusMiles);
+            const id = safeText(value?.id, 64);
+            const name = safeText(value?.name, 80).trim();
+            if (!id || !/^[A-Za-z0-9-]+$/.test(id) || !name
+                || !Number.isFinite(latitude) || latitude < -90 || latitude > 90
+                || !Number.isFinite(longitude) || longitude < -180 || longitude > 180
+                || ![5, 10, 25, 50].includes(radiusMiles)) return null;
+            return { id, name, latitude, longitude, radiusMiles };
+        }
+
+        function loadStoredGeofences() {
+            try {
+                const stored = localStorage.getItem(GEOFENCE_STORAGE_KEY);
+                if (!stored) return;
+                if (new Blob([stored]).size > MAX_SETTINGS_BYTES) throw new Error('Geofence storage exceeds the size limit');
+                const parsed = JSON.parse(stored);
+                if (!Array.isArray(parsed)) throw new Error('Geofences must be a JSON array');
+                geofences = parsed.slice(0, MAX_GEOFENCES).map(normalizeGeofence).filter(Boolean);
+            } catch (error) {
+                geofences = [];
+                console.warn('Stored geofences were ignored:', error);
+                showToast('Stored geofences were invalid and were ignored', 'error', 5000);
+            }
+        }
+
+        function saveGeofences() {
+            try {
+                localStorage.setItem(GEOFENCE_STORAGE_KEY, JSON.stringify(geofences));
+                return true;
+            } catch (error) {
+                console.error('Geofences could not be saved:', error);
+                showToast('Geofences could not be saved. Free browser storage and try again.', 'error', 6000);
+                return false;
+            }
+        }
+
+        function loadGeofenceLayer() {
+            removeLayer('geofences');
+            if (!settings.layers.geofences) return;
+            const group = L.layerGroup();
+            const renderer = L.svg({ padding: 0.5 });
+            group.addLayer(renderer);
+            geofences.forEach(geofence => {
+                const circle = L.circle([geofence.latitude, geofence.longitude], {
+                    className: 'user-geofence',
+                    renderer,
+                    radius: geofence.radiusMiles * 1609.344,
+                    color: '#38bdf8',
+                    weight: 2,
+                    dashArray: '7 5',
+                    fillColor: '#38bdf8',
+                    fillOpacity: 0.08
+                });
+                circle.bindTooltip(geofence.name, { direction: 'top' });
+                circle.bindPopup(`
+                    <div class="popup-content">
+                        <h4>${escapeHTML(geofence.name, 80)}</h4>
+                        <p>Local alert geofence · ${geofence.radiusMiles} mi / ${Math.round(geofence.radiusMiles * 1.609344)} km</p>
+                        <div class="meta">Stored only in this browser profile</div>
+                    </div>
+                `);
+                group.addLayer(circle);
+            });
+            layerRefs.geofences = group.addTo(map);
+            setLayerFeatureCount('geofences', geofences.length);
+        }
+
+        function renderGeofenceList() {
+            const list = document.getElementById('geofenceList');
+            if (!list) return;
+            if (!geofences.length) {
+                list.innerHTML = `<div class="setting-hint">${escapeHTML(translatedExact('No saved geofences.'))}</div>`;
+                return;
+            }
+            list.innerHTML = geofences.map(geofence => `
+                <div class="geofence-item">
+                    <button class="geofence-item-info" type="button" data-geofence-focus="${geofence.id}" style="border:0;background:none;color:inherit;text-align:left;cursor:pointer;">
+                        <div class="geofence-item-name">${escapeHTML(geofence.name, 80)}</div>
+                        <div class="geofence-item-meta">${geofence.radiusMiles} mi / ${Math.round(geofence.radiusMiles * 1.609344)} km · ${escapeHTML(translatedExact('local only'))}</div>
+                    </button>
+                    <button class="geofence-delete" type="button" data-geofence-delete="${geofence.id}" aria-label="${escapeHTML(translatedExact('Delete'))} ${escapeHTML(geofence.name, 80)}">${escapeHTML(translatedExact('Delete'))}</button>
+                </div>
+            `).join('');
+            list.querySelectorAll('[data-geofence-focus]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const geofence = geofences.find(item => item.id === button.dataset.geofenceFocus);
+                    if (geofence) map.flyTo([geofence.latitude, geofence.longitude], Math.max(map.getZoom(), 8));
+                });
+            });
+            list.querySelectorAll('[data-geofence-delete]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const geofence = geofences.find(item => item.id === button.dataset.geofenceDelete);
+                    if (!geofence || !window.confirm(`Delete geofence “${geofence.name}”?`)) return;
+                    geofences = geofences.filter(item => item.id !== geofence.id);
+                    if (saveGeofences()) {
+                        renderGeofenceList();
+                        if (settings.layers.geofences) loadGeofenceLayer();
+                        showToast(`Deleted geofence: ${geofence.name}`, 'info', 2500);
+                    }
+                });
+            });
+        }
+
+        function addGeofenceAtMapCenter() {
+            if (geofences.length >= MAX_GEOFENCES) {
+                showToast(`Geofences are limited to ${MAX_GEOFENCES}`, 'warn', 4000);
+                return;
+            }
+            const center = map.getCenter();
+            const nameInput = document.getElementById('geofenceNameInput');
+            const radiusInput = document.getElementById('geofenceRadiusSelect');
+            const name = safeText(nameInput.value, 80).trim() || `Geofence ${geofences.length + 1}`;
+            const geofence = normalizeGeofence({
+                id: crypto.randomUUID?.() || `${Date.now()}-${geofences.length}`,
+                name,
+                latitude: center.lat,
+                longitude: center.lng,
+                radiusMiles: Number(radiusInput.value)
+            });
+            if (!geofence) {
+                showToast('Enter a valid geofence name and radius', 'error', 3500);
+                return;
+            }
+            geofences.push(geofence);
+            if (!saveGeofences()) {
+                geofences.pop();
+                return;
+            }
+            nameInput.value = '';
+            settings.layers.geofences = true;
+            saveSettings();
+            document.querySelectorAll('[data-layer="geofences"]').forEach(element => element.classList.add('active'));
+            syncAccessibleControlStates();
+            renderGeofenceList();
+            loadGeofenceLayer();
+            showToast(`Geofence added: ${name}`, 'success', 2500);
         }
 
         function applyTheme() {
@@ -5713,6 +5918,9 @@
                 case 'highways':
                     toggleHighwaysLayer(on);
                     break;
+                case 'geofences':
+                    on ? loadGeofenceLayer() : removeLayer('geofences');
+                    break;
             }
         }
 
@@ -5763,7 +5971,8 @@
                 spcWatches: 'SPC Watches', spcMCD: 'Mesoscale Discussions',
                 spcTornado: 'Tornado Prob', spcWind: 'Wind Prob', spcHail: 'Hail Prob',
                 tropical: 'Tropical Systems', pireps: 'PIREPs', sigmets: 'SIGMETs',
-                states: 'State Borders', counties: 'County Borders', labels: 'City Labels', highways: 'Highways'
+                states: 'State Borders', counties: 'County Borders', labels: 'City Labels', highways: 'Highways',
+                geofences: 'Local Geofences'
             };
             return names[key] || key;
         }
@@ -5833,10 +6042,20 @@
             if (!settings.alertAudioEnabled || !newFeatures.length) return;
 
             const center = map.getCenter();
-            const matches = newFeatures.filter(feature => tools.alertMatchesAudioSettings(feature, settings, {
-                latitude: center.lat,
-                longitude: center.lng
-            }));
+            const alertAreas = settings.alertAudioArea === 'geofences'
+                ? geofences.map(geofence => ({
+                    point: { latitude: geofence.latitude, longitude: geofence.longitude },
+                    distanceMiles: geofence.radiusMiles
+                }))
+                : [{
+                    point: { latitude: center.lat, longitude: center.lng },
+                    distanceMiles: settings.alertAudioDistanceMiles
+                }];
+            const matches = newFeatures.filter(feature => alertAreas.some(area => tools.alertMatchesAudioSettings(
+                feature,
+                { ...settings, alertAudioDistanceMiles: area.distanceMiles },
+                area.point
+            )));
             if (!matches.length) return;
             if (!alertAudioUnlocked) {
                 showToast(t('alertAudioActivation'), 'warn', 5000);
@@ -7691,10 +7910,19 @@
             const alertSeveritySelect = document.getElementById('alertSeveritySelect');
             const alertTypeSelect = document.getElementById('alertTypeSelect');
             const alertDistanceSelect = document.getElementById('alertDistanceSelect');
+            const alertAreaSelect = document.getElementById('alertAreaSelect');
+            const syncAlertAreaControls = () => {
+                const usesGeofences = alertAreaSelect.value === 'geofences';
+                alertDistanceSelect.disabled = usesGeofences;
+                alertDistanceSelect.closest('.setting-row').style.opacity = usesGeofences ? '0.55' : '';
+            };
             alertAudioToggle.classList.toggle('on', settings.alertAudioEnabled);
             alertSeveritySelect.value = settings.alertAudioSeverity;
             alertTypeSelect.value = settings.alertAudioType;
             alertDistanceSelect.value = String(settings.alertAudioDistanceMiles);
+            alertAreaSelect.value = settings.alertAudioArea;
+            syncAlertAreaControls();
+            renderGeofenceList();
             alertAudioToggle.addEventListener('click', async () => {
                 settings.alertAudioEnabled = alertAudioToggle.classList.toggle('on');
                 saveSettings();
@@ -7715,10 +7943,16 @@
                 settings.alertAudioDistanceMiles = Number(alertDistanceSelect.value);
                 saveSettings();
             });
+            alertAreaSelect.addEventListener('change', () => {
+                settings.alertAudioArea = alertAreaSelect.value;
+                syncAlertAreaControls();
+                saveSettings();
+            });
             document.getElementById('testAlertSoundBtn').addEventListener('click', async () => {
                 const played = await playAlertTone('test');
                 showToast(played ? t('alertAudioReady') : t('alertAudioUnavailable'), played ? 'success' : 'error', 3000);
             });
+            document.getElementById('addGeofenceBtn').addEventListener('click', addGeofenceAtMapCenter);
 
             // API keys
             document.getElementById('owmKeyInput').value = settings.owmKey;

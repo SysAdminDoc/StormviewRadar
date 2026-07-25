@@ -131,3 +131,53 @@ test('alert audio is opt-in, silent on first load, filtered by distance, and ded
   await expect(page.locator('#testAlertSoundBtn')).toBeVisible();
   expect(await page.locator('#settingsPanel').evaluate(panel => panel.scrollWidth <= panel.clientWidth)).toBe(true);
 });
+
+test('named geofences persist locally, render on the map, and can scope alert matching', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('stormview_settings')) {
+      localStorage.setItem('stormview_settings', JSON.stringify({
+        schemaVersion: 4,
+        settings: {
+          source: 'hrrr',
+          autoRefresh: false,
+          layers: {
+            radar: false,
+            alerts: false,
+            spcOutlook: false,
+            states: false,
+            counties: false,
+            labels: false,
+            geofences: false
+          }
+        }
+      }));
+    }
+    localStorage.setItem('stormview_welcomed', '1');
+  });
+
+  await page.goto('/');
+  await page.locator('#settingsBtn').click();
+  await page.locator('.settings-tab[data-tab="alerts"]').click();
+  await page.locator('#geofenceNameInput').fill('Home');
+  await page.locator('#geofenceRadiusSelect').selectOption('10');
+  await page.locator('#addGeofenceBtn').click();
+
+  await expect(page.locator('.geofence-item-name')).toHaveText('Home');
+  await expect(page.locator('.user-geofence')).toHaveCount(1);
+  await expect(page.locator('.sidebar [data-layer="geofences"]')).toHaveAttribute('data-feature-count', '1');
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('stormview_geofences')));
+  expect(stored).toHaveLength(1);
+  expect(stored[0]).toMatchObject({ name: 'Home', latitude: 39, longitude: -96, radiusMiles: 10 });
+
+  await page.locator('#alertAreaSelect').selectOption('geofences');
+  await expect(page.locator('#alertDistanceSelect')).toBeDisabled();
+  await page.reload();
+  await expect(page.locator('.user-geofence')).toHaveCount(1);
+
+  await page.locator('#settingsBtn').click();
+  await page.locator('.settings-tab[data-tab="alerts"]').click();
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Delete Home' }).click();
+  await expect(page.locator('.user-geofence')).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('stormview_geofences')))).toEqual([]);
+});

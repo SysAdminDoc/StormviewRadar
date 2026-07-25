@@ -35,6 +35,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 ### Weather Layers
 - **NWS Alerts** — Real-time watches, warnings, and advisories with color-coded polygons
 - **Alert Sounds** — Opt in to synthesized tones for newly issued alerts, filtered by NWS severity, event type, and distance from the map center
+- **Private Geofences** — Save up to 20 named local alert radii at the map center, display them as optional overlays, and match alert sounds against their polygon intersections
 - **SPC Outlooks** — Storm Prediction Center convective outlooks
 - **Storm Reports** — View tornado, hail, and wind damage reports
 - **Storm Tracks** — Plot current NEXRAD storm cells with an hour of observed positions, 30/60-minute motion projections, and TVS, mesocyclone, hail, VIL, and echo-top details
@@ -66,6 +67,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Redacted Diagnostics** — Inspect provider freshness, fallback, coverage, resource counts, retry state, and request results without copying secrets or precise coordinates
 - **Language & Units** — Persist English or Spanish UI plus US customary or metric weather units, with locale-aware dates and safe English fallback
 - **Quiet-by-Default Audio** — The first alert load is silent; a user gesture unlocks audio and only unseen matching alerts can sound
+- **Local-Only Alert Areas** — Geofences remain in the current browser profile and are not sent to StormView or included in settings exports
 
 ## Quick Start
 
