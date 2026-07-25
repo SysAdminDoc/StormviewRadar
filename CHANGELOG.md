@@ -27,6 +27,7 @@ All notable changes to StormviewRadar will be documented in this file.
 - Added a live diagnostics view with provider freshness, coverage, fallback/retry state, resource counts, redacted request history, and copyable secret-free reports.
 - Unified the v0.1.0 identity across package, page metadata, loading UI, diagnostics, README, and release notes, with automated drift and hosted-commit checks.
 - Removed the unused WAQI credential field and migrated schema v2 settings to discard that unimplemented secret surface.
+- Added schema v3 language and unit preferences, Spanish UI/forecast localization, locale-aware dates, metric provider requests, and converted observation/radar units with English fallback.
 
 ## [v0.1.0] - 2026-07-25
 

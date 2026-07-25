@@ -46,7 +46,7 @@ test('legacy settings migrate once into the versioned schema', async ({ page }) 
     legacy: localStorage.getItem('stormview_pro_v3')
   }));
 
-  expect(storage.current.schemaVersion).toBe(2);
+  expect(storage.current.schemaVersion).toBe(3);
   expect(storage.current.settings.basemap).toBe('terrain');
   expect(storage.current.settings.theme).toBe('light');
   expect(storage.current.settings.owmKey).toBe('secret-owm-value');
@@ -67,7 +67,7 @@ test('settings export is versioned and excludes the API key', async ({ page }) =
   const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
 
   expect(download.suggestedFilename()).toBe('stormview-settings.json');
-  expect(payload.schemaVersion).toBe(2);
+  expect(payload.schemaVersion).toBe(3);
   expect(payload.secretsOmitted).toEqual(['owmKey']);
   expect(payload.settings).not.toHaveProperty('owmKey');
   expect(payload.settings).not.toHaveProperty('waqiKey');
@@ -81,7 +81,7 @@ test('future imports and browser quota failures are visible and recoverable', as
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ schemaVersion: 999, settings: {} }))
   });
-  await expect(page.locator('.toast').last()).toContainText('supports 2');
+  await expect(page.locator('.toast').last()).toContainText('supports 3');
 
   await page.evaluate(() => {
     Storage.prototype.setItem = () => {

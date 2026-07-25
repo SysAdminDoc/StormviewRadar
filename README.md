@@ -57,6 +57,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Versioned Settings** — Validated preferences migrate forward in browser storage
 - **Import/Export** — Backup and restore configuration without exporting API keys
 - **Redacted Diagnostics** — Inspect provider freshness, fallback, coverage, resource counts, retry state, and request results without copying secrets or precise coordinates
+- **Language & Units** — Persist English or Spanish UI plus US customary or metric weather units, with locale-aware dates and safe English fallback
 
 ## Quick Start
 
@@ -161,6 +162,8 @@ Access the settings panel (⚙️) to customize:
 
 **General**
 - Theme (dark/light)
+- Language (English/Spanish)
+- Units (US customary/metric)
 - Show legend
 - Border widths and opacity
 

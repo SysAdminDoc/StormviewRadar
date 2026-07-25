@@ -2133,6 +2133,20 @@
                         <div><div class="setting-label">Show Legend</div></div>
                         <div class="toggle on" id="legendToggle"></div>
                     </div>
+                    <div class="setting-row">
+                        <label class="setting-label" for="languageSelect">Language</label>
+                        <select class="api-input" id="languageSelect" style="width:145px;padding:8px;">
+                            <option value="en">English</option>
+                            <option value="es">Español</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
+                        <label class="setting-label" for="unitsSelect">Units</label>
+                        <select class="api-input" id="unitsSelect" style="width:145px;padding:8px;">
+                            <option value="us">US customary</option>
+                            <option value="metric">Metric</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="settings-section">
                     <div class="settings-section-title">Border Style</div>
@@ -2444,7 +2458,7 @@
         const activeRequests = new Map();
         const layerRequests = new Map();
         const MAX_SETTINGS_BYTES = 32768;
-        const SETTINGS_SCHEMA_VERSION = 2;
+        const SETTINGS_SCHEMA_VERSION = 3;
         const SETTINGS_STORAGE_KEY = 'stormview_settings';
         const LEGACY_SETTINGS_KEYS = ['stormview_pro_v3'];
         const WELCOME_STORAGE_KEY = 'stormview_welcomed';
@@ -2455,6 +2469,213 @@
             requests: [],
             layerCounts: {}
         };
+        const MESSAGE_CATALOG = {
+            en: {
+                loading: 'Loading...',
+                fetchingForecast: 'Fetching forecast...',
+                forecastFailed: 'Failed to load forecast. Try another location.',
+                feels: 'Feels',
+                humidity: 'Humidity',
+                wind: 'Wind',
+                gusts: 'Gusts',
+                pressure: 'Pressure',
+                precip: 'Precip',
+                hourlyForecast: 'Hourly Forecast',
+                sevenDayForecast: '7-Day Forecast',
+                now: 'Now',
+                today: 'Today',
+                localTime: 'Local Time',
+                forecast: 'Forecast',
+                analysis: 'Analysis',
+                past: 'Past',
+                latest: 'Latest',
+                noRadarFrame: 'No radar frame',
+                languageUpdated: 'Language updated',
+                unitsUpdated: 'Units updated',
+                providerLoading: '{provider}: loading…',
+                providerCurrent: '{provider}: current',
+                providerFallback: 'MRMS fallback: {provider} failed',
+                providerStale: '{provider}: stale; refresh failed',
+                providerUnavailable: '{provider}: unavailable',
+                invalidProviderTime: '{provider}: invalid provider time',
+                validInMinutes: 'Valid in {value}m',
+                validInHours: 'Valid in {value}h',
+                providerJustNow: 'Provider time: just now',
+                minutesOld: '{value}m old',
+                hoursOld: '{value}h old',
+                fetchedJustNow: 'Fetched just now',
+                fetchedMinuteAgo: 'Fetched 1 min ago',
+                fetchedMinutesAgo: 'Fetched {value}m ago'
+            },
+            es: {
+                loading: 'Cargando...',
+                fetchingForecast: 'Obteniendo pronóstico...',
+                forecastFailed: 'No se pudo cargar el pronóstico. Prueba otra ubicación.',
+                feels: 'Sensación',
+                humidity: 'Humedad',
+                wind: 'Viento',
+                gusts: 'Ráfagas',
+                pressure: 'Presión',
+                precip: 'Precip.',
+                hourlyForecast: 'Pronóstico por hora',
+                sevenDayForecast: 'Pronóstico de 7 días',
+                now: 'Ahora',
+                today: 'Hoy',
+                localTime: 'Hora local',
+                forecast: 'Pronóstico',
+                analysis: 'Análisis',
+                past: 'Pasado',
+                latest: 'Más reciente',
+                noRadarFrame: 'Sin imagen de radar',
+                languageUpdated: 'Idioma actualizado',
+                unitsUpdated: 'Unidades actualizadas',
+                providerLoading: '{provider}: cargando…',
+                providerCurrent: '{provider}: actual',
+                providerFallback: 'Respaldo MRMS: falló {provider}',
+                providerStale: '{provider}: datos antiguos; falló la actualización',
+                providerUnavailable: '{provider}: no disponible',
+                invalidProviderTime: '{provider}: hora del proveedor no válida',
+                validInMinutes: 'Válido en {value} min',
+                validInHours: 'Válido en {value} h',
+                providerJustNow: 'Hora del proveedor: ahora',
+                minutesOld: 'Hace {value} min',
+                hoursOld: 'Hace {value} h',
+                fetchedJustNow: 'Obtenido ahora',
+                fetchedMinuteAgo: 'Obtenido hace 1 min',
+                fetchedMinutesAgo: 'Obtenido hace {value} min'
+            }
+        };
+        const SPANISH_EXACT_TEXT = {
+            'Settings': 'Configuración',
+            'Display': 'Pantalla',
+            'Status': 'Estado',
+            'Appearance': 'Apariencia',
+            'Dark Theme': 'Tema oscuro',
+            'Show Legend': 'Mostrar leyenda',
+            'Language': 'Idioma',
+            'Units': 'Unidades',
+            'US customary': 'Sistema estadounidense',
+            'Metric': 'Métrico',
+            'Border Style': 'Estilo de bordes',
+            'State Border Width': 'Ancho de estados',
+            'County Border Width': 'Ancho de condados',
+            'Border Opacity': 'Opacidad de bordes',
+            'Import / Export': 'Importar / Exportar',
+            'Export': 'Exportar',
+            'Import': 'Importar',
+            'Radar Display': 'Pantalla de radar',
+            'Opacity': 'Opacidad',
+            'Smooth Radar': 'Radar suavizado',
+            'Snow Colors': 'Colores de nieve',
+            'High-Res Mode': 'Modo de alta resolución',
+            'Animation': 'Animación',
+            'Frame Delay': 'Demora de fotogramas',
+            'Auto-Refresh': 'Actualización automática',
+            'Loop Animation': 'Repetir animación',
+            'Radar Source': 'Fuente de radar',
+            'Radar Products': 'Productos de radar',
+            'Weather Layers': 'Capas meteorológicas',
+            'Map Overlays': 'Capas del mapa',
+            'Model Data': 'Datos del modelo',
+            'Base Map': 'Mapa base',
+            'Alerts': 'Alertas',
+            'Reports': 'Informes',
+            'Lightning': 'Rayos',
+            'Satellite': 'Satélite',
+            'Rivers': 'Ríos',
+            'Temperature': 'Temperatura',
+            'Clouds': 'Nubes',
+            'Radar & Freshness': 'Radar y vigencia',
+            'App version': 'Versión de la app',
+            'Provider / product': 'Proveedor / producto',
+            'Result': 'Resultado',
+            'Valid time / age': 'Hora válida / antigüedad',
+            'Coverage': 'Cobertura',
+            'Resources': 'Recursos',
+            'Retry / backoff': 'Reintento / espera',
+            'Redacted Request Results': 'Resultados de solicitudes redactados',
+            'Copy report': 'Copiar informe',
+            'Retry radar': 'Reintentar radar',
+            'Clear': 'Despejado',
+            'Partly Cloudy': 'Parcialmente nublado',
+            'Cloudy': 'Nublado',
+            'Fog': 'Niebla',
+            'Rain': 'Lluvia',
+            'Snow': 'Nieve',
+            'Thunderstorm': 'Tormenta',
+            'current': 'actual',
+            'loading': 'cargando',
+            'fallback': 'respaldo',
+            'stale': 'antiguo',
+            'error': 'error',
+            'success': 'correcto',
+            'cancelled': 'cancelado'
+        };
+        const originalTextNodes = new WeakMap();
+
+        function languageCode() {
+            return settings.language === 'es' ? 'es' : 'en';
+        }
+
+        function t(key, variables = {}) {
+            const template = MESSAGE_CATALOG[languageCode()]?.[key] ?? MESSAGE_CATALOG.en[key] ?? key;
+            return Object.entries(variables).reduce(
+                (value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)),
+                template
+            );
+        }
+
+        function translatedExact(value) {
+            return languageCode() === 'es' ? (SPANISH_EXACT_TEXT[value] || value) : value;
+        }
+
+        function localizeTextTree(root = document.body) {
+            if (!root) return;
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+            let node;
+            while ((node = walker.nextNode())) {
+                const original = originalTextNodes.get(node) ?? node.nodeValue;
+                originalTextNodes.set(node, original);
+                const trimmed = original.trim();
+                if (!trimmed) continue;
+                const translated = translatedExact(trimmed);
+                node.nodeValue = original.replace(trimmed, translated);
+            }
+        }
+
+        function formatLocalizedDate(value, options = {}) {
+            const date = value instanceof Date ? value : new Date(value);
+            return Number.isFinite(date.getTime())
+                ? new Intl.DateTimeFormat(languageCode() === 'es' ? 'es-US' : 'en-US', options).format(date)
+                : '';
+        }
+
+        function unitProfile() {
+            return settings.units === 'metric'
+                ? { temperature: '°C', speed: 'km/h', pressure: 'hPa', precipitation: 'mm', stage: 'm' }
+                : { temperature: '°F', speed: 'mph', pressure: 'inHg', precipitation: 'in', stage: 'ft' };
+        }
+
+        function formatObservationTemperature(fahrenheit) {
+            const value = Number(fahrenheit);
+            if (!Number.isFinite(value)) return 'N/A';
+            const converted = settings.units === 'metric' ? (value - 32) * 5 / 9 : value;
+            return `${new Intl.NumberFormat(languageCode(), { maximumFractionDigits: 0 }).format(converted)}${unitProfile().temperature}`;
+        }
+
+        function formatRiverStage(feet) {
+            const value = Number(feet);
+            if (!Number.isFinite(value)) return 'N/A';
+            const converted = settings.units === 'metric' ? value * 0.3048 : value;
+            return `${new Intl.NumberFormat(languageCode(), { maximumFractionDigits: 2 }).format(converted)} ${unitProfile().stage}`;
+        }
+
+        function applyLanguage() {
+            document.documentElement.lang = languageCode();
+            localizeTextTree();
+            updateTimestamp();
+            renderDiagnostics();
+        }
 
         function redactedEndpoint(input) {
             try {
@@ -2531,9 +2752,9 @@
             const product = report.radar.product || 'reflectivity';
             document.getElementById('diagVersion').textContent = report.appVersion;
             providerElement.textContent = `${report.radar.provider} / ${product}`;
-            document.getElementById('diagState').textContent = `${report.radar.state}: ${report.radar.message}`;
+            document.getElementById('diagState').textContent = `${translatedExact(report.radar.state)}: ${report.radar.message}`;
             document.getElementById('diagFreshness').textContent = report.radar.validAt
-                ? `${new Date(report.radar.validAt).toLocaleString()} · ${report.radar.age}`
+                ? `${formatLocalizedDate(report.radar.validAt, { dateStyle: 'short', timeStyle: 'medium' })} · ${report.radar.age}`
                 : report.radar.age;
             document.getElementById('diagCoverage').textContent = report.radar.coverage;
             const featureTotal = Object.values(report.resources.featureCounts).reduce((sum, value) => sum + value, 0);
@@ -2557,7 +2778,7 @@
                 const endpoint = document.createElement('strong');
                 endpoint.textContent = request.endpoint;
                 const detail = document.createElement('span');
-                detail.textContent = `${request.result}${request.status ? ` (${request.status})` : ''} · ${request.durationMs} ms · ${new Date(request.startedAt).toLocaleTimeString()}`;
+                detail.textContent = `${translatedExact(request.result)}${request.status ? ` (${request.status})` : ''} · ${request.durationMs} ms · ${formatLocalizedDate(request.startedAt, { timeStyle: 'medium' })}`;
                 row.append(endpoint, detail);
                 requestList.append(row);
             });
@@ -2713,7 +2934,9 @@
 
         function formatExternalDate(value, fallback = 'Unknown') {
             const date = new Date(value);
-            return Number.isFinite(date.getTime()) ? date.toLocaleString() : fallback;
+            return Number.isFinite(date.getTime())
+                ? formatLocalizedDate(date, { dateStyle: 'short', timeStyle: 'short' })
+                : fallback;
         }
 
         function providerEpochSeconds(value, provider) {
@@ -2778,7 +3001,9 @@
                 source: Object.keys(RADAR_CAPABILITIES),
                 radarProduct: ['reflectivity', 'velocity', 'echoTops', 'precipAccum'],
                 basemap: ['dark', 'light', 'satellite', 'terrain', 'clean'],
-                theme: ['dark', 'light']
+                theme: ['dark', 'light'],
+                language: ['en', 'es'],
+                units: ['us', 'metric']
             };
             Object.entries(enumFields).forEach(([key, allowed]) => {
                 if (typeof candidate[key] === 'string' && allowed.includes(candidate[key])) result[key] = candidate[key];
@@ -2984,6 +3209,8 @@
             radarProduct: 'reflectivity', // reflectivity, velocity, echoTops, precipAccum
             basemap: 'satellite',
             theme: 'dark',
+            language: 'en',
+            units: 'us',
             opacity: 0.85,
             smooth: 1,
             snowColor: 1,
@@ -3066,6 +3293,7 @@
             setupZoomHandler();
             initRadarSystem();
             initUI();
+            applyLanguage();
             initSidebarDrawer();
             initForecastPanel();
             initQuickToolbar();
@@ -3669,7 +3897,7 @@
                 pause();
                 clearAllFrameLayers();
                 framesReady = false;
-                setProviderStatus('loading', `${capability.label}: loading…`);
+                setProviderStatus('loading', t('providerLoading', { provider: capability.label }));
                 
                 if (requestedSource === 'rainviewer') {
                     await loadRainViewerPreloaded(signal, generation);
@@ -3682,7 +3910,7 @@
                 }
                 ensureCurrentRadarLoad(generation, signal);
                 lastRefreshTime = Date.now();
-                setProviderStatus('current', `${capability.label}: current`);
+                setProviderStatus('current', t('providerCurrent', { provider: capability.label }));
             } catch(e) {
                 if (signal.aborted || generation !== radarLoadGeneration || e?.name === 'AbortError') return;
                 console.error('Radar error:', e);
@@ -3699,7 +3927,7 @@
                         lastRefreshTime = Date.now();
                         setProviderStatus(
                             'fallback',
-                            `MRMS fallback: ${capability.label} failed`,
+                            t('providerFallback', { provider: capability.label }),
                             () => {
                                 settings.source = requestedSource;
                                 syncRadarCapabilities();
@@ -3713,7 +3941,9 @@
                         const restored = restoreRadarState(previousState);
                         setProviderStatus(
                             restored ? 'stale' : 'error',
-                            restored ? `${capability.label}: stale; refresh failed` : `${capability.label}: unavailable`,
+                            restored
+                                ? t('providerStale', { provider: capability.label })
+                                : t('providerUnavailable', { provider: capability.label }),
                             loadRadarData
                         );
                     }
@@ -3721,7 +3951,9 @@
                     const restored = restoreRadarState(previousState);
                     setProviderStatus(
                         restored ? 'stale' : 'error',
-                        restored ? 'MRMS: stale; refresh failed' : 'MRMS: unavailable',
+                        restored
+                            ? t('providerStale', { provider: 'MRMS' })
+                            : t('providerUnavailable', { provider: 'MRMS' }),
                         loadRadarData
                     );
                 }
@@ -4966,7 +5198,7 @@
                             <div class="popup-content">
                                 <h4>River Gauge</h4>
                                 <p><strong>${escapeHTML(name, 160)}</strong></p>
-                                <p>Stage: ${escapeHTML(value, 30)} ft</p>
+                                <p>Stage: ${escapeHTML(formatRiverStage(value), 30)}</p>
                                 <div class="meta">USGS Water Services</div>
                             </div>
                         `);
@@ -5011,9 +5243,9 @@
                             <div class="popup-content">
                                 <h4>${escapeHTML(p.station || 'Station', 40)}</h4>
                                 <p><strong>${escapeHTML(p.name || '', 160)}</strong></p>
-                                <p>Temp: ${Number.isFinite(Number(p.tmpf)) ? `${Number(p.tmpf).toFixed(0)}°F` : 'N/A'}</p>
+                                <p>Temp: ${formatObservationTemperature(p.tmpf)}</p>
                                 <p>Wind: ${Number.isFinite(Number(p.sknt)) ? `${Number(p.sknt).toFixed(0)} kt` : 'N/A'} ${Number.isFinite(Number(p.drct)) ? `from ${Number(p.drct).toFixed(0)}°` : ''}</p>
-                                <p>Dewpoint: ${Number.isFinite(Number(p.dwpf)) ? `${Number(p.dwpf).toFixed(0)}°F` : 'N/A'}</p>
+                                <p>Dewpoint: ${formatObservationTemperature(p.dwpf)}</p>
                                 <div class="meta">Updated: ${escapeHTML(p.local_valid || 'N/A', 80)}</div>
                             </div>
                         `);
@@ -5160,7 +5392,11 @@
 
             const date = new Date(frame.time * 1000);
             if (!Number.isFinite(date.getTime())) {
-                setProviderStatus('error', `${RADAR_CAPABILITIES[settings.source].label}: invalid provider time`, loadRadarData);
+                setProviderStatus(
+                    'error',
+                    t('invalidProviderTime', { provider: RADAR_CAPABILITIES[settings.source].label }),
+                    loadRadarData
+                );
                 return;
             }
             let timeStr;
@@ -5174,19 +5410,19 @@
             };
 
             if (settings.useLocalTime) {
-                timeStr = date.toLocaleString('en-US', formatOpts);
+                timeStr = formatLocalizedDate(date, formatOpts);
                 const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
-                document.getElementById('timestampTz').textContent = 'Local Time';
+                document.getElementById('timestampTz').textContent = t('localTime');
                 document.getElementById('timestampTz').title = localZone;
             } else {
-                timeStr = date.toLocaleString('en-US', { ...formatOpts, timeZone: 'UTC' });
+                timeStr = formatLocalizedDate(date, { ...formatOpts, timeZone: 'UTC' });
                 document.getElementById('timestampTz').textContent = 'UTC';
                 document.getElementById('timestampTz').title = 'Coordinated Universal Time';
             }
 
             const isForecast = frame.isForecast === true;
-            const frameKinds = { forecast: 'Forecast', analysis: 'Analysis', past: 'Past', latest: 'Latest' };
-            const frameKind = frameKinds[frame.kind] || (isForecast ? 'Forecast' : 'Latest');
+            const frameKinds = { forecast: t('forecast'), analysis: t('analysis'), past: t('past'), latest: t('latest') };
+            const frameKind = frameKinds[frame.kind] || (isForecast ? t('forecast') : t('latest'));
             document.getElementById('timestampText').textContent = `${timeStr} (${frameKind})`;
             const timestampBox = document.getElementById('timestampBox');
             timestampBox.classList.toggle('forecast', isForecast);
@@ -5208,12 +5444,12 @@
             const deltaSeconds = Math.round((Date.now() - frame.time * 1000) / 1000);
             const absoluteMinutes = Math.max(0, Math.round(Math.abs(deltaSeconds) / 60));
             if (deltaSeconds < -60) {
-                if (absoluteMinutes < 60) return `Valid in ${absoluteMinutes}m`;
-                return `Valid in ${Math.round(absoluteMinutes / 60)}h`;
+                if (absoluteMinutes < 60) return t('validInMinutes', { value: absoluteMinutes });
+                return t('validInHours', { value: Math.round(absoluteMinutes / 60) });
             }
-            if (absoluteMinutes < 1) return 'Provider time: just now';
-            if (absoluteMinutes < 60) return `${absoluteMinutes}m old`;
-            return `${Math.round(absoluteMinutes / 60)}h old`;
+            if (absoluteMinutes < 1) return t('providerJustNow');
+            if (absoluteMinutes < 60) return t('minutesOld', { value: absoluteMinutes });
+            return t('hoursOld', { value: Math.round(absoluteMinutes / 60) });
         }
 
         function updateFrameIndicator(isForecast, frameKind) {
@@ -5229,9 +5465,9 @@
             if (settings.source === 'hrrr') {
                 const hour = frame.forecastHour || 0;
                 if (hour === 0) {
-                    frameEl.textContent = `Analysis • ${formatProviderAge(frame)} • 1/${frames.length}`;
+                    frameEl.textContent = `${t('analysis')} • ${formatProviderAge(frame)} • 1/${frames.length}`;
                 } else {
-                    frameEl.textContent = `F${String(hour).padStart(2, '0')} Forecast • ${formatProviderAge(frame)} • ${currentFrame + 1}/${frames.length}`;
+                    frameEl.textContent = `F${String(hour).padStart(2, '0')} ${t('forecast')} • ${formatProviderAge(frame)} • ${currentFrame + 1}/${frames.length}`;
                 }
                 frameEl.title = `Model initialized ${new Date(frame.modelInitTime * 1000).toISOString()}`;
             } else if (!RADAR_CAPABILITIES[settings.source]?.animation) {
@@ -5245,9 +5481,9 @@
             const refreshEl = document.getElementById('fiRefreshed');
             if (refreshEl && lastRefreshTime) {
                 const ago = Math.round((Date.now() - lastRefreshTime) / 60000);
-                if (ago < 1) refreshEl.textContent = 'Fetched just now';
-                else if (ago === 1) refreshEl.textContent = 'Fetched 1 min ago';
-                else refreshEl.textContent = `Fetched ${ago}m ago`;
+                if (ago < 1) refreshEl.textContent = t('fetchedJustNow');
+                else if (ago === 1) refreshEl.textContent = t('fetchedMinuteAgo');
+                else refreshEl.textContent = t('fetchedMinutesAgo', { value: ago });
             }
         }
         
@@ -5262,7 +5498,7 @@
                 const hour = frames[currentFrame]?.mins ? Math.round(frames[currentFrame].mins / 60) : 0;
                 badge.textContent = `+${hour}hr`;
             } else if (isForecast) {
-                badge.textContent = 'Forecast';
+                badge.textContent = t('forecast');
             } else {
                 badge.textContent = frameKind;
             }
@@ -5277,8 +5513,8 @@
             timeline.setAttribute('aria-valuemax', String(Math.max(1, frames.length)));
             timeline.setAttribute('aria-valuenow', String(Math.max(1, currentFrame + 1)));
             timeline.setAttribute('aria-valuetext', frames[currentFrame]
-                ? `${RADAR_CAPABILITIES[settings.source]?.label || settings.source}, ${new Date(frames[currentFrame].time * 1000).toLocaleString()}`
-                : 'No radar frame');
+                ? `${RADAR_CAPABILITIES[settings.source]?.label || settings.source}, ${formatLocalizedDate(frames[currentFrame].time * 1000, { dateStyle: 'short', timeStyle: 'short' })}`
+                : t('noRadarFrame'));
         }
 
         function updateTimelineUI() {
@@ -5331,7 +5567,7 @@
                     const label = document.createElement('div');
                     label.className = 'timeline-tick-label';
                     label.style.left = pct + '%';
-                    label.textContent = 'Now';
+                    label.textContent = t('now');
                     container.appendChild(label);
                 }
             }
@@ -5428,13 +5664,19 @@
             
             if (settings.radarProduct === 'velocity' && settings.source === 'mrms') {
                 gradient.style.background = 'linear-gradient(to bottom, #ff0000 0%, #ff6600 15%, #ffaa00 30%, #ffffff 50%, #00aaff 70%, #0055ff 85%, #0000aa 100%)';
-                labels.innerHTML = '<span>+70 kt</span><span>+50</span><span>+30</span><span>0</span><span>-30</span><span>-50</span><span>-70 kt</span>';
+                labels.innerHTML = settings.units === 'metric'
+                    ? '<span>+130 km/h</span><span>+93</span><span>+56</span><span>0</span><span>-56</span><span>-93</span><span>-130 km/h</span>'
+                    : '<span>+70 kt</span><span>+50</span><span>+30</span><span>0</span><span>-30</span><span>-50</span><span>-70 kt</span>';
             } else if (settings.radarProduct === 'echoTops' && settings.source === 'mrms') {
                 gradient.style.background = 'linear-gradient(to bottom, #ff00ff 0%, #ff0000 20%, #ff8800 40%, #ffff00 60%, #00ff00 80%, #0088ff 100%)';
-                labels.innerHTML = '<span>60k ft</span><span>50k</span><span>40k</span><span>30k</span><span>20k</span><span>10k ft</span>';
+                labels.innerHTML = settings.units === 'metric'
+                    ? '<span>18 km</span><span>15</span><span>12</span><span>9</span><span>6</span><span>3 km</span>'
+                    : '<span>60k ft</span><span>50k</span><span>40k</span><span>30k</span><span>20k</span><span>10k ft</span>';
             } else if (settings.radarProduct === 'precipAccum' && settings.source === 'mrms') {
                 gradient.style.background = 'linear-gradient(to bottom, #ff00ff 0%, #ff0000 15%, #ff6600 30%, #ffcc00 45%, #00ff00 60%, #00ccff 75%, #0066ff 90%, #000066 100%)';
-                labels.innerHTML = '<span>6.0"+</span><span>4.0"</span><span>3.0"</span><span>2.0"</span><span>1.0"</span><span>0.5"</span><span>0.1"</span><span>Trace</span>';
+                labels.innerHTML = settings.units === 'metric'
+                    ? '<span>152+ mm</span><span>102</span><span>76</span><span>51</span><span>25</span><span>13</span><span>3</span><span>Trace</span>'
+                    : '<span>6.0"+</span><span>4.0"</span><span>3.0"</span><span>2.0"</span><span>1.0"</span><span>0.5"</span><span>0.1"</span><span>Trace</span>';
             } else {
                 // Default reflectivity
                 gradient.style.background = 'linear-gradient(to bottom, #ff00ff 0%, #ff0000 15%, #ff6600 25%, #ffc800 35%, #ffff00 45%, #7fff00 55%, #00c800 65%, #00b4ff 75%, #0064ff 85%, #000096 100%)';
@@ -5541,20 +5783,23 @@
             }
 
             // Show panel with loading state
-            locEl.textContent = 'Loading...';
+            locEl.textContent = t('loading');
             coordsEl.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-            body.innerHTML = '<div class="fc-loading"><div class="fc-loading-spinner"></div><div class="fc-loading-text">Fetching forecast...</div></div>';
+            body.innerHTML = `<div class="fc-loading"><div class="fc-loading-spinner"></div><div class="fc-loading-text">${escapeHTML(t('fetchingForecast'))}</div></div>`;
             overlay.classList.add('open');
             panel.classList.add('open');
             setAccessibleDialog(panel, overlay, true, document.activeElement, () => document.getElementById('fcClose').click());
 
             try {
                 // Parallel fetch: Open-Meteo forecast + NWS point metadata + NWS alerts for point
+                const requestedUnits = settings.units === 'metric'
+                    ? { temperature: 'celsius', wind: 'kmh', precipitation: 'mm' }
+                    : { temperature: 'fahrenheit', wind: 'mph', precipitation: 'inch' };
                 const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
                     `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure,precipitation,is_day` +
                     `&hourly=temperature_2m,weather_code,precipitation_probability,is_day` +
                     `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max` +
-                    `&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto&forecast_days=7`;
+                    `&temperature_unit=${requestedUnits.temperature}&wind_speed_unit=${requestedUnits.wind}&precipitation_unit=${requestedUnits.precipitation}&timezone=auto&forecast_days=7`;
 
                 const nwsUrl = `https://api.weather.gov/points/${lat.toFixed(4)},${lng.toFixed(4)}`;
                 const nwsAlertUrl = `https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lng.toFixed(4)}&limit=3`;
@@ -5602,7 +5847,7 @@
             } catch(e) {
                 if (e.name === 'AbortError') return;
                 console.error('Forecast error:', e);
-                body.innerHTML = `<div class="fc-loading"><div class="fc-loading-text" style="color:var(--danger)">Failed to load forecast. Try another location.</div></div>`;
+                body.innerHTML = `<div class="fc-loading"><div class="fc-loading-text" style="color:var(--danger)">${escapeHTML(t('forecastFailed'))}</div></div>`;
             }
         }
 
@@ -5612,6 +5857,10 @@
             const hourly = om.hourly;
             const daily = om.daily;
             const isNight = !cur.is_day;
+            const units = unitProfile();
+            const pressure = settings.units === 'metric'
+                ? `${Math.round(cur.surface_pressure)} ${units.pressure}`
+                : `${(cur.surface_pressure * 0.02953).toFixed(2)} ${units.pressure}`;
 
             let html = '';
 
@@ -5626,39 +5875,36 @@
             // Current conditions
             html += `<div class="fc-current">
                 <div class="fc-current-icon">${getWeatherIcon(cur.weather_code, isNight)}</div>
-                <div class="fc-current-temp">${Math.round(cur.temperature_2m)}\u00B0</div>
+                <div class="fc-current-temp">${Math.round(cur.temperature_2m)}${units.temperature}</div>
                 <div class="fc-current-details">
-                    <div class="fc-condition">${getWeatherText(cur.weather_code)}</div>
+                    <div class="fc-condition">${translatedExact(getWeatherText(cur.weather_code))}</div>
                     <div class="fc-stats">
-                        <div><span class="fc-stat-label">Feels </span>${Math.round(cur.apparent_temperature)}\u00B0F</div>
-                        <div><span class="fc-stat-label">Humidity </span>${Math.round(finiteNumber(cur.relative_humidity_2m, 0, 100, 0))}%</div>
-                        <div><span class="fc-stat-label">Wind </span>${windDirection(cur.wind_direction_10m)} ${Math.round(cur.wind_speed_10m)} mph</div>
-                        <div><span class="fc-stat-label">Gusts </span>${Math.round(cur.wind_gusts_10m)} mph</div>
-                        <div><span class="fc-stat-label">Pressure </span>${(cur.surface_pressure * 0.02953).toFixed(2)} inHg</div>
-                        <div><span class="fc-stat-label">Precip </span>${finiteNumber(cur.precipitation, 0, 100, 0).toFixed(2)}" /hr</div>
+                        <div><span class="fc-stat-label">${t('feels')} </span>${Math.round(cur.apparent_temperature)}${units.temperature}</div>
+                        <div><span class="fc-stat-label">${t('humidity')} </span>${Math.round(finiteNumber(cur.relative_humidity_2m, 0, 100, 0))}%</div>
+                        <div><span class="fc-stat-label">${t('wind')} </span>${windDirection(cur.wind_direction_10m)} ${Math.round(cur.wind_speed_10m)} ${units.speed}</div>
+                        <div><span class="fc-stat-label">${t('gusts')} </span>${Math.round(cur.wind_gusts_10m)} ${units.speed}</div>
+                        <div><span class="fc-stat-label">${t('pressure')} </span>${pressure}</div>
+                        <div><span class="fc-stat-label">${t('precip')} </span>${finiteNumber(cur.precipitation, 0, 100, 0).toFixed(2)} ${units.precipitation}/h</div>
                     </div>
                 </div>
             </div>`;
 
             // Hourly forecast (next 24h)
             if (hourly && hourly.time) {
-                html += `<div class="fc-section-title">Hourly Forecast</div>`;
+                html += `<div class="fc-section-title">${t('hourlyForecast')}</div>`;
                 html += `<div class="fc-hourly-scroll">`;
                 const now = new Date();
                 const startIdx = hourly.time.findIndex(t => new Date(t) >= now);
                 const start = Math.max(0, startIdx);
                 for (let i = start; i < Math.min(start + 24, hourly.time.length); i++) {
                     const d = new Date(hourly.time[i]);
-                    const hr = d.getHours();
-                    const ampm = hr >= 12 ? 'p' : 'a';
-                    const hr12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
                     const isHourNight = !hourly.is_day[i];
-                    const label = i === start ? 'Now' : `${hr12}${ampm}`;
+                    const label = i === start ? t('now') : formatLocalizedDate(d, { hour: 'numeric' });
                     const precip = hourly.precipitation_probability?.[i];
                     html += `<div class="fc-hour">
                         <div class="fc-hour-time">${label}</div>
                         <div class="fc-hour-icon">${getWeatherIcon(hourly.weather_code[i], isHourNight)}</div>
-                        <div class="fc-hour-temp">${Math.round(hourly.temperature_2m[i])}\u00B0</div>
+                        <div class="fc-hour-temp">${Math.round(hourly.temperature_2m[i])}${units.temperature}</div>
                         ${precip > 0 ? `<div class="fc-hour-precip">${precip}%</div>` : ''}
                     </div>`;
                 }
@@ -5667,7 +5913,7 @@
 
             // 7-day forecast
             if (daily && daily.time) {
-                html += `<div class="fc-section-title">7-Day Forecast</div>`;
+                html += `<div class="fc-section-title">${t('sevenDayForecast')}</div>`;
                 html += `<div class="fc-daily">`;
 
                 // Find overall temp range for bar scaling
@@ -5679,7 +5925,7 @@
 
                 for (let i = 0; i < daily.time.length; i++) {
                     const d = new Date(daily.time[i] + 'T12:00:00');
-                    const dayName = i === 0 ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                    const dayName = i === 0 ? t('today') : formatLocalizedDate(d, { weekday: 'short', month: 'short', day: 'numeric' });
                     const hi = Math.round(allHi[i]);
                     const lo = Math.round(allLo[i]);
                     
@@ -5691,8 +5937,8 @@
                         <div class="fc-day-name">${dayName}</div>
                         <div class="fc-day-icon">${getWeatherIcon(daily.weather_code[i])}</div>
                         <div class="fc-day-bar-track"><div class="fc-day-bar" style="margin-left:${barLeft}%;width:${barWidth}%"></div></div>
-                        <div class="fc-day-lo">${lo}\u00B0</div>
-                        <div class="fc-day-hi">${hi}\u00B0</div>
+                        <div class="fc-day-lo">${lo}${units.temperature}</div>
+                        <div class="fc-day-hi">${hi}${units.temperature}</div>
                     </div>`;
                 }
                 html += `</div>`;
@@ -6212,6 +6458,28 @@
                 saveSettings();
             });
             document.getElementById('legend').style.display = settings.showLegend ? 'block' : 'none';
+
+            const languageSelect = document.getElementById('languageSelect');
+            languageSelect.value = settings.language;
+            languageSelect.addEventListener('change', () => {
+                settings.language = languageSelect.value;
+                saveSettings();
+                applyLanguage();
+                showToast(t('languageUpdated'), 'success', 2200);
+                if (currentForecastLocation) openForecast(currentForecastLocation.lat, currentForecastLocation.lng);
+            });
+
+            const unitsSelect = document.getElementById('unitsSelect');
+            unitsSelect.value = settings.units;
+            unitsSelect.addEventListener('change', () => {
+                settings.units = unitsSelect.value;
+                saveSettings();
+                updateLegend();
+                showToast(t('unitsUpdated'), 'success', 2200);
+                if (settings.layers.surfaceObs) loadSurfaceObs();
+                if (settings.layers.riverGauges) loadRiverGauges();
+                if (currentForecastLocation) openForecast(currentForecastLocation.lat, currentForecastLocation.lng);
+            });
 
             // Border sliders
             initSlider('stateBorderSlider', 'stateBorderValue', 'stateBorderWidth', 'px', () => {
