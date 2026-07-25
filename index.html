@@ -2177,7 +2177,7 @@
                 <div class="settings-section">
                     <div class="settings-section-title">OpenWeatherMap</div>
                     <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Required for Temperature, Wind, Clouds, and Pressure layers</p>
-                    <input type="text" class="api-input" id="owmKeyInput" placeholder="Enter your OWM API key" aria-label="OpenWeatherMap API key">
+                    <input type="password" class="api-input" id="owmKeyInput" placeholder="Enter your OWM API key" aria-label="OpenWeatherMap API key" autocomplete="off" spellcheck="false">
                     <a class="api-link" href="https://openweathermap.org/api" target="_blank">
                         Get free API key
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
@@ -2186,12 +2186,13 @@
                 <div class="settings-section">
                     <div class="settings-section-title">WAQI (Air Quality)</div>
                     <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Optional - for air quality overlay</p>
-                    <input type="text" class="api-input" id="waqiKeyInput" placeholder="Enter your WAQI API key" aria-label="WAQI API key">
+                    <input type="password" class="api-input" id="waqiKeyInput" placeholder="Enter your WAQI API key" aria-label="WAQI API key" autocomplete="off" spellcheck="false">
                     <a class="api-link" href="https://aqicn.org/data-platform/token/" target="_blank">
                         Get free API key
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
                     </a>
                 </div>
+                <p class="setting-hint" role="note">Keys are stored unencrypted in this browser profile and sent directly to their providers. Anyone with local browser access can read them. Settings exports always omit keys.</p>
                 <button class="btn" id="saveKeysBtn" style="width:100%;margin-top:20px;background:var(--accent);color:#fff;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                     Save API Keys
@@ -2377,6 +2378,9 @@
         const activeRequests = new Map();
         const layerRequests = new Map();
         const MAX_SETTINGS_BYTES = 32768;
+        const SETTINGS_SCHEMA_VERSION = 1;
+        const SETTINGS_STORAGE_KEY = 'stormview_settings';
+        const LEGACY_SETTINGS_KEYS = ['stormview_pro_v3'];
         let activeDialog = null;
 
         function focusableElements(container) {
@@ -2628,6 +2632,44 @@
             return result;
         }
 
+        function migrateSettingsPayload(payload) {
+            if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+                throw new Error('Settings must be a JSON object');
+            }
+
+            let candidate = payload;
+            if (Object.hasOwn(payload, 'schemaVersion')) {
+                const version = Number(payload.schemaVersion);
+                if (!Number.isInteger(version) || version < 1) throw new Error('Settings schema version is invalid');
+                if (version > SETTINGS_SCHEMA_VERSION) {
+                    throw new Error(`Settings require schema version ${version}; this app supports ${SETTINGS_SCHEMA_VERSION}`);
+                }
+                candidate = payload.settings;
+            }
+
+            if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+                throw new Error('Settings payload is missing');
+            }
+
+            const migrated = {
+                ...candidate,
+                layers: candidate.layers && typeof candidate.layers === 'object'
+                    ? { ...candidate.layers }
+                    : candidate.layers
+            };
+            const basemapMigrations = { topo: 'terrain', darkNolabels: 'clean' };
+            if (basemapMigrations[migrated.basemap]) migrated.basemap = basemapMigrations[migrated.basemap];
+            if (migrated.source === 'noaa') migrated.source = 'nowcoast';
+            return validateSettingsPayload(migrated);
+        }
+
+        function settingsRecord(settingsValue = settings) {
+            return {
+                schemaVersion: SETTINGS_SCHEMA_VERSION,
+                settings: validateSettingsPayload(settingsValue)
+            };
+        }
+
         async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
             const controller = new AbortController();
             const requestKey = typeof input === 'string' ? input : input.url;
@@ -2864,22 +2906,33 @@
         }
 
         function loadSettings() {
+            let sourceKey = SETTINGS_STORAGE_KEY;
             try {
-                const s = localStorage.getItem('stormview_pro_v3');
+                let s = localStorage.getItem(SETTINGS_STORAGE_KEY);
+                if (!s) {
+                    sourceKey = LEGACY_SETTINGS_KEYS.find(key => localStorage.getItem(key)) || SETTINGS_STORAGE_KEY;
+                    s = sourceKey === SETTINGS_STORAGE_KEY ? null : localStorage.getItem(sourceKey);
+                }
                 if (!s) return;
                 if (new Blob([s]).size > MAX_SETTINGS_BYTES) throw new Error('Stored settings exceed the size limit');
-                Object.assign(settings, validateSettingsPayload(JSON.parse(s)));
+                Object.assign(settings, migrateSettingsPayload(JSON.parse(s)));
+                if (sourceKey !== SETTINGS_STORAGE_KEY && saveSettings()) {
+                    LEGACY_SETTINGS_KEYS.forEach(key => localStorage.removeItem(key));
+                }
             } catch(e) {
                 console.warn('Stored settings were ignored:', e);
+                showToast(`Stored settings were ignored: ${safeText(e.message, 120)}`, 'error', 6000);
             }
         }
 
         function saveSettings() {
             try {
-                localStorage.setItem('stormview_pro_v3', JSON.stringify(validateSettingsPayload(settings)));
+                localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settingsRecord()));
+                return true;
             } catch(e) {
                 console.error('Settings could not be saved:', e);
-                if (document.body) showToast('Settings could not be saved', 'error');
+                if (document.body) showToast('Settings could not be saved. Free browser storage or export and reset settings.', 'error', 6000);
+                return false;
             }
         }
 
@@ -6026,17 +6079,27 @@
             document.getElementById('saveKeysBtn').addEventListener('click', () => {
                 settings.owmKey = document.getElementById('owmKeyInput').value.trim();
                 settings.waqiKey = document.getElementById('waqiKeyInput').value.trim();
-                saveSettings();
-                showToast('API keys saved', 'success', 2000);
+                if (saveSettings()) showToast('API keys saved in this browser profile', 'success', 2500);
             });
 
             // Import/Export
             document.getElementById('exportBtn').addEventListener('click', () => {
-                const blob = new Blob([JSON.stringify(settings, null, 2)], {type: 'application/json'});
+                const exportSettings = validateSettingsPayload(settings);
+                delete exportSettings.owmKey;
+                delete exportSettings.waqiKey;
+                const payload = {
+                    schemaVersion: SETTINGS_SCHEMA_VERSION,
+                    exportedAt: new Date().toISOString(),
+                    secretsOmitted: ['owmKey', 'waqiKey'],
+                    settings: exportSettings
+                };
+                const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
-                a.download = 'stormview_pro_settings.json';
+                a.download = 'stormview-settings.json';
                 a.click();
+                setTimeout(() => URL.revokeObjectURL(a.href), 0);
+                showToast('Settings exported without API keys', 'success', 2500);
             });
             
             document.getElementById('importBtn').addEventListener('click', () => {
@@ -6056,13 +6119,13 @@
                     try {
                         const raw = typeof ev.target.result === 'string' ? ev.target.result : '';
                         if (new Blob([raw]).size > MAX_SETTINGS_BYTES) throw new Error('Settings file is too large');
-                        Object.assign(settings, validateSettingsPayload(JSON.parse(raw)));
-                        saveSettings();
+                        Object.assign(settings, migrateSettingsPayload(JSON.parse(raw)));
+                        if (!saveSettings()) throw new Error('Browser storage rejected the imported settings');
                         showToast('Settings imported', 'success');
                         setTimeout(() => location.reload(), 500);
                     } catch(err) {
                         console.error('Import error:', err);
-                        showToast('Settings file is invalid', 'error');
+                        showToast(`Import failed: ${safeText(err.message, 120)}`, 'error', 6000);
                     }
                 };
                 reader.onerror = () => showToast('Settings file could not be read', 'error');

@@ -53,8 +53,8 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Geolocation** — Jump to your current position with one click
 - **Mobile Optimized** — Responsive design with bottom sheet navigation on mobile
 - **Keyboard Shortcuts** — Quick controls for power users
-- **Settings Persistence** — All preferences saved to localStorage
-- **Import/Export** — Backup and restore your configuration
+- **Versioned Settings** — Validated preferences migrate forward in browser storage
+- **Import/Export** — Backup and restore configuration without exporting API keys
 
 ## Quick Start
 
@@ -88,6 +88,8 @@ Required for temperature, wind, clouds, and pressure layers.
 1. Sign up at [openweathermap.org](https://openweathermap.org/api)
 2. Copy your API key
 3. Paste in Settings → API tab
+
+API keys are stored unencrypted in the current browser profile and sent directly to their providers. Anyone with local access to that browser profile can read them. StormView settings exports omit all API keys.
 
 ## Data Sources
 

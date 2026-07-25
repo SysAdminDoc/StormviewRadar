@@ -19,6 +19,8 @@ All notable changes to StormviewRadar will be documented in this file.
 - Added model initialization, forecast lead, data age, timezone, capability-driven playback, and explicit global/CONUS coverage status.
 - Added named keyboard controls, switch/radio state, accessible search suggestions, range labels, and focus-managed dialogs/sheets.
 - Added reduced-motion and forced-colors styles plus automated WCAG A/AA, keyboard, focus, and 390px light-theme checks.
+- Added a versioned settings schema with legacy basemap/source migration and validation for future imports.
+- Removed API keys from settings exports, masked key inputs, documented browser-profile exposure, and surfaced quota/import recovery errors.
 
 ## [v0.1.0] - %Y->- (HEAD -> main, origin/main, origin/HEAD)
 
