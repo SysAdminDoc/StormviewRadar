@@ -2204,6 +2204,7 @@
         <div class="settings-tabs">
             <button class="settings-tab active" data-tab="display">Display</button>
             <button class="settings-tab" data-tab="radar">Radar</button>
+            <button class="settings-tab" data-tab="alerts">Alerts</button>
             <button class="settings-tab" data-tab="api">APIs</button>
             <button class="settings-tab" data-tab="diagnostics">Status</button>
         </div>
@@ -2323,6 +2324,51 @@
                         <div class="toggle on" id="loopToggle"></div>
                     </div>
                 </div>
+            </div>
+            <!-- Alerts Tab -->
+            <div class="settings-tab-content" data-tab-content="alerts" style="display:none;">
+                <div class="settings-section">
+                    <div class="settings-section-title">Audio Notifications</div>
+                    <div class="setting-row">
+                        <div>
+                            <div class="setting-label">Alert Sounds</div>
+                            <div class="setting-hint">Opt in to a tone for newly issued matching alerts</div>
+                        </div>
+                        <div class="toggle" id="alertAudioToggle"></div>
+                    </div>
+                    <div class="setting-row">
+                        <label class="setting-label" for="alertSeveritySelect">Minimum Severity</label>
+                        <select class="api-input" id="alertSeveritySelect" style="width:160px;padding:8px;">
+                            <option value="extreme">Extreme</option>
+                            <option value="severe">Severe</option>
+                            <option value="moderate">Moderate</option>
+                            <option value="minor">Minor</option>
+                            <option value="unknown">Any severity</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
+                        <label class="setting-label" for="alertTypeSelect">Alert Type</label>
+                        <select class="api-input" id="alertTypeSelect" style="width:160px;padding:8px;">
+                            <option value="tornado">Tornado only</option>
+                            <option value="warnings">Warnings</option>
+                            <option value="watchesWarnings">Watches + warnings</option>
+                            <option value="all">All alerts</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
+                        <label class="setting-label" for="alertDistanceSelect">Map Center Radius</label>
+                        <select class="api-input" id="alertDistanceSelect" style="width:160px;padding:8px;">
+                            <option value="25">25 mi / 40 km</option>
+                            <option value="50">50 mi / 80 km</option>
+                            <option value="100">100 mi / 161 km</option>
+                            <option value="250">250 mi / 402 km</option>
+                            <option value="500">500 mi / 805 km</option>
+                            <option value="0">Any distance</option>
+                        </select>
+                    </div>
+                </div>
+                <p class="setting-hint" role="note">The first alert load is always silent. Keep the map centered on the area you care about; alerts without polygons only match “Any distance.” Browsers may require Test Sound once per tab.</p>
+                <button class="btn" id="testAlertSoundBtn" type="button" style="width:100%;margin-top:16px;">Test Sound</button>
             </div>
             <!-- API Tab -->
             <div class="settings-tab-content" data-tab-content="api" style="display:none;">
@@ -2557,6 +2603,12 @@
         let stormTrackToolsPromise = null;
         let stormTrackHistoryHydrated = false;
         const stormTrackHistory = new Map();
+        let alertAudioToolsPromise = null;
+        let alertAudioContext = null;
+        let alertAudioUnlocked = false;
+        let alertAudioPrimed = false;
+        let currentAlertFeatures = [];
+        const seenAlertIds = new Set();
         const meshWorkerRequests = new Map();
         const level2WorkerRequests = new Map();
         const REQUEST_TIMEOUT_MS = 15000;
@@ -2627,7 +2679,11 @@
                 stormMotion: 'Motion',
                 stormHistory: 'Observed history',
                 stormProjection: 'Projected path',
-                stormTrackCaution: 'Automated NEXRAD cell guidance, not an official warning.'
+                stormTrackCaution: 'Automated NEXRAD cell guidance, not an official warning.',
+                alertAudioReady: 'Alert sounds enabled',
+                alertAudioUnavailable: 'Audio is unavailable in this browser',
+                alertAudioActivation: 'Use Test Sound to activate alert audio in this tab',
+                newMatchingAlerts: '{value} new matching alert(s)'
             },
             es: {
                 loading: 'Cargando...',
@@ -2674,7 +2730,11 @@
                 stormMotion: 'Movimiento',
                 stormHistory: 'Historial observado',
                 stormProjection: 'Trayectoria proyectada',
-                stormTrackCaution: 'Guía automatizada de celdas NEXRAD; no es una alerta oficial.'
+                stormTrackCaution: 'Guía automatizada de celdas NEXRAD; no es una alerta oficial.',
+                alertAudioReady: 'Sonidos de alerta activados',
+                alertAudioUnavailable: 'El audio no está disponible en este navegador',
+                alertAudioActivation: 'Usa Probar sonido para activar el audio en esta pestaña',
+                newMatchingAlerts: '{value} alerta(s) nueva(s) coincidente(s)'
             }
         };
         const SPANISH_EXACT_TEXT = {
@@ -2721,6 +2781,24 @@
             'Model Data': 'Datos del modelo',
             'Base Map': 'Mapa base',
             'Alerts': 'Alertas',
+            'Audio Notifications': 'Notificaciones de audio',
+            'Alert Sounds': 'Sonidos de alerta',
+            'Opt in to a tone for newly issued matching alerts': 'Activa un tono para alertas nuevas que coincidan',
+            'Minimum Severity': 'Gravedad mínima',
+            'Alert Type': 'Tipo de alerta',
+            'Map Center Radius': 'Radio desde el centro',
+            'Test Sound': 'Probar sonido',
+            'Extreme': 'Extrema',
+            'Severe': 'Severa',
+            'Moderate': 'Moderada',
+            'Minor': 'Menor',
+            'Any severity': 'Cualquier gravedad',
+            'Tornado only': 'Solo tornados',
+            'Warnings': 'Alertas',
+            'Watches + warnings': 'Vigilancias y alertas',
+            'All alerts': 'Todas las alertas',
+            'Any distance': 'Cualquier distancia',
+            'The first alert load is always silent. Keep the map centered on the area you care about; alerts without polygons only match “Any distance.” Browsers may require Test Sound once per tab.': 'La primera carga de alertas siempre es silenciosa. Mantén el mapa centrado en el área de interés; las alertas sin polígonos solo coinciden con “Cualquier distancia”. El navegador puede requerir Probar sonido una vez por pestaña.',
             'Reports': 'Informes',
             'Storm Tracks': 'Trayectorias de tormentas',
             'Lightning': 'Rayos',
@@ -3146,13 +3224,15 @@
                 basemap: ['dark', 'light', 'satellite', 'terrain', 'clean'],
                 theme: ['dark', 'light'],
                 language: ['en', 'es'],
-                units: ['us', 'metric']
+                units: ['us', 'metric'],
+                alertAudioSeverity: ['extreme', 'severe', 'moderate', 'minor', 'unknown'],
+                alertAudioType: ['tornado', 'warnings', 'watchesWarnings', 'all']
             };
             Object.entries(enumFields).forEach(([key, allowed]) => {
                 if (typeof candidate[key] === 'string' && allowed.includes(candidate[key])) result[key] = candidate[key];
             });
 
-            ['loop', 'autoRefresh', 'showLegend', 'highResMode', 'useLocalTime'].forEach(key => {
+            ['loop', 'autoRefresh', 'showLegend', 'highResMode', 'useLocalTime', 'alertAudioEnabled'].forEach(key => {
                 if (typeof candidate[key] === 'boolean') result[key] = candidate[key];
             });
             ['smooth', 'snowColor'].forEach(key => {
@@ -3164,6 +3244,9 @@
             result.stateBorderWidth = finiteNumber(candidate.stateBorderWidth, 0, 8, result.stateBorderWidth);
             result.countyBorderWidth = finiteNumber(candidate.countyBorderWidth, 0, 8, result.countyBorderWidth);
             result.borderOpacity = finiteNumber(candidate.borderOpacity, 0, 1, result.borderOpacity);
+            result.alertAudioDistanceMiles = [0, 25, 50, 100, 250, 500].includes(Number(candidate.alertAudioDistanceMiles))
+                ? Number(candidate.alertAudioDistanceMiles)
+                : result.alertAudioDistanceMiles;
             if (typeof candidate.owmKey === 'string') result.owmKey = safeText(candidate.owmKey.trim(), 256);
             if (typeof candidate.level2Site === 'string' && /^(?:|[A-Z]{4})$/.test(candidate.level2Site)) {
                 result.level2Site = candidate.level2Site;
@@ -3369,6 +3452,10 @@
             autoRefresh: true,
             showLegend: true,
             highResMode: true,
+            alertAudioEnabled: false,
+            alertAudioSeverity: 'severe',
+            alertAudioType: 'warnings',
+            alertAudioDistanceMiles: 100,
             owmKey: '',
             useLocalTime: true,
             stateBorderWidth: 2,
@@ -5681,6 +5768,88 @@
             return names[key] || key;
         }
 
+        function alertAudioTools() {
+            if (!alertAudioToolsPromise) alertAudioToolsPromise = import('./src/alert-audio.js');
+            return alertAudioToolsPromise;
+        }
+
+        async function playAlertTone(urgency = 'standard') {
+            try {
+                const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextConstructor) return false;
+                if (!alertAudioContext) alertAudioContext = new AudioContextConstructor();
+                await alertAudioContext.resume();
+                if (alertAudioContext.state !== 'running') return false;
+
+                const patterns = {
+                    standard: [660],
+                    severe: [660, 880],
+                    extreme: [880, 988, 1175],
+                    test: [660, 880]
+                };
+                const frequencies = patterns[urgency] || patterns.standard;
+                frequencies.forEach((frequency, index) => {
+                    const start = alertAudioContext.currentTime + 0.02 + index * 0.2;
+                    const oscillator = alertAudioContext.createOscillator();
+                    const gain = alertAudioContext.createGain();
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(frequency, start);
+                    gain.gain.setValueAtTime(0.0001, start);
+                    gain.gain.exponentialRampToValueAtTime(0.18, start + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.16);
+                    oscillator.connect(gain);
+                    gain.connect(alertAudioContext.destination);
+                    oscillator.start(start);
+                    oscillator.stop(start + 0.18);
+                });
+                alertAudioUnlocked = true;
+                return true;
+            } catch (error) {
+                console.warn('Alert audio unavailable:', error);
+                return false;
+            }
+        }
+
+        async function processAlertAudio(features) {
+            currentAlertFeatures = features;
+            const tools = await alertAudioTools();
+            const identified = features
+                .map(feature => ({ feature, id: tools.alertIdentifier(feature) }))
+                .filter(item => item.id);
+
+            if (!alertAudioPrimed) {
+                identified.forEach(item => seenAlertIds.add(item.id));
+                alertAudioPrimed = true;
+                return;
+            }
+
+            const newFeatures = identified
+                .filter(item => !seenAlertIds.has(item.id))
+                .map(item => item.feature);
+            identified.forEach(item => seenAlertIds.add(item.id));
+            if (seenAlertIds.size > 2000) {
+                [...seenAlertIds].slice(0, seenAlertIds.size - 1000).forEach(id => seenAlertIds.delete(id));
+            }
+            if (!settings.alertAudioEnabled || !newFeatures.length) return;
+
+            const center = map.getCenter();
+            const matches = newFeatures.filter(feature => tools.alertMatchesAudioSettings(feature, settings, {
+                latitude: center.lat,
+                longitude: center.lng
+            }));
+            if (!matches.length) return;
+            if (!alertAudioUnlocked) {
+                showToast(t('alertAudioActivation'), 'warn', 5000);
+                return;
+            }
+            const urgencies = matches.map(tools.alertUrgency);
+            const urgency = urgencies.includes('extreme')
+                ? 'extreme'
+                : urgencies.includes('severe') ? 'severe' : 'standard';
+            await playAlertTone(urgency);
+            showToast(t('newMatchingAlerts', { value: matches.length }), 'warn', 4000);
+        }
+
         // NWS Alerts
         async function loadAlerts() {
             removeLayer('alerts');
@@ -5735,6 +5904,7 @@
                     return evt.includes('warning') || evt.includes('tornado') || evt.includes('severe');
                 }).length;
                 updateAlertCount(warningCount || features.length);
+                await processAlertAudio(features);
             } catch(e) {
                 if (e?.name === 'AbortError') return;
                 console.error('Alerts error:', e);
@@ -7514,6 +7684,40 @@
                 el.addEventListener('click', () => {
                     showToast('RainViewer currently provides the Universal Blue palette only', 'info');
                 });
+            });
+
+            // Alert audio
+            const alertAudioToggle = document.getElementById('alertAudioToggle');
+            const alertSeveritySelect = document.getElementById('alertSeveritySelect');
+            const alertTypeSelect = document.getElementById('alertTypeSelect');
+            const alertDistanceSelect = document.getElementById('alertDistanceSelect');
+            alertAudioToggle.classList.toggle('on', settings.alertAudioEnabled);
+            alertSeveritySelect.value = settings.alertAudioSeverity;
+            alertTypeSelect.value = settings.alertAudioType;
+            alertDistanceSelect.value = String(settings.alertAudioDistanceMiles);
+            alertAudioToggle.addEventListener('click', async () => {
+                settings.alertAudioEnabled = alertAudioToggle.classList.toggle('on');
+                saveSettings();
+                if (settings.alertAudioEnabled) {
+                    const played = await playAlertTone('test');
+                    showToast(played ? t('alertAudioReady') : t('alertAudioUnavailable'), played ? 'success' : 'error', 3000);
+                }
+            });
+            alertSeveritySelect.addEventListener('change', () => {
+                settings.alertAudioSeverity = alertSeveritySelect.value;
+                saveSettings();
+            });
+            alertTypeSelect.addEventListener('change', () => {
+                settings.alertAudioType = alertTypeSelect.value;
+                saveSettings();
+            });
+            alertDistanceSelect.addEventListener('change', () => {
+                settings.alertAudioDistanceMiles = Number(alertDistanceSelect.value);
+                saveSettings();
+            });
+            document.getElementById('testAlertSoundBtn').addEventListener('click', async () => {
+                const played = await playAlertTone('test');
+                showToast(played ? t('alertAudioReady') : t('alertAudioUnavailable'), played ? 'success' : 'error', 3000);
             });
 
             // API keys
