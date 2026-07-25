@@ -33,6 +33,7 @@ All notable changes to StormviewRadar will be documented in this file.
 - Added an optional NOAA MRMS MESH hail-size overlay with direct S3 discovery, worker-based GRIB2/PNG decoding, safety limits, localized units, and explicit estimate-not-warning guidance.
 - Added NOAA/NESDIS GeoColor and IR-sandwich satellite layers, and fixed infrared/water-vapor toggles so disabling them releases the correct tile resources.
 - Added a combined current GOES-East M1/M2 mesoscale-sector overlay with lifecycle diagnostics and full resource cleanup.
+- Added current NEXRAD storm-cell tracks with one-hour archived history, bounded live updates, 30/60-minute motion projections, threat-aware styling, and explicit automated-guidance labeling.
 
 ## [v0.1.0] - 2026-07-25
 

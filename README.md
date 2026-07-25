@@ -36,6 +36,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **NWS Alerts** — Real-time watches, warnings, and advisories with color-coded polygons
 - **SPC Outlooks** — Storm Prediction Center convective outlooks
 - **Storm Reports** — View tornado, hail, and wind damage reports
+- **Storm Tracks** — Plot current NEXRAD storm cells with an hour of observed positions, 30/60-minute motion projections, and TVS, mesocyclone, hail, VIL, and echo-top details
 - **Lightning** — Near real-time lightning strike data
 - **Satellite** — GOES satellite imagery overlay
 - **River Gauges** — USGS water level monitoring stations
@@ -113,6 +114,7 @@ API keys are stored unencrypted in the current browser profile and sent directly
 | Alerts | [NWS API](https://www.weather.gov/documentation/services-web-api) | Real-time |
 | SPC Outlook | [SPC](https://www.spc.noaa.gov/) | Daily |
 | Storm Reports | SPC | As reported |
+| Storm tracks | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/geojson/nexrad_attr.py?help=) | ~1 minute |
 | Lightning | Iowa State Mesonet | ~5 minutes |
 | Satellite | GOES East (IEM) | ~15 minutes |
 | River Gauges | [USGS](https://waterservices.usgs.gov/) | Varies |

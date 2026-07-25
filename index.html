@@ -1828,6 +1828,11 @@
                         <span class="dot" style="background: var(--purple)"></span>
                         <span class="layer-name">Reports</span>
                     </div>
+                    <div class="layer-chip full-width" data-layer="stormTracks">
+                        <span class="dot" style="background: #22d3ee"></span>
+                        <span class="layer-name">Storm Tracks</span>
+                        <span class="badge live">LIVE</span>
+                    </div>
                     <div class="layer-chip" data-layer="hailMesh">
                         <span class="dot" style="background: #f97316"></span>
                         <span class="layer-name">Hail Size</span>
@@ -2460,6 +2465,7 @@
             
             // Storm Reports
             iemLSR: 'https://mesonet.agron.iastate.edu/geojson/lsr.geojson?recent=86400',
+            iemStormAttributes: 'https://mesonet.agron.iastate.edu/geojson/nexrad_attr.py',
             
             // Surface Observations
             surfaceObs: 'https://mesonet.agron.iastate.edu/geojson/network/AWOS.geojson',
@@ -2548,6 +2554,9 @@
         let meshWorkerSequence = 0;
         let meshLegendControl = null;
         let meshMaximumMm = 0;
+        let stormTrackToolsPromise = null;
+        let stormTrackHistoryHydrated = false;
+        const stormTrackHistory = new Map();
         const meshWorkerRequests = new Map();
         const level2WorkerRequests = new Map();
         const REQUEST_TIMEOUT_MS = 15000;
@@ -2614,7 +2623,11 @@
                 radarRange: 'Radar range',
                 automationCaution: 'Automated heuristic, not a warning. Confirm threats with official NWS products.',
                 hailSize: 'Estimated hail size',
-                meshCaution: 'Radar estimate, not a ground report or warning.'
+                meshCaution: 'Radar estimate, not a ground report or warning.',
+                stormMotion: 'Motion',
+                stormHistory: 'Observed history',
+                stormProjection: 'Projected path',
+                stormTrackCaution: 'Automated NEXRAD cell guidance, not an official warning.'
             },
             es: {
                 loading: 'Cargando...',
@@ -2657,7 +2670,11 @@
                 radarRange: 'Distancia del radar',
                 automationCaution: 'Heurística automatizada, no es una alerta. Confirma las amenazas con productos oficiales del NWS.',
                 hailSize: 'Tamaño estimado del granizo',
-                meshCaution: 'Estimación de radar; no es un reporte en tierra ni una alerta.'
+                meshCaution: 'Estimación de radar; no es un reporte en tierra ni una alerta.',
+                stormMotion: 'Movimiento',
+                stormHistory: 'Historial observado',
+                stormProjection: 'Trayectoria proyectada',
+                stormTrackCaution: 'Guía automatizada de celdas NEXRAD; no es una alerta oficial.'
             }
         };
         const SPANISH_EXACT_TEXT = {
@@ -2705,6 +2722,7 @@
             'Base Map': 'Mapa base',
             'Alerts': 'Alertas',
             'Reports': 'Informes',
+            'Storm Tracks': 'Trayectorias de tormentas',
             'Lightning': 'Rayos',
             'Satellite': 'Satélite',
             'Rivers': 'Ríos',
@@ -3310,7 +3328,7 @@
 
         const layerRefs = {
             // Weather
-            alerts: null, spcOutlook: null, stormReports: null, couplets: null, hailMesh: null,
+            alerts: null, spcOutlook: null, stormReports: null, stormTracks: null, couplets: null, hailMesh: null,
             lightning: null, satellite: null, satelliteIR: null, satelliteWV: null,
             satelliteGeoColor: null, satelliteSandwich: null, satelliteMesoscale: null,
             riverGauges: null, surfaceObs: null,
@@ -3358,7 +3376,7 @@
             borderOpacity: 0.6,
             layers: {
                 // Core weather
-                radar: true, alerts: true, spcOutlook: true, stormReports: false, couplets: true, hailMesh: false,
+                radar: true, alerts: true, spcOutlook: true, stormReports: false, stormTracks: false, couplets: true, hailMesh: false,
                 lightning: false, satellite: false, riverGauges: false, surfaceObs: false,
                 
                 // Model data (requires API)
@@ -5518,6 +5536,9 @@
                 case 'stormReports':
                     on ? loadStormReports() : removeLayer('stormReports');
                     break;
+                case 'stormTracks':
+                    on ? loadStormTracks() : removeLayer('stormTracks');
+                    break;
                 case 'hailMesh':
                     on ? loadHailMesh() : removeLayer('hailMesh');
                     break;
@@ -5645,7 +5666,8 @@
         function getLayerName(key) {
             const names = {
                 radar: 'Radar', alerts: 'NWS Alerts', spcOutlook: 'SPC Outlook',
-                stormReports: 'Storm Reports', hailMesh: 'MRMS Hail Size', lightning: 'Lightning', satellite: 'Satellite',
+                stormReports: 'Storm Reports', stormTracks: 'NEXRAD Storm Tracks',
+                hailMesh: 'MRMS Hail Size', lightning: 'Lightning', satellite: 'Satellite',
                 satelliteIR: 'Infrared Sat', satelliteWV: 'Water Vapor',
                 satelliteGeoColor: 'NOAA GeoColor', satelliteSandwich: 'IR Sandwich',
                 satelliteMesoscale: 'GOES Mesoscale Sectors',
@@ -5829,6 +5851,179 @@
                 console.error('Storm reports error:', e);
             } finally {
                 finishLayerRequest('stormReports', controller);
+            }
+        }
+
+        function stormTrackTools() {
+            if (!stormTrackToolsPromise) stormTrackToolsPromise = import('./src/storm-tracks.js');
+            return stormTrackToolsPromise;
+        }
+
+        async function fetchStormAttributes(signal, valid = null) {
+            const url = new URL(DATA_URLS.iemStormAttributes);
+            if (valid) url.searchParams.set('valid', valid);
+            const response = await fetchWithTimeout(url.toString(), { signal });
+            return response.json();
+        }
+
+        function stormCellsInView(payload, tools) {
+            const bounds = map.getBounds();
+            const center = map.getCenter();
+            const maxItems = Math.min(MAX_POINT_FEATURES, Math.max(100, (map.getZoom() - 3) * 100));
+            return featureList(payload, 3000)
+                .map(tools.normalizeStormFeature)
+                .filter(cell => cell && bounds.contains([cell.latitude, cell.longitude]))
+                .sort((left, right) => {
+                    const threatDifference = tools.stormThreatScore(right) - tools.stormThreatScore(left);
+                    if (threatDifference) return threatDifference;
+                    const leftDistance = Math.hypot(left.latitude - center.lat, left.longitude - center.lng);
+                    const rightDistance = Math.hypot(right.latitude - center.lat, right.longitude - center.lng);
+                    return leftDistance - rightDistance;
+                })
+                .slice(0, maxItems);
+        }
+
+        function stormMotionLabel(cell) {
+            if (settings.units === 'metric') {
+                return `${Math.round(cell.speedKnots * 1.852)} km/h at ${Math.round(cell.direction)}°`;
+            }
+            return `${Math.round(cell.speedKnots * 1.15078)} mph at ${Math.round(cell.direction)}°`;
+        }
+
+        function stormTopLabel(cell) {
+            if (settings.units === 'metric') return `${(cell.topKft * 0.3048).toFixed(1)} km`;
+            return `${cell.topKft.toFixed(1)} kft`;
+        }
+
+        function stormHailLabel(cell) {
+            if (settings.units === 'metric') return `${Math.round(cell.maxHailInches * 25.4)} mm`;
+            return `${cell.maxHailInches.toFixed(1)} in`;
+        }
+
+        function renderStormTracks(cells, tools) {
+            const group = L.layerGroup();
+            const renderer = L.svg({ padding: 0.5 });
+            group.addLayer(renderer);
+            for (const cell of cells) {
+                const color = tools.stormTrackColor(cell);
+                const history = stormTrackHistory.get(tools.stormCellKey(cell)) || [];
+                if (history.length > 1) {
+                    group.addLayer(L.polyline(
+                        history.map(point => [point.latitude, point.longitude]),
+                        {
+                            className: 'storm-track-history',
+                            color,
+                            weight: 3,
+                            opacity: 0.8,
+                            dashArray: '2 5',
+                            renderer
+                        }
+                    ));
+                }
+
+                if (cell.speedKnots > 0) {
+                    const projected30 = tools.projectStormCell(cell, 30);
+                    const projected60 = tools.projectStormCell(cell, 60);
+                    group.addLayer(L.polyline([
+                        [cell.latitude, cell.longitude],
+                        [projected30.latitude, projected30.longitude],
+                        [projected60.latitude, projected60.longitude]
+                    ], {
+                        className: 'storm-track-projection',
+                        color,
+                        weight: 2,
+                        opacity: 0.75,
+                        dashArray: '8 7',
+                        renderer
+                    }));
+                    for (const [minutes, projected] of [[30, projected30], [60, projected60]]) {
+                        group.addLayer(L.circleMarker([projected.latitude, projected.longitude], {
+                            className: 'storm-track-forecast-point',
+                            radius: 3,
+                            color,
+                            weight: 1,
+                            fillColor: color,
+                            fillOpacity: 0.65,
+                            renderer
+                        }).bindTooltip(`+${minutes}m`, { direction: 'top' }));
+                    }
+                }
+
+                const hasTvs = cell.tvs && cell.tvs !== 'NONE';
+                const hasMeso = cell.meso && cell.meso !== 'NONE' && cell.meso !== '0';
+                const marker = L.circleMarker([cell.latitude, cell.longitude], {
+                    className: 'storm-cell-marker',
+                    radius: Math.max(5, Math.min(10, 5 + Math.max(0, cell.maxDbz - 40) / 8)),
+                    color: '#ffffff',
+                    weight: 2,
+                    fillColor: color,
+                    fillOpacity: 0.9,
+                    renderer
+                });
+                marker.bindTooltip(`${cell.radar}-${cell.id}`, { direction: 'top' });
+                marker.bindPopup(`
+                    <div class="popup-content">
+                        <h4>Storm ${escapeHTML(cell.radar, 4)}-${escapeHTML(cell.id, 8)}</h4>
+                        ${hasTvs ? '<p><strong>TVS</strong></p>' : ''}
+                        ${hasMeso ? `<p><strong>Mesocyclone:</strong> ${escapeHTML(cell.meso, 16)}</p>` : ''}
+                        <p><strong>Max:</strong> ${Math.round(cell.maxDbz)} dBZ · <strong>Top:</strong> ${stormTopLabel(cell)}</p>
+                        <p><strong>${t('hailSize')}:</strong> ${stormHailLabel(cell)} · <strong>POSH:</strong> ${Math.round(cell.posh)}%</p>
+                        <p><strong>${t('stormMotion')}:</strong> ${escapeHTML(stormMotionLabel(cell), 40)}</p>
+                        <p><strong>${t('stormHistory')}:</strong> ${history.length} · <strong>${t('stormProjection')}:</strong> 30/60 min</p>
+                        <div class="meta">${escapeHTML(formatExternalDate(cell.valid))}<br>${escapeHTML(t('stormTrackCaution'), 160)}</div>
+                    </div>
+                `);
+                group.addLayer(marker);
+            }
+            layerRefs.stormTracks = group.addTo(map);
+            setLayerFeatureCount('stormTracks', cells.length);
+        }
+
+        async function loadStormTracks() {
+            removeLayer('stormTracks');
+            const controller = beginLayerRequest('stormTracks');
+            try {
+                const tools = await stormTrackTools();
+                const currentPayload = await fetchStormAttributes(controller.signal);
+                if (controller.signal.aborted || !settings.layers.stormTracks) return;
+                const cells = stormCellsInView(currentPayload, tools);
+                const latestCellTime = cells.reduce((latest, cell) => Math.max(latest, cell.valid), 0);
+                const referenceTime = latestCellTime || Date.now();
+
+                if (!stormTrackHistoryHydrated && cells.length) {
+                    const currentKeys = new Set(cells.map(tools.stormCellKey));
+                    const baseTime = Number.isFinite(new Date(currentPayload.generated_at).getTime())
+                        ? new Date(currentPayload.generated_at).getTime()
+                        : referenceTime;
+                    const snapshots = await Promise.all([45, 30, 15].map(async minutes => {
+                        const valid = new Date(baseTime - minutes * 60 * 1000).toISOString();
+                        try {
+                            return await fetchStormAttributes(controller.signal, valid);
+                        } catch (error) {
+                            if (error?.name === 'AbortError') throw error;
+                            console.warn(`Storm history snapshot ${minutes}m unavailable:`, error);
+                            return null;
+                        }
+                    }));
+                    for (const snapshot of snapshots) {
+                        const historicalCells = featureList(snapshot, 3000)
+                            .map(tools.normalizeStormFeature)
+                            .filter(cell => cell && currentKeys.has(tools.stormCellKey(cell)));
+                        tools.mergeStormHistory(stormTrackHistory, historicalCells, referenceTime);
+                    }
+                    stormTrackHistoryHydrated = true;
+                }
+
+                tools.mergeStormHistory(stormTrackHistory, cells, referenceTime);
+                if (controller.signal.aborted || !settings.layers.stormTracks) return;
+                renderStormTracks(cells, tools);
+            } catch (error) {
+                if (error?.name === 'AbortError') return;
+                console.error('Storm tracks error:', error);
+                setLayerFeatureCount('stormTracks', 0);
+                showToast('Storm tracks are temporarily unavailable', 'error');
+            } finally {
+                finishLayerRequest('stormTracks', controller);
             }
         }
 
@@ -7124,6 +7319,7 @@
                 if (settings.layers.alerts) loadAlerts();
                 if (settings.layers.spcOutlook) loadSPCOutlook();
                 if (settings.layers.stormReports) loadStormReports();
+                if (settings.layers.stormTracks) loadStormTracks();
                 if (settings.layers.hailMesh) loadHailMesh();
                 if (settings.layers.satellite) loadSatelliteLayer('visible');
                 if (settings.layers.satelliteIR) loadSatelliteLayer('ir');
@@ -7673,6 +7869,7 @@
                 if (settings.autoRefresh && !isPlaying && !document.hidden) {
                     loadRadarData();
                     if (settings.layers.alerts) loadAlerts();
+                    if (settings.layers.stormTracks) loadStormTracks();
                 }
             }, 5 * 60 * 1000);
             
@@ -7697,6 +7894,7 @@
                         showToast('Refreshing stale data...', 'info', 2000);
                         loadRadarData();
                         if (settings.layers.alerts) loadAlerts();
+                        if (settings.layers.stormTracks) loadStormTracks();
                     }
                 }
             });
