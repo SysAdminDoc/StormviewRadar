@@ -102,6 +102,8 @@ Required for temperature, wind, clouds, and pressure layers.
 | Satellite | GOES East (IEM) | ~15 minutes |
 | River Gauges | [USGS](https://waterservices.usgs.gov/) | Varies |
 
+Location searches use the public [Nominatim](https://nominatim.openstreetmap.org/) service. Requests are limited to one per second, include the project contact address required by the service policy, and are not stored in StormView search history.
+
 ## Browser Support
 
 - Chrome 80+
