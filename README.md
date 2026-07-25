@@ -21,6 +21,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Smooth Animation** — Play, pause, and step through radar frames with customizable speed (0.5x–3x)
 - **Model Forecast** — View HRRR reflectivity guidance through 18 hours
 - **RainViewer History** — Animate approximately two hours of past global radar using the provider's Universal Blue palette (native zoom 7)
+- **Provider-Time Timeline** — Show model initialization, valid time, forecast lead, data age, timezone, and source coverage without substituting the client clock
 - **Adjustable Opacity** — Fine-tune radar transparency for optimal map visibility
 - **Smart Tile Caching** — Optimized loading with rate limit protection
 

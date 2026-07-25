@@ -941,7 +941,10 @@
         .status-chip .dot.red { background: var(--danger); }
         .status-chip[data-state="current"] .dot,
         .status-chip[data-state="stale"] .dot,
-        .status-chip[data-state="error"] .dot { animation: none; }
+        .status-chip[data-state="error"] .dot,
+        .status-chip[data-state="inside"] .dot,
+        .status-chip[data-state="outside"] .dot,
+        .status-chip[data-state="global"] .dot { animation: none; }
 
         @keyframes pulse {
             0%, 100% { opacity: 0.4; transform: scale(0.8); }
@@ -2017,6 +2020,7 @@
     <div class="status-bar">
         <div class="status-chip" id="tileStatus"><span class="dot blue"></span><span id="tileStatusText">Caching...</span></div>
         <button class="status-chip" id="dataStatus" type="button" aria-live="polite"><span class="dot green"></span><span id="dataStatusText">Data loaded</span></button>
+        <div class="status-chip show" id="coverageStatus" aria-live="polite"><span class="dot green"></span><span id="coverageStatusText">Coverage loading…</span></div>
     </div>
 
     <!-- Location Button -->
@@ -2278,6 +2282,8 @@
             
             // HRRR Model Metadata
             hrrrLatest: 'https://mesonet.agron.iastate.edu/data/gis/images/4326/hrrr/refd_1080.json',
+            mrmsLatest: 'https://mesonet.agron.iastate.edu/data/gis/images/4326/USCOMP/n0q_0.json',
+            nowcoastCapabilities: 'https://nowcoast.noaa.gov/geoserver/observations/weather_radar/ows?service=WMS&version=1.3.0&request=GetCapabilities',
             
             // Aviation - use NWS API (CORS-friendly) instead of aviationweather.gov
             pireps: 'https://api.weather.gov/alerts/active?event=SIGMET,Convective%20SIGMET',
@@ -2373,6 +2379,12 @@
         function formatExternalDate(value, fallback = 'Unknown') {
             const date = new Date(value);
             return Number.isFinite(date.getTime()) ? date.toLocaleString() : fallback;
+        }
+
+        function providerEpochSeconds(value, provider) {
+            const timestamp = new Date(value).getTime();
+            if (!Number.isFinite(timestamp)) throw new Error(`${provider} did not provide a valid timestamp`);
+            return timestamp / 1000;
         }
 
         function featureList(payload, maxItems = 3000) {
@@ -2639,22 +2651,30 @@
             hrrr: {
                 label: 'HRRR',
                 products: ['reflectivity'],
-                note: 'Forecast model: analysis plus hourly guidance through +18 hours.'
+                note: 'Analysis plus hourly forecast guidance through +18 hours.',
+                animation: true,
+                coverage: { label: 'CONUS', bounds: [-125, 24, -66, 50] }
             },
             rainviewer: {
                 label: 'RainViewer',
                 products: ['reflectivity'],
-                note: 'Past radar only: approximately 2 hours, Universal Blue palette, native zoom 7.'
+                note: 'Past radar only: approximately 2 hours, Universal Blue palette, native zoom 7.',
+                animation: true,
+                coverage: { label: 'Global' }
             },
             mrms: {
                 label: 'MRMS',
                 products: ['reflectivity', 'velocity', 'echoTops', 'precipAccum'],
-                note: 'Latest US radar products from Iowa Environmental Mesonet.'
+                note: 'Latest US radar products from Iowa Environmental Mesonet.',
+                animation: false,
+                coverage: { label: 'CONUS', bounds: [-125, 24, -66, 50] }
             },
             nowcoast: {
                 label: 'NOAA WMS',
                 products: ['reflectivity'],
-                note: 'Latest NOAA nowCOAST radar mosaic; single frame.'
+                note: 'Latest NOAA nowCOAST CONUS radar mosaic; single frame.',
+                animation: false,
+                coverage: { label: 'CONUS', bounds: [-125, 24, -66, 50] }
             }
         });
 
@@ -2742,6 +2762,8 @@
             map.getPane('markerPane').style.zIndex = 500;
             
             setBasemap(settings.basemap);
+            map.on('moveend', updateCoverageStatus);
+            updateCoverageStatus();
         }
 
         function setBasemap(id) {
@@ -3147,6 +3169,33 @@
             // Continental US bounding box with some buffer
             return center.lat > 23 && center.lat < 50 && center.lng > -128 && center.lng < -64;
         }
+
+        function updateCoverageStatus() {
+            if (!map) return;
+            const capability = RADAR_CAPABILITIES[settings.source] || RADAR_CAPABILITIES.mrms;
+            const chip = document.getElementById('coverageStatus');
+            const text = document.getElementById('coverageStatusText');
+            const dot = chip?.querySelector('.dot');
+            if (!chip || !text || !dot) return;
+
+            const coverage = capability.coverage;
+            let state = 'global';
+            let message = `${capability.label}: global coverage`;
+            if (coverage?.bounds) {
+                const [west, south, east, north] = coverage.bounds;
+                const center = map.getCenter();
+                const inside = center.lng >= west && center.lng <= east && center.lat >= south && center.lat <= north;
+                state = inside ? 'inside' : 'outside';
+                message = inside
+                    ? `${capability.label}: ${coverage.label} coverage`
+                    : `${capability.label}: outside ${coverage.label} coverage`;
+            }
+
+            chip.dataset.state = state;
+            dot.className = `dot ${state === 'outside' ? 'yellow' : 'green'}`;
+            text.textContent = message;
+            document.body.classList.toggle('outside-radar-coverage', state === 'outside');
+        }
         
         // Gentle refresh of MRMS layer - only if not rate limited
         function refreshMRMSLayer() {
@@ -3294,7 +3343,11 @@
             ensureCurrentRadarLoad(generation, signal);
 
             frames = Array.isArray(rainviewerData.radar?.past)
-                ? rainviewerData.radar.past.map(frame => ({ ...frame, kind: 'past' }))
+                ? rainviewerData.radar.past.map(frame => ({
+                    ...frame,
+                    kind: 'past',
+                    timeSource: 'RainViewer weather maps metadata'
+                }))
                 : [];
             if (!frames.length || typeof rainviewerData.host !== 'string') {
                 throw new Error('RainViewer returned no supported past radar frames');
@@ -3378,7 +3431,7 @@
             hideLoadProgress();
             updateLegend();
             // Auto-play if source supports animation
-            if (settings.source !== 'mrms' && settings.source !== 'nowcoast' && frames.length > 1) {
+            if (RADAR_CAPABILITIES[settings.source]?.animation && frames.length > 1) {
                 play();
             }
         }
@@ -3396,6 +3449,11 @@
             } else if (settings.radarProduct === 'precipAccum') {
                 productUrl = RADAR_PRODUCTS.n1p;
             }
+
+            const metaResp = await fetchWithTimeout(DATA_URLS.mrmsLatest, { signal });
+            const metadata = await metaResp.json();
+            const validTime = providerEpochSeconds(metadata?.meta?.valid, 'IEM radar metadata');
+            ensureCurrentRadarLoad(generation, signal);
             
             const layer = L.tileLayer.cached(productUrl, {
                 opacity: settings.opacity,
@@ -3412,10 +3470,16 @@
             frameLayers.push(layer);
             ensureCurrentRadarLoad(generation, signal);
             
-            frames = [{ time: Date.now() / 1000, path: 'mrms' }];
+            frames = [{
+                time: validTime,
+                path: 'mrms',
+                kind: 'latest',
+                timeSource: 'IEM US composite metadata'
+            }];
             lastPastFrame = 0;
             currentFrame = 0;
             framesReady = true;
+            lastRefreshTime = Date.now();
             updateTimestamp();
             updateTimelineUI();
             hideLoadProgress();
@@ -3425,12 +3489,23 @@
         async function loadNowCOAST(signal, generation) {
             ensureCurrentRadarLoad(generation, signal);
             clearAllFrameLayers();
+
+            const capabilitiesResp = await fetchWithTimeout(DATA_URLS.nowcoastCapabilities, { signal });
+            const capabilitiesXml = await capabilitiesResp.text();
+            const capabilitiesDoc = new DOMParser().parseFromString(capabilitiesXml, 'application/xml');
+            const conusLayer = [...capabilitiesDoc.querySelectorAll('Layer')].find(layer =>
+                layer.querySelector(':scope > Name')?.textContent === 'conus_base_reflectivity_mosaic'
+            );
+            const validIso = conusLayer?.querySelector(':scope > Dimension[name="time"]')?.getAttribute('default');
+            const validTime = providerEpochSeconds(validIso, 'NOAA nowCOAST');
+            ensureCurrentRadarLoad(generation, signal);
             
             const layer = L.tileLayer.wms('https://nowcoast.noaa.gov/geoserver/observations/weather_radar/ows', {
-                layers: 'weather_radar',
+                layers: 'conus_base_reflectivity_mosaic',
                 format: 'image/png',
                 transparent: true,
                 version: '1.3.0',
+                time: new Date(validTime * 1000).toISOString(),
                 crs: L.CRS.EPSG3857,
                 opacity: settings.opacity,
                 pane: 'radarPane',
@@ -3445,7 +3520,12 @@
             frameLayers.push(layer);
             ensureCurrentRadarLoad(generation, signal);
             
-            frames = [{ time: Date.now() / 1000, path: 'nowcoast' }];
+            frames = [{
+                time: validTime,
+                path: 'nowcoast',
+                kind: 'latest',
+                timeSource: 'NOAA nowCOAST capabilities'
+            }];
             lastPastFrame = 0;
             currentFrame = 0;
             framesReady = true;
@@ -3465,30 +3545,29 @@
                 const metaResp = await fetchWithTimeout(DATA_URLS.hrrrLatest, { signal });
                 const meta = await metaResp.json();
                 ensureCurrentRadarLoad(generation, signal);
-                // Convert ISO time to YYYYMMDDHHMM format for tile URL
-                if (meta.model_init_utc) {
-                    const d = new Date(meta.model_init_utc);
-                    hrrrInitTime = d.getUTCFullYear().toString() +
-                        String(d.getUTCMonth() + 1).padStart(2, '0') +
-                        String(d.getUTCDate()).padStart(2, '0') +
-                        String(d.getUTCHours()).padStart(2, '0') +
-                        String(d.getUTCMinutes()).padStart(2, '0');
-                } else {
-                    hrrrInitTime = 0; // Use 0 for "latest"
-                }
+                const modelInitEpoch = providerEpochSeconds(meta.model_init_utc, 'HRRR metadata');
+                const d = new Date(modelInitEpoch * 1000);
+                hrrrInitTime = d.getUTCFullYear().toString() +
+                    String(d.getUTCMonth() + 1).padStart(2, '0') +
+                    String(d.getUTCDate()).padStart(2, '0') +
+                    String(d.getUTCHours()).padStart(2, '0') +
+                    String(d.getUTCMinutes()).padStart(2, '0');
                 
-                // Build frames for forecast hours (every 15 min for 18 hours = 72 frames)
-                // We'll do every hour for simplicity (18 frames)
+                const maxForecastMinute = Math.min(1080, Math.max(0, Number(meta.forecast_minute) || 1080));
                 frames = [];
                 hrrrFrames = [];
                 
-                // Create frames for each hour (0-18)
-                for (let hour = 0; hour <= 18; hour++) {
+                // Provider metadata identifies the model run; valid time is initialization plus lead time.
+                for (let hour = 0; hour <= Math.floor(maxForecastMinute / 60); hour++) {
                     const mins = hour * 60;
                     frames.push({
-                        time: (Date.now() / 1000) + (hour * 3600),
+                        time: modelInitEpoch + (hour * 3600),
                         mins: mins,
-                        isForecast: hour > 0
+                        isForecast: hour > 0,
+                        kind: hour > 0 ? 'forecast' : 'analysis',
+                        modelInitTime: modelInitEpoch,
+                        forecastHour: hour,
+                        timeSource: 'IEM HRRR metadata'
                     });
                 }
                 
@@ -4672,12 +4751,8 @@
         function updatePlaybackVisibility() {
             const playback = document.getElementById('playback');
             if (!playback) return;
-            // MRMS and nowCOAST are single-frame with no animation support
-            if (settings.source === 'mrms' || settings.source === 'nowcoast') {
-                playback.style.display = 'none';
-            } else {
-                playback.style.display = '';
-            }
+            const capability = RADAR_CAPABILITIES[settings.source] || RADAR_CAPABILITIES.mrms;
+            playback.style.display = capability.animation ? '' : 'none';
         }
 
         function updateTimestamp() {
@@ -4685,6 +4760,10 @@
             if (!frame) return;
 
             const date = new Date(frame.time * 1000);
+            if (!Number.isFinite(date.getTime())) {
+                setProviderStatus('error', `${RADAR_CAPABILITIES[settings.source].label}: invalid provider time`, loadRadarData);
+                return;
+            }
             let timeStr;
             
             const formatOpts = { 
@@ -4697,58 +4776,79 @@
 
             if (settings.useLocalTime) {
                 timeStr = date.toLocaleString('en-US', formatOpts);
+                const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
                 document.getElementById('timestampTz').textContent = 'Local Time';
+                document.getElementById('timestampTz').title = localZone;
             } else {
                 timeStr = date.toLocaleString('en-US', { ...formatOpts, timeZone: 'UTC' });
                 document.getElementById('timestampTz').textContent = 'UTC';
+                document.getElementById('timestampTz').title = 'Coordinated Universal Time';
             }
 
             const isForecast = frame.isForecast === true;
-            const frameKind = isForecast
-                ? 'Forecast'
-                : (frame.kind === 'past' ? 'Past' : (settings.source === 'hrrr' ? 'Analysis' : 'Latest'));
+            const frameKinds = { forecast: 'Forecast', analysis: 'Analysis', past: 'Past', latest: 'Latest' };
+            const frameKind = frameKinds[frame.kind] || (isForecast ? 'Forecast' : 'Latest');
             document.getElementById('timestampText').textContent = `${timeStr} (${frameKind})`;
-            document.getElementById('timestampBox').classList.toggle('forecast', isForecast);
+            const timestampBox = document.getElementById('timestampBox');
+            timestampBox.classList.toggle('forecast', isForecast);
+            timestampBox.dataset.providerTime = date.toISOString();
+            timestampBox.dataset.kind = frame.kind || frameKind.toLowerCase();
+            timestampBox.dataset.source = settings.source;
+            timestampBox.dataset.modelInit = frame.modelInitTime
+                ? new Date(frame.modelInitTime * 1000).toISOString()
+                : '';
             
             // Update frame indicator
-            updateFrameIndicator(isForecast);
+            updateFrameIndicator(isForecast, frameKind);
             
             // Update mobile timestamp
             updateMobileTimestamp(timeStr, isForecast, frameKind);
         }
         
-        function updateFrameIndicator(isForecast) {
+        function formatProviderAge(frame) {
+            const deltaSeconds = Math.round((Date.now() - frame.time * 1000) / 1000);
+            const absoluteMinutes = Math.max(0, Math.round(Math.abs(deltaSeconds) / 60));
+            if (deltaSeconds < -60) {
+                if (absoluteMinutes < 60) return `Valid in ${absoluteMinutes}m`;
+                return `Valid in ${Math.round(absoluteMinutes / 60)}h`;
+            }
+            if (absoluteMinutes < 1) return 'Provider time: just now';
+            if (absoluteMinutes < 60) return `${absoluteMinutes}m old`;
+            return `${Math.round(absoluteMinutes / 60)}h old`;
+        }
+
+        function updateFrameIndicator(isForecast, frameKind) {
             const sourceEl = document.getElementById('fiSource');
             const frameEl = document.getElementById('fiFrame');
+            const frame = frames[currentFrame];
             
-            if (!sourceEl || !frameEl) return;
+            if (!sourceEl || !frameEl || !frame) return;
             
-            // Source label
-            const sourceNames = { hrrr: 'HRRR', rainviewer: 'RainViewer', mrms: 'MRMS', nowcoast: 'NOAA WMS' };
-            sourceEl.textContent = sourceNames[settings.source] || settings.source;
+            sourceEl.textContent = RADAR_CAPABILITIES[settings.source]?.label || settings.source;
             sourceEl.classList.toggle('forecast', isForecast);
             
-            // Frame info
-            if (settings.source === 'mrms' || settings.source === 'nowcoast') {
-                frameEl.textContent = 'Real-time';
-            } else if (settings.source === 'hrrr') {
-                const hour = frames[currentFrame]?.mins ? Math.round(frames[currentFrame].mins / 60) : currentFrame;
+            if (settings.source === 'hrrr') {
+                const hour = frame.forecastHour || 0;
                 if (hour === 0) {
-                    frameEl.textContent = 'Analysis (Now)';
+                    frameEl.textContent = `Analysis • ${formatProviderAge(frame)} • 1/${frames.length}`;
                 } else {
-                    frameEl.textContent = `+${hour}hr Forecast  \u2022  ${currentFrame + 1}/${frames.length}`;
+                    frameEl.textContent = `F${String(hour).padStart(2, '0')} Forecast • ${formatProviderAge(frame)} • ${currentFrame + 1}/${frames.length}`;
                 }
+                frameEl.title = `Model initialized ${new Date(frame.modelInitTime * 1000).toISOString()}`;
+            } else if (!RADAR_CAPABILITIES[settings.source]?.animation) {
+                frameEl.textContent = `${frameKind} • ${formatProviderAge(frame)}`;
+                frameEl.title = frame.timeSource || '';
             } else {
-                frameEl.textContent = `Frame ${currentFrame + 1} of ${frames.length}`;
+                frameEl.textContent = `${frameKind} • ${formatProviderAge(frame)} • ${currentFrame + 1}/${frames.length}`;
+                frameEl.title = frame.timeSource || '';
             }
             
-            // Last refreshed
             const refreshEl = document.getElementById('fiRefreshed');
             if (refreshEl && lastRefreshTime) {
                 const ago = Math.round((Date.now() - lastRefreshTime) / 60000);
-                if (ago < 1) refreshEl.textContent = 'Updated just now';
-                else if (ago === 1) refreshEl.textContent = 'Updated 1 min ago';
-                else refreshEl.textContent = `Updated ${ago}m ago`;
+                if (ago < 1) refreshEl.textContent = 'Fetched just now';
+                else if (ago === 1) refreshEl.textContent = 'Fetched 1 min ago';
+                else refreshEl.textContent = `Fetched ${ago}m ago`;
             }
         }
         
@@ -4777,8 +4877,9 @@
         }
 
         function updateTimelineUI() {
-            if (lastPastFrame < frames.length - 1) {
-                const start = ((lastPastFrame + 1) / frames.length) * 100;
+            const forecastStart = frames.findIndex(frame => frame.isForecast === true);
+            if (forecastStart >= 0) {
+                const start = (forecastStart / frames.length) * 100;
                 document.getElementById('timelineForecast').style.width = (100 - start) + '%';
             } else {
                 document.getElementById('timelineForecast').style.width = '0';
@@ -5446,8 +5547,9 @@
             });
 
             document.querySelectorAll('.source-capability-note').forEach(note => {
-                note.textContent = capability.note;
+                note.textContent = `${capability.note} Coverage: ${capability.coverage.label}.`;
             });
+            updateCoverageStatus();
         }
 
         function initUI() {
