@@ -771,6 +771,34 @@
             padding: 20px;
         }
 
+        .diagnostics-grid {
+            display: grid;
+            gap: 8px;
+        }
+        .diagnostic-row {
+            display: grid;
+            grid-template-columns: minmax(90px, 0.8fr) minmax(0, 1.4fr);
+            gap: 12px;
+            padding: 9px 0;
+            border-bottom: 1px solid var(--glass-border);
+            font-size: 12px;
+        }
+        .diagnostic-row dt { color: var(--text-muted); }
+        .diagnostic-row dd { color: var(--text); overflow-wrap: anywhere; text-align: right; }
+        .diagnostic-requests {
+            display: grid;
+            gap: 8px;
+            font-size: 11px;
+        }
+        .diagnostic-request {
+            padding: 9px 10px;
+            border-radius: 8px;
+            background: var(--glass-hover);
+            overflow-wrap: anywhere;
+        }
+        .diagnostic-request strong { display: block; color: var(--text); margin-bottom: 3px; }
+        .diagnostic-request span { color: var(--text-muted); }
+
         .settings-section { margin-bottom: 24px; }
         .settings-section:last-child { margin-bottom: 0; }
         .settings-section-title {
@@ -2088,7 +2116,8 @@
         <div class="settings-tabs">
             <button class="settings-tab active" data-tab="display">Display</button>
             <button class="settings-tab" data-tab="radar">Radar</button>
-            <button class="settings-tab" data-tab="api">API Keys</button>
+            <button class="settings-tab" data-tab="api">APIs</button>
+            <button class="settings-tab" data-tab="diagnostics">Status</button>
         </div>
         <div class="settings-content">
             <!-- Display Tab -->
@@ -2218,6 +2247,29 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                     Save API Keys
                 </button>
+            </div>
+            <!-- Diagnostics Tab -->
+            <div class="settings-tab-content" data-tab-content="diagnostics" style="display:none;">
+                <div class="settings-section">
+                    <div class="settings-section-title">Radar &amp; Freshness</div>
+                    <dl class="diagnostics-grid">
+                        <div class="diagnostic-row"><dt>Provider / product</dt><dd id="diagProvider">Loading…</dd></div>
+                        <div class="diagnostic-row"><dt>Result</dt><dd id="diagState">Loading…</dd></div>
+                        <div class="diagnostic-row"><dt>Valid time / age</dt><dd id="diagFreshness">Loading…</dd></div>
+                        <div class="diagnostic-row"><dt>Coverage</dt><dd id="diagCoverage">Loading…</dd></div>
+                        <div class="diagnostic-row"><dt>Resources</dt><dd id="diagResources">Loading…</dd></div>
+                        <div class="diagnostic-row"><dt>Retry / backoff</dt><dd id="diagRetry">Loading…</dd></div>
+                    </dl>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-section-title">Redacted Request Results</div>
+                    <div class="diagnostic-requests" id="diagRequests" aria-live="polite"></div>
+                </div>
+                <p class="setting-hint" role="note">Reports omit API keys, query strings, bookmarks, and precise coordinates.</p>
+                <div class="btn-row" style="margin-top:12px;">
+                    <button class="btn" id="copyDiagnosticsBtn">Copy report</button>
+                    <button class="btn" id="retryDiagnosticsBtn">Retry radar</button>
+                </div>
             </div>
         </div>
     </div>
@@ -2403,6 +2455,116 @@
         const SETTINGS_STORAGE_KEY = 'stormview_settings';
         const LEGACY_SETTINGS_KEYS = ['stormview_pro_v3'];
         let activeDialog = null;
+        const diagnosticsState = {
+            provider: { state: 'loading', message: 'Starting radar provider', updatedAt: null, retryable: false },
+            requests: [],
+            layerCounts: {}
+        };
+
+        function redactedEndpoint(input) {
+            try {
+                const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+                const path = url.pathname.replace(
+                    /-?\d{1,3}(?:\.\d+)?(?:,|%2C)-?\d{1,3}(?:\.\d+)?/gi,
+                    '[coordinates]'
+                );
+                return `${url.origin}${path}`;
+            } catch {
+                return 'invalid request endpoint';
+            }
+        }
+
+        function recordRequestDiagnostic(input, startedAt, result, status = null) {
+            diagnosticsState.requests.unshift({
+                endpoint: redactedEndpoint(input),
+                startedAt: new Date(startedAt).toISOString(),
+                durationMs: Math.max(0, Date.now() - startedAt),
+                result: safeText(result, 80),
+                status: Number.isInteger(status) ? status : null
+            });
+            diagnosticsState.requests = diagnosticsState.requests.slice(0, 12);
+            renderDiagnostics();
+        }
+
+        function diagnosticAge(validAt) {
+            if (!validAt) return 'No provider timestamp';
+            const minutes = Math.round((Date.now() - new Date(validAt).getTime()) / 60000);
+            if (!Number.isFinite(minutes)) return 'Invalid provider timestamp';
+            if (minutes < 0) return `${Math.abs(minutes)} min in the future`;
+            return `${minutes} min old`;
+        }
+
+        function diagnosticsSnapshot() {
+            const capability = RADAR_CAPABILITIES[settings.source] || RADAR_CAPABILITIES.mrms;
+            const frame = frames[currentFrame];
+            const validAt = frame?.time ? new Date(frame.time * 1000).toISOString() : null;
+            return {
+                generatedAt: new Date().toISOString(),
+                radar: {
+                    provider: capability.label,
+                    source: settings.source,
+                    product: settings.radarProduct,
+                    state: diagnosticsState.provider.state,
+                    message: diagnosticsState.provider.message,
+                    statusUpdatedAt: diagnosticsState.provider.updatedAt,
+                    validAt,
+                    age: diagnosticAge(validAt),
+                    coverage: document.getElementById('coverageStatusText')?.textContent || capability.coverage.label,
+                    refreshCompletedAt: lastRefreshTime ? new Date(lastRefreshTime).toISOString() : null,
+                    frames: {
+                        current: frames.length ? currentFrame + 1 : 0,
+                        total: frames.length,
+                        loaded: framesLoaded || frameLayers.filter(Boolean).length
+                    },
+                    retryable: diagnosticsState.provider.retryable,
+                    retryBackoffMs: rateLimiter.backoffMs
+                },
+                resources: {
+                    activeRequests: activeRequests.size,
+                    activeLayerRequests: layerRequests.size,
+                    featureCounts: { ...diagnosticsState.layerCounts }
+                },
+                requests: diagnosticsState.requests.map(request => ({ ...request }))
+            };
+        }
+
+        function renderDiagnostics() {
+            const providerElement = document.getElementById('diagProvider');
+            if (!providerElement || typeof settings === 'undefined' || typeof rateLimiter === 'undefined') return;
+            const report = diagnosticsSnapshot();
+            const product = report.radar.product || 'reflectivity';
+            providerElement.textContent = `${report.radar.provider} / ${product}`;
+            document.getElementById('diagState').textContent = `${report.radar.state}: ${report.radar.message}`;
+            document.getElementById('diagFreshness').textContent = report.radar.validAt
+                ? `${new Date(report.radar.validAt).toLocaleString()} · ${report.radar.age}`
+                : report.radar.age;
+            document.getElementById('diagCoverage').textContent = report.radar.coverage;
+            const featureTotal = Object.values(report.resources.featureCounts).reduce((sum, value) => sum + value, 0);
+            document.getElementById('diagResources').textContent =
+                `${report.radar.frames.loaded}/${report.radar.frames.total} frames · ${featureTotal} features · ${report.resources.activeRequests} requests`;
+            document.getElementById('diagRetry').textContent =
+                `${report.radar.retryable ? 'Retry available' : 'No retry pending'} · ${report.radar.retryBackoffMs} ms tile backoff`;
+
+            const requestList = document.getElementById('diagRequests');
+            requestList.replaceChildren();
+            if (!report.requests.length) {
+                const empty = document.createElement('p');
+                empty.className = 'setting-hint';
+                empty.textContent = 'No provider requests recorded yet.';
+                requestList.append(empty);
+                return;
+            }
+            report.requests.forEach(request => {
+                const row = document.createElement('div');
+                row.className = 'diagnostic-request';
+                const endpoint = document.createElement('strong');
+                endpoint.textContent = request.endpoint;
+                const detail = document.createElement('span');
+                detail.textContent = `${request.result}${request.status ? ` (${request.status})` : ''} · ${request.durationMs} ms · ${new Date(request.startedAt).toLocaleTimeString()}`;
+                row.append(endpoint, detail);
+                requestList.append(row);
+            });
+        }
 
         function focusableElements(container) {
             return [...container.querySelectorAll(
@@ -2694,6 +2856,9 @@
         async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
             const controller = new AbortController();
             const requestKey = typeof input === 'string' ? input : input.url;
+            const startedAt = Date.now();
+            let diagnosticResult = 'cancelled';
+            let diagnosticStatus = null;
             activeRequests.get(requestKey)?.abort(new DOMException('Superseded request', 'AbortError'));
             activeRequests.set(requestKey, controller);
             const callerSignal = init.signal;
@@ -2707,14 +2872,21 @@
 
             try {
                 const response = await window.fetch(input, { ...init, signal: controller.signal });
+                diagnosticStatus = response.status;
                 if (!response.ok) {
+                    diagnosticResult = 'HTTP error';
                     throw new Error(`HTTP ${response.status} ${response.statusText || 'request failed'}`);
                 }
+                diagnosticResult = 'success';
                 return response;
+            } catch (error) {
+                diagnosticResult = error?.name === 'AbortError' ? 'cancelled' : safeText(error?.message || 'request failed', 80);
+                throw error;
             } finally {
                 clearTimeout(timeoutId);
                 callerSignal?.removeEventListener('abort', abortFromCaller);
                 if (activeRequests.get(requestKey) === controller) activeRequests.delete(requestKey);
+                recordRequestDiagnostic(input, startedAt, diagnosticResult, diagnosticStatus);
             }
         }
 
@@ -4504,9 +4676,11 @@
         }
 
         function setLayerFeatureCount(name, count) {
+            diagnosticsState.layerCounts[name] = Math.max(0, Number(count) || 0);
             document.querySelectorAll(`[data-layer="${name}"]`).forEach(element => {
-                element.dataset.featureCount = String(Math.max(0, Number(count) || 0));
+                element.dataset.featureCount = String(diagnosticsState.layerCounts[name]);
             });
+            renderDiagnostics();
         }
 
         function getLayerName(key) {
@@ -5196,6 +5370,13 @@
             el.classList.toggle('retryable', typeof retry === 'function');
             el.title = retry ? `${message}. Activate to retry.` : message;
             el.onclick = typeof retry === 'function' ? retry : null;
+            diagnosticsState.provider = {
+                state,
+                message: safeText(message, 160),
+                updatedAt: new Date().toISOString(),
+                retryable: typeof retry === 'function'
+            };
+            renderDiagnostics();
         }
 
         function showDataStatus(msg) {
@@ -5996,7 +6177,22 @@
                     document.querySelectorAll('.settings-tab-content').forEach(c => c.style.display = 'none');
                     tab.classList.add('active');
                     document.querySelector(`[data-tab-content="${tab.dataset.tab}"]`).style.display = 'block';
+                    if (tab.dataset.tab === 'diagnostics') renderDiagnostics();
                 });
+            });
+
+            document.getElementById('copyDiagnosticsBtn').addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(JSON.stringify(diagnosticsSnapshot(), null, 2));
+                    showToast('Redacted diagnostics copied', 'success', 2500);
+                } catch {
+                    showToast('Clipboard access was denied; use a secure browser context', 'error', 4500);
+                }
+            });
+            document.getElementById('retryDiagnosticsBtn').addEventListener('click', () => {
+                const status = document.getElementById('dataStatus');
+                if (diagnosticsState.provider.retryable) status.click();
+                else loadRadarData();
             });
 
             // Display settings

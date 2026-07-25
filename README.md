@@ -55,6 +55,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Keyboard Shortcuts** — Quick controls for power users
 - **Versioned Settings** — Validated preferences migrate forward in browser storage
 - **Import/Export** — Backup and restore configuration without exporting API keys
+- **Redacted Diagnostics** — Inspect provider freshness, fallback, coverage, resource counts, retry state, and request results without copying secrets or precise coordinates
 
 ## Quick Start
 
