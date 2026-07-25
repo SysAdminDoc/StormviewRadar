@@ -15,3 +15,8 @@ AGENTS.md
 .ai/
 PROJECT_CONTEXT.md
 CONTINUATION_PROMPT.md
+
+# Local test artifacts
+node_modules/
+test-results/
+playwright-report/

@@ -9,6 +9,8 @@ All notable changes to StormviewRadar will be documented in this file.
 - Clarified analysis, forecast, past, and latest timestamps.
 - Added cancellable, time-bounded HTTP requests with status validation and stale-response protection.
 - Added persistent provider health states, retry actions, MRMS fallback status, and last-good radar restoration.
+- Hardened provider popups, search, toasts, bookmarks, WebSocket data, and forecast alerts against HTML injection.
+- Added bounded settings/bookmark validation and deterministic Playwright security tests in CI.
 
 ## [v0.1.0] - %Y->- (HEAD -> main, origin/main, origin/HEAD)
 

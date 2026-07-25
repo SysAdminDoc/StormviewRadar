@@ -2300,6 +2300,86 @@
         let radarAbortController = null;
         const REQUEST_TIMEOUT_MS = 15000;
         const activeRequests = new Map();
+        const MAX_SETTINGS_BYTES = 32768;
+
+        function safeText(value, maxLength = 500) {
+            if (value === null || value === undefined) return '';
+            return String(value).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').slice(0, maxLength);
+        }
+
+        function escapeHTML(value, maxLength = 500) {
+            return safeText(value, maxLength).replace(/[&<>"']/g, character => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            })[character]);
+        }
+
+        function finiteNumber(value, min, max, fallback = 0) {
+            const number = Number(value);
+            return Number.isFinite(number) && number >= min && number <= max ? number : fallback;
+        }
+
+        function formatExternalDate(value, fallback = 'Unknown') {
+            const date = new Date(value);
+            return Number.isFinite(date.getTime()) ? date.toLocaleString() : fallback;
+        }
+
+        function featureList(payload, maxItems = 3000) {
+            return Array.isArray(payload?.features)
+                ? payload.features.filter(feature => feature && typeof feature === 'object').slice(0, maxItems)
+                : [];
+        }
+
+        function validateSettingsPayload(candidate) {
+            if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+                throw new Error('Settings must be a JSON object');
+            }
+
+            const result = {
+                ...settings,
+                layers: { ...settings.layers },
+                colorScheme: 2
+            };
+            const enumFields = {
+                source: Object.keys(RADAR_CAPABILITIES),
+                radarProduct: ['reflectivity', 'velocity', 'echoTops', 'precipAccum'],
+                basemap: ['dark', 'light', 'satellite', 'terrain', 'clean'],
+                theme: ['dark', 'light']
+            };
+            Object.entries(enumFields).forEach(([key, allowed]) => {
+                if (typeof candidate[key] === 'string' && allowed.includes(candidate[key])) result[key] = candidate[key];
+            });
+
+            ['loop', 'autoRefresh', 'showLegend', 'highResMode', 'useLocalTime'].forEach(key => {
+                if (typeof candidate[key] === 'boolean') result[key] = candidate[key];
+            });
+            ['smooth', 'snowColor'].forEach(key => {
+                if (candidate[key] === 0 || candidate[key] === 1) result[key] = candidate[key];
+            });
+
+            result.opacity = finiteNumber(candidate.opacity, 0.3, 1, result.opacity);
+            result.delay = finiteNumber(candidate.delay, 200, 1200, result.delay);
+            result.stateBorderWidth = finiteNumber(candidate.stateBorderWidth, 0, 8, result.stateBorderWidth);
+            result.countyBorderWidth = finiteNumber(candidate.countyBorderWidth, 0, 8, result.countyBorderWidth);
+            result.borderOpacity = finiteNumber(candidate.borderOpacity, 0, 1, result.borderOpacity);
+            ['owmKey', 'waqiKey'].forEach(key => {
+                if (typeof candidate[key] === 'string') result[key] = safeText(candidate[key].trim(), 256);
+            });
+
+            if (candidate.layers && typeof candidate.layers === 'object' && !Array.isArray(candidate.layers)) {
+                Object.keys(result.layers).forEach(key => {
+                    if (typeof candidate.layers[key] === 'boolean') result.layers[key] = candidate.layers[key];
+                });
+            }
+
+            if (!RADAR_CAPABILITIES[result.source].products.includes(result.radarProduct)) {
+                result.radarProduct = 'reflectivity';
+            }
+            return result;
+        }
 
         async function fetchWithTimeout(input, init = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
             const controller = new AbortController();
@@ -2519,12 +2599,21 @@
         function loadSettings() {
             try {
                 const s = localStorage.getItem('stormview_pro_v3');
-                if (s) Object.assign(settings, JSON.parse(s));
-            } catch(e) {}
+                if (!s) return;
+                if (new Blob([s]).size > MAX_SETTINGS_BYTES) throw new Error('Stored settings exceed the size limit');
+                Object.assign(settings, validateSettingsPayload(JSON.parse(s)));
+            } catch(e) {
+                console.warn('Stored settings were ignored:', e);
+            }
         }
 
         function saveSettings() {
-            try { localStorage.setItem('stormview_pro_v3', JSON.stringify(settings)); } catch(e) {}
+            try {
+                localStorage.setItem('stormview_pro_v3', JSON.stringify(validateSettingsPayload(settings)));
+            } catch(e) {
+                console.error('Settings could not be saved:', e);
+                if (document.body) showToast('Settings could not be saved', 'error');
+            }
         }
 
         function applyTheme() {
@@ -2947,7 +3036,7 @@
                     color = 'var(--warning)';
                 }
                 
-                indicator.innerHTML = status;
+                indicator.textContent = status;
                 indicator.style.color = color;
                 indicator.style.borderColor = color;
                 indicator.style.display = 'block';
@@ -3391,9 +3480,12 @@
                 
                 lightningSocket.onmessage = (event) => {
                     try {
+                        if (typeof event.data !== 'string' || event.data.length > 10000) return;
                         const data = JSON.parse(event.data);
-                        if (data.lat && data.lon) {
-                            addLightningStrike(data);
+                        const lat = Number(data?.lat);
+                        const lon = Number(data?.lon);
+                        if (Number.isFinite(lat) && lat >= -90 && lat <= 90 && Number.isFinite(lon) && lon >= -180 && lon <= 180) {
+                            addLightningStrike({ lat, lon });
                         }
                     } catch(e) {}
                 };
@@ -3514,9 +3606,9 @@
                                 onEachFeature: (feature, layer) => {
                                     if (feature.properties) {
                                         const p = feature.properties;
-                                        const name = p.STORMNAME || p.NAME || 'Unknown';
-                                        const type = p.STORMTYPE || p.DVLBL || '';
-                                        const wind = p.MAXWIND || p.INTENSITY || '';
+                                        const name = escapeHTML(p.STORMNAME || p.NAME || 'Unknown', 120);
+                                        const type = escapeHTML(p.STORMTYPE || p.DVLBL || '', 120);
+                                        const wind = escapeHTML(p.MAXWIND || p.INTENSITY || '', 30);
                                         layer.bindPopup(`
                                             <div class="popup-content">
                                                 <h4>${name}</h4>
@@ -3583,7 +3675,7 @@
                     headers: { 'User-Agent': 'StormViewPro/4.0' }
                 });
                 const data = await resp.json();
-                const features = data.features || [];
+                const features = featureList(data);
                 
                 if (features.length === 0) {
                     showToast('No active watches right now', 'info', 2500);
@@ -3592,7 +3684,7 @@
                 
                 layerRefs.spcWatches = L.geoJSON(features, {
                     style: (feature) => {
-                        const evt = (feature.properties?.event || '').toLowerCase();
+                        const evt = safeText(feature.properties?.event, 120).toLowerCase();
                         const isTornado = evt.includes('tornado');
                         return {
                             color: isTornado ? '#ff0000' : '#ffff00',
@@ -3605,9 +3697,9 @@
                         const p = feature.properties || {};
                         layer.bindPopup(`
                             <div class="popup-content">
-                                <h4>${p.event || 'Watch'}</h4>
-                                <p>${p.headline || ''}</p>
-                                <p class="meta">Expires: ${p.expires ? new Date(p.expires).toLocaleString() : 'Unknown'}</p>
+                                <h4>${escapeHTML(p.event || 'Watch', 120)}</h4>
+                                <p>${escapeHTML(p.headline || '', 300)}</p>
+                                <p class="meta">Expires: ${escapeHTML(formatExternalDate(p.expires))}</p>
                             </div>
                         `);
                     },
@@ -3630,7 +3722,7 @@
                     headers: { 'User-Agent': 'StormViewPro/4.0' }
                 });
                 const data = await resp.json();
-                const features = data.features || [];
+                const features = featureList(data);
                 
                 if (features.length === 0) {
                     showDataStatus('No active MCDs');
@@ -3649,8 +3741,8 @@
                         const p = feature.properties || {};
                         layer.bindPopup(`
                             <div class="popup-content">
-                                <h4>${p.event || 'Special Weather Statement'}</h4>
-                                <p>${(p.headline || '').substring(0, 200)}</p>
+                                <h4>${escapeHTML(p.event || 'Special Weather Statement', 120)}</h4>
+                                <p>${escapeHTML(p.headline || '', 200)}</p>
                             </div>
                         `);
                     },
@@ -3686,7 +3778,7 @@
                 const data = await resp.json();
                 
                 // Filter out features with empty geometries
-                const validFeatures = (data.features || []).filter(f => {
+                const validFeatures = featureList(data).filter(f => {
                     const geom = f.geometry || {};
                     if (geom.type === 'GeometryCollection') return (geom.geometries || []).length > 0;
                     return geom.coordinates && geom.coordinates.length > 0;
@@ -3755,7 +3847,7 @@
                     headers: { 'User-Agent': 'StormViewPro/4.0' }
                 });
                 const data = await resp.json();
-                const features = data.features || [];
+                const features = featureList(data);
                 
                 if (features.length === 0) {
                     showDataStatus('No active SIGMETs/aviation hazards');
@@ -3764,7 +3856,7 @@
                 
                 layerRefs.pireps = L.geoJSON(features, {
                     style: (feature) => {
-                        const evt = (feature.properties?.event || '').toLowerCase();
+                        const evt = safeText(feature.properties?.event, 120).toLowerCase();
                         let color = '#ff9900';
                         if (evt.includes('convective')) color = '#ff0000';
                         return {
@@ -3779,9 +3871,9 @@
                         const p = feature.properties || {};
                         layer.bindPopup(`
                             <div class="popup-content">
-                                <h4>${p.event || 'Aviation Hazard'}</h4>
-                                <p>${(p.headline || '').substring(0, 200)}</p>
-                                <p class="meta">${p.expires ? 'Expires: ' + new Date(p.expires).toLocaleString() : ''}</p>
+                                <h4>${escapeHTML(p.event || 'Aviation Hazard', 120)}</h4>
+                                <p>${escapeHTML(p.headline || '', 200)}</p>
+                                <p class="meta">${p.expires ? `Expires: ${escapeHTML(formatExternalDate(p.expires))}` : ''}</p>
                             </div>
                         `);
                     },
@@ -3804,7 +3896,7 @@
                     headers: { 'User-Agent': 'StormViewPro/4.0' }
                 });
                 const data = await resp.json();
-                const features = data.features || [];
+                const features = featureList(data);
                 
                 if (features.length === 0) {
                     showDataStatus('No active SIGMETs/AIRMETs');
@@ -3813,7 +3905,7 @@
                 
                 layerRefs.sigmets = L.geoJSON(features, {
                     style: (feature) => {
-                        const evt = (feature.properties?.event || '').toLowerCase();
+                        const evt = safeText(feature.properties?.event, 120).toLowerCase();
                         let color = '#ff9900';
                         if (evt.includes('convective')) color = '#ff0000';
                         else if (evt.includes('airmet')) color = '#00ccff';
@@ -3830,9 +3922,9 @@
                         const p = feature.properties || {};
                         layer.bindPopup(`
                             <div class="popup-content">
-                                <h4>${p.event || 'Aviation Alert'}</h4>
-                                <p>${(p.headline || '').substring(0, 200)}</p>
-                                <p class="meta">${p.expires ? 'Expires: ' + new Date(p.expires).toLocaleString() : ''}</p>
+                                <h4>${escapeHTML(p.event || 'Aviation Alert', 120)}</h4>
+                                <p>${escapeHTML(p.headline || '', 200)}</p>
+                                <p class="meta">${p.expires ? `Expires: ${escapeHTML(formatExternalDate(p.expires))}` : ''}</p>
                             </div>
                         `);
                     },
@@ -4149,14 +4241,14 @@
                     headers: { 'User-Agent': 'StormViewPro/3.0' }
                 });
                 const data = await resp.json();
-                const features = data.features || [];
+                const features = featureList(data);
 
                 removeLayer('alerts');
 
                 layerRefs.alerts = L.geoJSON(features, {
                     pane: 'alertPane',
                     style: (f) => {
-                        const evt = (f.properties?.event || '').toLowerCase();
+                        const evt = safeText(f.properties?.event, 120).toLowerCase();
                         let color = '#6699ff';
                         if (evt.includes('tornado')) color = '#ff0000';
                         else if (evt.includes('severe thunderstorm')) color = '#ff6600';
@@ -4168,18 +4260,18 @@
                         return { color, weight: 2, fillColor: color, fillOpacity: 0.2, dashArray: evt.includes('watch') ? '5, 5' : null };
                     },
                     onEachFeature: (f, layer) => {
-                        const p = f.properties;
-                        const evt = p.event || 'Alert';
-                        const headline = p.headline || '';
-                        const desc = (p.description || '').substring(0, 300);
-                        const expires = p.expires ? new Date(p.expires).toLocaleString() : 'N/A';
+                        const p = f.properties || {};
+                        const evt = safeText(p.event || 'Alert', 120);
+                        const headline = escapeHTML(p.headline || '', 300);
+                        const desc = escapeHTML(p.description || '', 300);
+                        const expires = escapeHTML(formatExternalDate(p.expires, 'N/A'));
                         let badgeClass = 'info';
                         if (evt.toLowerCase().includes('warning')) badgeClass = 'danger';
                         else if (evt.toLowerCase().includes('watch')) badgeClass = 'warning';
                         
                         layer.bindPopup(`
                             <div class="popup-content">
-                                <h4><span class="badge ${badgeClass}">${evt}</span></h4>
+                                <h4><span class="badge ${badgeClass}">${escapeHTML(evt, 120)}</span></h4>
                                 <p><strong>${headline}</strong></p>
                                 <p>${desc}${desc.length >= 300 ? '...' : ''}</p>
                                 <div class="meta">Expires: ${expires}</div>
@@ -4192,7 +4284,7 @@
                 
                 // Update alert count badges
                 const warningCount = features.filter(f => {
-                    const evt = (f.properties?.event || '').toLowerCase();
+                    const evt = safeText(f.properties?.event, 120).toLowerCase();
                     return evt.includes('warning') || evt.includes('tornado') || evt.includes('severe');
                 }).length;
                 updateAlertCount(warningCount || features.length);
@@ -4210,7 +4302,7 @@
                 removeLayer('spcOutlook');
 
                 // Filter out features with empty geometries
-                const validFeatures = (data.features || []).filter(f => {
+                const validFeatures = featureList(data).filter(f => {
                     const geom = f.geometry || {};
                     if (geom.type === 'GeometryCollection') return (geom.geometries || []).length > 0;
                     return geom.coordinates && geom.coordinates.length > 0;
@@ -4243,7 +4335,7 @@
                         layer.bindPopup(`
                             <div class="popup-content">
                                 <h4>Day 1 Convective Outlook</h4>
-                                <p style="color:${riskColors[label] || '#fff'};font-weight:600;">${riskNames[label] || label} Risk</p>
+                                <p style="color:${riskColors[label] || '#fff'};font-weight:600;">${escapeHTML(riskNames[label] || label, 40)} Risk</p>
                                 <div class="meta">Storm Prediction Center</div>
                             </div>
                         `);
@@ -4287,14 +4379,14 @@
                         });
                     },
                     onEachFeature: (f, layer) => {
-                        const p = f.properties;
+                        const p = f.properties || {};
                         layer.bindPopup(`
                             <div class="popup-content">
-                                <h4>${p.typetext || 'Report'}</h4>
-                                <p><strong>${p.city || ''}, ${p.state || ''}</strong></p>
-                                ${p.magnitude ? `<p>Magnitude: ${p.magnitude}</p>` : ''}
-                                <p>${p.remark || ''}</p>
-                                <div class="meta">${p.valid || ''}</div>
+                                <h4>${escapeHTML(p.typetext || 'Report', 80)}</h4>
+                                <p><strong>${escapeHTML(p.city || '', 80)}, ${escapeHTML(p.state || '', 40)}</strong></p>
+                                ${p.magnitude ? `<p>Magnitude: ${escapeHTML(p.magnitude, 30)}</p>` : ''}
+                                <p>${escapeHTML(p.remark || '', 500)}</p>
+                                <div class="meta">${escapeHTML(p.valid || '', 80)}</div>
                             </div>
                         `);
                     }
@@ -4380,8 +4472,8 @@
                         marker.bindPopup(`
                             <div class="popup-content">
                                 <h4>River Gauge</h4>
-                                <p><strong>${name}</strong></p>
-                                <p>Stage: ${value} ft</p>
+                                <p><strong>${escapeHTML(name, 160)}</strong></p>
+                                <p>Stage: ${escapeHTML(value, 30)} ft</p>
                                 <div class="meta">USGS Water Services</div>
                             </div>
                         `);
@@ -4416,15 +4508,15 @@
                         });
                     },
                     onEachFeature: (f, layer) => {
-                        const p = f.properties;
+                        const p = f.properties || {};
                         layer.bindPopup(`
                             <div class="popup-content">
-                                <h4>${p.station || 'Station'}</h4>
-                                <p><strong>${p.name || ''}</strong></p>
-                                <p>Temp: ${p.tmpf ? p.tmpf + '°F' : 'N/A'}</p>
-                                <p>Wind: ${p.sknt ? p.sknt + ' kt' : 'N/A'} ${p.drct ? 'from ' + p.drct + '°' : ''}</p>
-                                <p>Dewpoint: ${p.dwpf ? p.dwpf + '°F' : 'N/A'}</p>
-                                <div class="meta">Updated: ${p.local_valid || 'N/A'}</div>
+                                <h4>${escapeHTML(p.station || 'Station', 40)}</h4>
+                                <p><strong>${escapeHTML(p.name || '', 160)}</strong></p>
+                                <p>Temp: ${Number.isFinite(Number(p.tmpf)) ? `${Number(p.tmpf).toFixed(0)}°F` : 'N/A'}</p>
+                                <p>Wind: ${Number.isFinite(Number(p.sknt)) ? `${Number(p.sknt).toFixed(0)} kt` : 'N/A'} ${Number.isFinite(Number(p.drct)) ? `from ${Number(p.drct).toFixed(0)}°` : ''}</p>
+                                <p>Dewpoint: ${Number.isFinite(Number(p.dwpf)) ? `${Number(p.dwpf).toFixed(0)}°F` : 'N/A'}</p>
+                                <div class="meta">Updated: ${escapeHTML(p.local_valid || 'N/A', 80)}</div>
                             </div>
                         `);
                     }
@@ -4636,17 +4728,19 @@
         function updateMobileTimestamp(timeStr, isForecast, frameKind) {
             const el = document.getElementById('mobileTimestamp');
             if (!el) return;
-            
-            let html = timeStr;
+
+            el.replaceChildren(document.createTextNode(timeStr));
+            const badge = document.createElement('span');
+            badge.className = 'forecast-badge';
             if (isForecast && settings.source === 'hrrr') {
                 const hour = frames[currentFrame]?.mins ? Math.round(frames[currentFrame].mins / 60) : 0;
-                html += ` <span class="forecast-badge">+${hour}hr</span>`;
+                badge.textContent = `+${hour}hr`;
             } else if (isForecast) {
-                html += ' <span class="forecast-badge">Forecast</span>';
+                badge.textContent = 'Forecast';
             } else {
-                html += ` <span class="forecast-badge">${frameKind}</span>`;
+                badge.textContent = frameKind;
             }
-            el.innerHTML = html;
+            el.append(' ', badge);
         }
 
         function updateTimelineFill() {
@@ -4765,10 +4859,14 @@
             
             const toast = document.createElement('div');
             toast.className = 'toast';
-            toast.innerHTML = `
-                <span class="toast-icon ${type}">${icons[type] || icons.info}</span>
-                <span class="toast-msg">${message}</span>
-            `;
+            const icon = document.createElement('span');
+            const safeType = Object.hasOwn(icons, type) ? type : 'info';
+            icon.className = `toast-icon ${safeType}`;
+            icon.innerHTML = icons[safeType];
+            const text = document.createElement('span');
+            text.className = 'toast-msg';
+            text.textContent = safeText(message, 500);
+            toast.append(icon, text);
             container.appendChild(toast);
             
             // Limit visible toasts
@@ -4932,6 +5030,9 @@
                     throw new Error('Open-Meteo API unavailable');
                 }
                 const om = await omResp.value.json();
+                if (!om || typeof om.current !== 'object' || !om.hourly || !om.daily) {
+                    throw new Error('Open-Meteo returned an invalid forecast payload');
+                }
 
                 // Parse NWS location name
                 let locationName = `${lat.toFixed(2)}, ${lng.toFixed(2)}`;
@@ -4947,7 +5048,7 @@
                 let alerts = [];
                 if (alertResp.status === 'fulfilled' && alertResp.value.ok) {
                     const alertData = await alertResp.value.json();
-                    alerts = (alertData.features || []).map(f => f.properties?.event).filter(Boolean);
+                    alerts = featureList(alertData, 3).map(f => safeText(f.properties?.event, 120)).filter(Boolean);
                 }
 
                 locEl.textContent = locationName;
@@ -4976,7 +5077,7 @@
             if (alerts.length > 0) {
                 html += `<div class="fc-alert-banner">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                    ${alerts.slice(0, 3).join(' \u2022 ')}
+                    ${alerts.slice(0, 3).map(alert => escapeHTML(alert, 120)).join(' \u2022 ')}
                 </div>`;
             }
 
@@ -4988,11 +5089,11 @@
                     <div class="fc-condition">${getWeatherText(cur.weather_code)}</div>
                     <div class="fc-stats">
                         <div><span class="fc-stat-label">Feels </span>${Math.round(cur.apparent_temperature)}\u00B0F</div>
-                        <div><span class="fc-stat-label">Humidity </span>${cur.relative_humidity_2m}%</div>
+                        <div><span class="fc-stat-label">Humidity </span>${Math.round(finiteNumber(cur.relative_humidity_2m, 0, 100, 0))}%</div>
                         <div><span class="fc-stat-label">Wind </span>${windDirection(cur.wind_direction_10m)} ${Math.round(cur.wind_speed_10m)} mph</div>
                         <div><span class="fc-stat-label">Gusts </span>${Math.round(cur.wind_gusts_10m)} mph</div>
                         <div><span class="fc-stat-label">Pressure </span>${(cur.surface_pressure * 0.02953).toFixed(2)} inHg</div>
-                        <div><span class="fc-stat-label">Precip </span>${cur.precipitation}" /hr</div>
+                        <div><span class="fc-stat-label">Precip </span>${finiteNumber(cur.precipitation, 0, 100, 0).toFixed(2)}" /hr</div>
                     </div>
                 </div>
             </div>`;
@@ -5062,12 +5163,25 @@
 
         // ==================== SAVED LOCATIONS ====================
         const BOOKMARKS_KEY = 'stormview_bookmarks';
+        const MAX_BOOKMARKS = 100;
         let savedLocations = [];
         let currentForecastLocation = null; // {name, lat, lng}
 
         function loadBookmarks() {
             try {
-                savedLocations = JSON.parse(localStorage.getItem(BOOKMARKS_KEY)) || [];
+                const parsed = JSON.parse(localStorage.getItem(BOOKMARKS_KEY)) || [];
+                if (!Array.isArray(parsed)) throw new Error('Bookmarks must be an array');
+                savedLocations = parsed.slice(0, MAX_BOOKMARKS).flatMap((bookmark, index) => {
+                    const lat = Number(bookmark?.lat);
+                    const lng = Number(bookmark?.lng);
+                    if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) return [];
+                    return [{
+                        name: safeText(bookmark.name || 'Saved location', 120),
+                        lat,
+                        lng,
+                        id: Number.isSafeInteger(Number(bookmark.id)) ? Number(bookmark.id) : Date.now() + index
+                    }];
+                });
             } catch { savedLocations = []; }
         }
 
@@ -5076,6 +5190,17 @@
         }
 
         function addBookmark(name, lat, lng) {
+            name = safeText(name || 'Saved location', 120);
+            lat = Number(lat);
+            lng = Number(lng);
+            if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) {
+                showToast('That location could not be saved', 'error');
+                return false;
+            }
+            if (savedLocations.length >= MAX_BOOKMARKS) {
+                showToast(`Saved locations are limited to ${MAX_BOOKMARKS}`, 'warn');
+                return false;
+            }
             // Check for duplicate (within ~0.01 degree)
             const exists = savedLocations.some(b =>
                 Math.abs(b.lat - lat) < 0.01 && Math.abs(b.lng - lng) < 0.01
@@ -5117,7 +5242,7 @@
             list.innerHTML = savedLocations.map(b => `
                 <div class="bm-item" data-bm-id="${b.id}">
                     <div class="bm-item-info">
-                        <div class="bm-item-name">${b.name}</div>
+                        <div class="bm-item-name">${escapeHTML(b.name, 120)}</div>
                         <div class="bm-item-coords">${b.lat.toFixed(4)}, ${b.lng.toFixed(4)}</div>
                     </div>
                     <div class="bm-item-actions">
@@ -5608,16 +5733,26 @@
             document.getElementById('importFile').addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
+                if (file.size > MAX_SETTINGS_BYTES) {
+                    showToast('Settings file is too large', 'error');
+                    e.target.value = '';
+                    return;
+                }
                 const reader = new FileReader();
                 reader.onload = (ev) => {
                     try {
-                        Object.assign(settings, JSON.parse(ev.target.result));
+                        const raw = typeof ev.target.result === 'string' ? ev.target.result : '';
+                        if (new Blob([raw]).size > MAX_SETTINGS_BYTES) throw new Error('Settings file is too large');
+                        Object.assign(settings, validateSettingsPayload(JSON.parse(raw)));
                         saveSettings();
+                        showToast('Settings imported', 'success');
                         setTimeout(() => location.reload(), 500);
                     } catch(err) {
                         console.error('Import error:', err);
+                        showToast('Settings file is invalid', 'error');
                     }
                 };
+                reader.onerror = () => showToast('Settings file could not be read', 'error');
                 reader.readAsText(file);
                 e.target.value = '';
             });
@@ -5659,16 +5794,39 @@
                     try {
                         const resp = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&q=${encodeURIComponent(q)}&limit=5`);
                         const data = await resp.json();
-                        
-                        if (data.length === 0) {
-                            results.innerHTML = '<div class="search-item"><div class="search-item-name">No results found</div></div>';
+
+                        results.replaceChildren();
+                        const validResults = (Array.isArray(data) ? data : []).slice(0, 5).flatMap(result => {
+                            const lat = Number(result?.lat);
+                            const lon = Number(result?.lon);
+                            if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) return [];
+                            return [{ lat, lon, displayName: safeText(result.display_name || 'Unnamed location', 300) }];
+                        });
+
+                        if (validResults.length === 0) {
+                            const item = document.createElement('div');
+                            item.className = 'search-item';
+                            const name = document.createElement('div');
+                            name.className = 'search-item-name';
+                            name.textContent = 'No results found';
+                            item.appendChild(name);
+                            results.appendChild(item);
                         } else {
-                            results.innerHTML = data.map(r => `
-                                <div class="search-item" data-lat="${r.lat}" data-lon="${r.lon}">
-                                    <div class="search-item-name">${r.display_name.split(',')[0]}</div>
-                                    <div class="search-item-detail">${r.display_name.split(',').slice(1, 3).join(',')}</div>
-                                </div>
-                            `).join('');
+                            validResults.forEach(result => {
+                                const parts = result.displayName.split(',');
+                                const item = document.createElement('div');
+                                item.className = 'search-item';
+                                item.dataset.lat = String(result.lat);
+                                item.dataset.lon = String(result.lon);
+                                const name = document.createElement('div');
+                                name.className = 'search-item-name';
+                                name.textContent = parts[0] || 'Unnamed location';
+                                const detail = document.createElement('div');
+                                detail.className = 'search-item-detail';
+                                detail.textContent = parts.slice(1, 3).join(',');
+                                item.append(name, detail);
+                                results.appendChild(item);
+                            });
                         }
                         
                         results.classList.add('open');
