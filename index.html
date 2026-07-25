@@ -1353,7 +1353,8 @@
         .sheet-tab-content.active { display: block; }
 
         /* Alert count badge on layer chips */
-        .layer-chip .alert-count {
+        .layer-chip .alert-count,
+        .layer-chip .analysis-count {
             font-size: 9px;
             padding: 1px 5px;
             border-radius: 8px;
@@ -1363,7 +1364,8 @@
             line-height: 1.3;
             flex-shrink: 0;
         }
-        .layer-chip .alert-count:empty { display: none; }
+        .layer-chip .alert-count:empty,
+        .layer-chip .analysis-count:empty { display: none; }
 
         .layer-legend {
             display: flex; flex-wrap: wrap; gap: 4px 8px;
@@ -1767,6 +1769,12 @@
                     <div class="layer-chip" data-product="correlationCoefficient">
                         <span class="dot" style="background: #ec4899"></span>
                         <span class="layer-name">Correlation</span>
+                    </div>
+                    <div class="layer-chip full-width" data-layer="couplets">
+                        <span class="dot" style="background: var(--danger)"></span>
+                        <span class="layer-name">Rotation Candidates</span>
+                        <span class="analysis-count"></span>
+                        <span class="badge">AUTO</span>
                     </div>
                 </div>
             </div>
@@ -2489,6 +2497,7 @@
         let level2WorkerSequence = 0;
         let level2LoadedKey = null;
         let level2Sites = [];
+        let level2Couplets = [];
         const level2WorkerRequests = new Map();
         const REQUEST_TIMEOUT_MS = 15000;
         const LEVEL2_MAX_BYTES = 80 * 1024 * 1024;
@@ -2547,7 +2556,11 @@
                 hoursOld: '{value}h old',
                 fetchedJustNow: 'Fetched just now',
                 fetchedMinuteAgo: 'Fetched 1 min ago',
-                fetchedMinutesAgo: 'Fetched {value}m ago'
+                fetchedMinutesAgo: 'Fetched {value}m ago',
+                rotationCandidate: 'Rotation candidate',
+                gateShear: 'Gate-to-gate shear',
+                radarRange: 'Radar range',
+                automationCaution: 'Automated heuristic, not a warning. Confirm threats with official NWS products.'
             },
             es: {
                 loading: 'Cargando...',
@@ -2584,7 +2597,11 @@
                 hoursOld: 'Hace {value} h',
                 fetchedJustNow: 'Obtenido ahora',
                 fetchedMinuteAgo: 'Obtenido hace 1 min',
-                fetchedMinutesAgo: 'Obtenido hace {value} min'
+                fetchedMinutesAgo: 'Obtenido hace {value} min',
+                rotationCandidate: 'Candidato de rotación',
+                gateShear: 'Cizalladura entre compuertas',
+                radarRange: 'Distancia del radar',
+                automationCaution: 'Heurística automatizada, no es una alerta. Confirma las amenazas con productos oficiales del NWS.'
             }
         };
         const SPANISH_EXACT_TEXT = {
@@ -2621,6 +2638,7 @@
             'Reflectivity': 'Reflectividad',
             'Velocity': 'Velocidad',
             'Correlation': 'Correlación',
+            'Rotation Candidates': 'Candidatos de rotación',
             'Weather Layers': 'Capas meteorológicas',
             'Map Overlays': 'Capas del mapa',
             'Model Data': 'Datos del modelo',
@@ -3232,7 +3250,7 @@
 
         const layerRefs = {
             // Weather
-            alerts: null, spcOutlook: null, stormReports: null,
+            alerts: null, spcOutlook: null, stormReports: null, couplets: null,
             lightning: null, satellite: null, riverGauges: null, surfaceObs: null,
             temp: null, wind: null, clouds: null, pressure: null,
             
@@ -3278,7 +3296,7 @@
             borderOpacity: 0.6,
             layers: {
                 // Core weather
-                radar: true, alerts: true, spcOutlook: true, stormReports: false,
+                radar: true, alerts: true, spcOutlook: true, stormReports: false, couplets: true,
                 lightning: false, satellite: false, riverGauges: false, surfaceObs: false,
                 
                 // Model data (requires API)
@@ -4118,6 +4136,55 @@
             });
         }
 
+        function renderLevel2Couplets() {
+            removeLayer('couplets');
+            if (settings.source !== 'level2' || !settings.layers.couplets || !level2Couplets.length) return;
+            const group = L.layerGroup();
+            level2Couplets
+                .filter(candidate => Number.isFinite(candidate.latitude)
+                    && Number.isFinite(candidate.longitude)
+                    && Number.isFinite(candidate.shearMs)
+                    && candidate.latitude >= -90 && candidate.latitude <= 90
+                    && candidate.longitude >= -180 && candidate.longitude <= 180)
+                .slice(0, 20)
+                .forEach(candidate => {
+                    const shear = settings.units === 'metric'
+                        ? `${(candidate.shearMs * 3.6).toFixed(0)} km/h`
+                        : `${(candidate.shearMs * 1.94384).toFixed(0)} kt`;
+                    const range = settings.units === 'metric'
+                        ? `${candidate.rangeKm.toFixed(1)} km`
+                        : `${(candidate.rangeKm * 0.621371).toFixed(1)} mi`;
+                    const marker = L.circleMarker([candidate.latitude, candidate.longitude], {
+                        pane: 'alertPane',
+                        radius: Math.min(14, 7 + candidate.shearMs / 18),
+                        color: '#ffffff',
+                        weight: 2,
+                        fillColor: '#ff1744',
+                        fillOpacity: 0.72,
+                        className: 'rotation-candidate'
+                    });
+                    marker.bindTooltip(`${t('rotationCandidate')}: ${shear}`, {
+                        direction: 'top',
+                        offset: [0, -8]
+                    });
+                    const popup = document.createElement('div');
+                    popup.className = 'popup-content';
+                    const title = document.createElement('h4');
+                    title.textContent = t('rotationCandidate');
+                    const details = document.createElement('p');
+                    details.textContent = `${t('gateShear')}: ${shear} • ${t('radarRange')}: ${range} • ${candidate.reflectivityDbz} dBZ`;
+                    const caution = document.createElement('p');
+                    caution.className = 'meta';
+                    caution.textContent = t('automationCaution');
+                    popup.append(title, details, caution);
+                    marker.bindPopup(popup);
+                    marker.addTo(group);
+                });
+            if (!group.getLayers().length) return;
+            layerRefs.couplets = group.addTo(map);
+            setLayerFeatureCount('couplets', group.getLayers().length);
+        }
+
         async function loadLevel2(signal, generation) {
             showLoadProgress();
             updateLoadProgress(5);
@@ -4158,6 +4225,8 @@
             layer._stormviewObjectUrl = imageUrl;
             layer.addTo(map);
             frameLayers = [layer];
+            level2Couplets = Array.isArray(rendered.couplets) ? rendered.couplets : [];
+            renderLevel2Couplets();
             frames = [{
                 time: object.time,
                 path: object.key,
@@ -5063,6 +5132,8 @@
             frameLayers = [];
             framesLoaded = 0;
             framesReady = false;
+            level2Couplets = [];
+            removeLayer('couplets');
             
             // Clean up hybrid radar layers
             cleanupRadarLayers();
@@ -5162,6 +5233,9 @@
                 case 'radar':
                     if (on) loadRadarData();
                     else clearAllFrameLayers();
+                    break;
+                case 'couplets':
+                    on ? renderLevel2Couplets() : removeLayer('couplets');
                     break;
                 case 'alerts':
                     on ? loadAlerts() : removeLayer('alerts');
@@ -5270,6 +5344,11 @@
             document.querySelectorAll(`[data-layer="${name}"]`).forEach(element => {
                 element.dataset.featureCount = String(diagnosticsState.layerCounts[name]);
             });
+            if (name === 'couplets') {
+                document.querySelectorAll('[data-layer="couplets"] .analysis-count').forEach(element => {
+                    element.textContent = diagnosticsState.layerCounts[name] || '';
+                });
+            }
             renderDiagnostics();
         }
 
@@ -6590,6 +6669,11 @@
                 el.setAttribute('aria-disabled', String(!supported));
                 el.title = supported ? '' : `${capability.label} does not provide this product`;
             });
+            document.querySelectorAll('[data-layer="couplets"]').forEach(el => {
+                const supported = settings.source === 'level2';
+                el.setAttribute('aria-disabled', String(!supported));
+                el.title = supported ? '' : 'Rotation candidates require a NEXRAD Level II volume';
+            });
 
             document.querySelectorAll('.source-capability-note').forEach(note => {
                 note.textContent = `${capability.note} Coverage: ${capability.coverage.label}.`;
@@ -6609,6 +6693,10 @@
                 const layer = el.dataset.layer;
                 el.classList.toggle('active', settings.layers[layer]);
                 el.addEventListener('click', () => {
+                    if (el.getAttribute('aria-disabled') === 'true') {
+                        showToast('Rotation candidates require NEXRAD Level II', 'warn');
+                        return;
+                    }
                     const on = el.classList.toggle('active');
                     handleLayerToggle(layer, on);
                     // Sync quick toolbar
@@ -6852,6 +6940,7 @@
                 showToast(t('unitsUpdated'), 'success', 2200);
                 if (settings.layers.surfaceObs) loadSurfaceObs();
                 if (settings.layers.riverGauges) loadRiverGauges();
+                if (layerRefs.couplets) renderLevel2Couplets();
                 if (currentForecastLocation) openForecast(currentForecastLocation.lat, currentForecastLocation.lng);
             });
 
@@ -7187,6 +7276,10 @@
                 const layer = el.dataset.layer;
                 el.classList.toggle('active', settings.layers[layer]);
                 el.addEventListener('click', () => {
+                    if (el.getAttribute('aria-disabled') === 'true') {
+                        showToast('Rotation candidates require NEXRAD Level II', 'warn');
+                        return;
+                    }
                     const on = el.classList.toggle('active');
                     // Sync sidebar + quick toolbar
                     document.querySelector(`.sidebar [data-layer="${layer}"]`)?.classList.toggle('active', on);

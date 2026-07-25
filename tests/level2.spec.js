@@ -52,7 +52,15 @@ test('Level II mode selects the nearest site and renders all native base product
               elevationAngle: 0.5,
               site: 'KTWX',
               hasGaps: false,
-              isTruncated: false
+              isTruncated: false,
+              couplets: [{
+                latitude: 39.1,
+                longitude: -96.1,
+                shearMs: 42,
+                rangeKm: 18.4,
+                reflectivityDbz: 48,
+                bearing: 45
+              }]
             }
           });
         });
@@ -110,6 +118,7 @@ test('Level II mode selects the nearest site and renders all native base product
   await expect(page.locator('#dataStatusText')).toHaveText('NEXRAD Level II: current');
   await expect(page.locator('.sidebar .level2-site-row')).toHaveClass(/visible/);
   await expect(page.locator('.leaflet-image-layer.level2-radar')).toBeVisible();
+  await expect(page.locator('.sidebar [data-layer="couplets"]')).toHaveAttribute('data-feature-count', '1');
   await expect(page.locator('#timestampBox')).toHaveAttribute('data-provider-time', '2026-07-25T21:00:00.000Z');
   expect(requestedPrefixes[0]).toContain('/KTWX/');
 

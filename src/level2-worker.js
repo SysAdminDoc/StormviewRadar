@@ -1,5 +1,6 @@
 import { Buffer } from 'buffer';
 import level2Data from 'nexrad-level-2-data';
+import { detectVelocityCoupletsFromSweep } from './level2-analysis.js';
 
 globalThis.Buffer = Buffer;
 
@@ -13,6 +14,7 @@ const PRODUCT_FIELDS = Object.freeze({
 });
 
 let radar = null;
+let coupletCache = null;
 
 function clamp(value, minimum, maximum) {
     return Math.max(minimum, Math.min(maximum, value));
@@ -85,6 +87,19 @@ function selectSweep(product) {
     return candidates[0];
 }
 
+function detectVelocityCouplets() {
+    if (coupletCache) return coupletCache;
+    let sweep;
+    try {
+        sweep = selectSweep('velocity');
+    } catch {
+        coupletCache = [];
+        return coupletCache;
+    }
+    coupletCache = detectVelocityCoupletsFromSweep(sweep.records);
+    return coupletCache;
+}
+
 function renderProduct(product) {
     if (!radar) throw new Error('No Level II volume is loaded');
     const field = PRODUCT_FIELDS[product];
@@ -147,7 +162,8 @@ function renderProduct(product) {
         elevationAngle: sweep.angle,
         site: radar.header.ICAO,
         hasGaps: radar.hasGaps,
-        isTruncated: radar.isTruncated
+        isTruncated: radar.isTruncated,
+        couplets: detectVelocityCouplets()
     };
 }
 
@@ -156,6 +172,7 @@ self.addEventListener('message', event => {
     try {
         if (type === 'load') {
             radar = new Level2Radar(Buffer.from(buffer), { logger: false });
+            coupletCache = null;
             self.postMessage({ id, type: 'loaded', site: radar.header.ICAO });
             return;
         }
