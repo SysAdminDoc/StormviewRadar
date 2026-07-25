@@ -534,6 +534,17 @@
         }
         .source-tab:hover { color: var(--text); }
         .source-tab.active { background: var(--accent); color: #fff; }
+        .source-capability-note {
+            margin-top: 8px;
+            font-size: 10px;
+            line-height: 1.4;
+            color: var(--text-muted);
+        }
+        .layer-chip[aria-disabled="true"],
+        .color-scheme-btn[aria-disabled="true"] {
+            cursor: not-allowed;
+            opacity: 0.45;
+        }
 
         .basemap-grid {
             display: grid;
@@ -1596,10 +1607,11 @@
             </div>
             <div class="source-tabs">
                 <button class="source-tab active" data-source="hrrr" title="18hr Forecast!">HRRR</button>
-                <button class="source-tab" data-source="rainviewer">RainViewer</button>
+                <button class="source-tab" data-source="rainviewer" title="Past radar only; approximately 2 hours; native zoom 7">RainViewer</button>
                 <button class="source-tab" data-source="mrms">MRMS</button>
                 <button class="source-tab" data-source="nowcoast" title="NOAA 1km WMS">NOAA</button>
             </div>
+            <div class="source-capability-note" id="sourceCapabilityNote"></div>
         </div>
         
         <!-- Radar Products -->
@@ -2094,15 +2106,9 @@
                 <div class="settings-section">
                     <div class="settings-section-title">Color Scheme</div>
                     <div class="color-scheme-grid" id="colorSchemes">
-                        <div class="color-scheme-btn" data-scheme="0"><div class="gradient" style="background:linear-gradient(90deg,#000,#0f0,#ff0,#f00,#f0f)"></div></div>
-                        <div class="color-scheme-btn" data-scheme="1"><div class="gradient" style="background:linear-gradient(90deg,#000,#00f,#0ff,#0f0,#ff0,#f00)"></div></div>
-                        <div class="color-scheme-btn" data-scheme="2"><div class="gradient" style="background:linear-gradient(90deg,#000,#004,#00f,#0ff,#ff0,#f00)"></div></div>
-                        <div class="color-scheme-btn" data-scheme="3"><div class="gradient" style="background:linear-gradient(90deg,#000,#222,#666,#aaa,#fff)"></div></div>
-                        <div class="color-scheme-btn active" data-scheme="4"><div class="gradient" style="background:linear-gradient(90deg,#006,#00f,#0ff,#0f0,#ff0,#f80,#f00,#f0f)"></div></div>
-                        <div class="color-scheme-btn" data-scheme="5"><div class="gradient" style="background:linear-gradient(90deg,#000,#300,#600,#900,#f00,#f60,#fc0)"></div></div>
-                        <div class="color-scheme-btn" data-scheme="6"><div class="gradient" style="background:linear-gradient(90deg,#001,#003,#00a,#0af,#0fa,#af0,#fa0,#f00)"></div></div>
-                        <div class="color-scheme-btn" data-scheme="7"><div class="gradient" style="background:linear-gradient(90deg,#111,#333,#888,#ccc,#fff)"></div></div>
+                        <div class="color-scheme-btn active" data-scheme="2" aria-disabled="true" title="RainViewer Universal Blue (provider fixed)"><div class="gradient" style="background:linear-gradient(90deg,#000,#004,#00f,#0ff,#ff0,#f00)"></div></div>
                     </div>
+                    <div class="setting-hint">RainViewer's public API currently provides the Universal Blue palette only.</div>
                 </div>
                 <div class="settings-section">
                     <div class="settings-section-title">Animation</div>
@@ -2360,7 +2366,7 @@
             opacity: 0.85,
             smooth: 1,
             snowColor: 1,
-            colorScheme: 4,
+            colorScheme: 2,
             delay: 600,
             loop: true,
             autoRefresh: true,
@@ -2400,6 +2406,29 @@
                 states: true, counties: true, labels: true, highways: false
             }
         };
+
+        const RADAR_CAPABILITIES = Object.freeze({
+            hrrr: {
+                label: 'HRRR',
+                products: ['reflectivity'],
+                note: 'Forecast model: analysis plus hourly guidance through +18 hours.'
+            },
+            rainviewer: {
+                label: 'RainViewer',
+                products: ['reflectivity'],
+                note: 'Past radar only: approximately 2 hours, Universal Blue palette, native zoom 7.'
+            },
+            mrms: {
+                label: 'MRMS',
+                products: ['reflectivity', 'velocity', 'echoTops', 'precipAccum'],
+                note: 'Latest US radar products from Iowa Environmental Mesonet.'
+            },
+            nowcoast: {
+                label: 'NOAA WMS',
+                products: ['reflectivity'],
+                note: 'Latest NOAA nowCOAST radar mosaic; single frame.'
+            }
+        });
 
         // ==================== INITIALIZATION ====================
         function init() {
@@ -2936,15 +2965,13 @@
             if (!resp.ok) throw new Error('RainViewer API error');
             rainviewerData = await resp.json();
 
-            frames = [];
-            
-            if (rainviewerData.radar?.past) {
-                frames = [...rainviewerData.radar.past];
-                lastPastFrame = frames.length - 1;
+            frames = Array.isArray(rainviewerData.radar?.past)
+                ? rainviewerData.radar.past.map(frame => ({ ...frame, kind: 'past' }))
+                : [];
+            if (!frames.length || typeof rainviewerData.host !== 'string') {
+                throw new Error('RainViewer returned no supported past radar frames');
             }
-            if (rainviewerData.radar?.nowcast) {
-                frames.push(...rainviewerData.radar.nowcast.map(f => ({...f, isForecast: true})));
-            }
+            lastPastFrame = frames.length - 1;
 
             framesTotal = frames.length;
             framesLoaded = 0;
@@ -2959,7 +2986,7 @@
                 updateWhenZooming: false,
                 keepBuffer: 2,
                 tileSize: 256,
-                maxNativeZoom: 12,
+                maxNativeZoom: 7,
                 maxZoom: 18,
                 minZoom: 3
             };
@@ -3013,9 +3040,9 @@
         }
 
         function buildRadarUrl(frame) {
-            const color = settings.colorScheme;
-            const smooth = settings.smooth;
-            const snow = settings.snowColor;
+            const color = 2;
+            const smooth = settings.smooth === 0 ? 0 : 1;
+            const snow = settings.snowColor === 0 ? 0 : 1;
             return `${rainviewerData.host}${frame.path}/256/{z}/{x}/{y}/${color}/${smooth}_${snow}.png`;
         }
 
@@ -4426,15 +4453,18 @@
                 document.getElementById('timestampTz').textContent = 'UTC';
             }
 
-            const isForecast = currentFrame > lastPastFrame;
-            document.getElementById('timestampText').textContent = timeStr + (isForecast ? ' (Fcst)' : '');
+            const isForecast = frame.isForecast === true;
+            const frameKind = isForecast
+                ? 'Forecast'
+                : (frame.kind === 'past' ? 'Past' : (settings.source === 'hrrr' ? 'Analysis' : 'Latest'));
+            document.getElementById('timestampText').textContent = `${timeStr} (${frameKind})`;
             document.getElementById('timestampBox').classList.toggle('forecast', isForecast);
             
             // Update frame indicator
             updateFrameIndicator(isForecast);
             
             // Update mobile timestamp
-            updateMobileTimestamp(timeStr, isForecast);
+            updateMobileTimestamp(timeStr, isForecast, frameKind);
         }
         
         function updateFrameIndicator(isForecast) {
@@ -4472,7 +4502,7 @@
             }
         }
         
-        function updateMobileTimestamp(timeStr, isForecast) {
+        function updateMobileTimestamp(timeStr, isForecast, frameKind) {
             const el = document.getElementById('mobileTimestamp');
             if (!el) return;
             
@@ -4482,6 +4512,8 @@
                 html += ` <span class="forecast-badge">+${hour}hr</span>`;
             } else if (isForecast) {
                 html += ' <span class="forecast-badge">Forecast</span>';
+            } else {
+                html += ` <span class="forecast-badge">${frameKind}</span>`;
             }
             el.innerHTML = html;
         }
@@ -5094,6 +5126,28 @@
         }
 
         // ==================== UI INITIALIZATION ====================
+        function syncRadarCapabilities() {
+            const capability = RADAR_CAPABILITIES[settings.source] || RADAR_CAPABILITIES.mrms;
+            if (!capability.products.includes(settings.radarProduct)) {
+                settings.radarProduct = 'reflectivity';
+                saveSettings();
+            }
+
+            document.querySelectorAll('[data-source]').forEach(el => {
+                el.classList.toggle('active', el.dataset.source === settings.source);
+            });
+            document.querySelectorAll('[data-product]').forEach(el => {
+                const supported = capability.products.includes(el.dataset.product);
+                el.classList.toggle('active', el.dataset.product === settings.radarProduct);
+                el.setAttribute('aria-disabled', String(!supported));
+                el.title = supported ? '' : `${capability.label} does not provide this product`;
+            });
+
+            document.querySelectorAll('.source-capability-note').forEach(note => {
+                note.textContent = capability.note;
+            });
+        }
+
         function initUI() {
             // Panel collapsing
             document.querySelectorAll('.panel-header').forEach(header => {
@@ -5116,9 +5170,8 @@
             document.querySelectorAll('.sidebar [data-source]').forEach(el => {
                 el.classList.toggle('active', el.dataset.source === settings.source);
                 el.addEventListener('click', () => {
-                    document.querySelectorAll('.sidebar [data-source]').forEach(e => e.classList.remove('active'));
-                    el.classList.add('active');
                     settings.source = el.dataset.source;
+                    syncRadarCapabilities();
                     saveSettings();
                     pause();
                     updatePlaybackVisibility();
@@ -5131,6 +5184,10 @@
             document.querySelectorAll('.sidebar [data-product]').forEach(el => {
                 el.classList.toggle('active', el.dataset.product === settings.radarProduct);
                 el.addEventListener('click', () => {
+                    if (el.getAttribute('aria-disabled') === 'true') {
+                        showToast(`${RADAR_CAPABILITIES[settings.source].label} does not provide that product`, 'warn');
+                        return;
+                    }
                     document.querySelectorAll('[data-product]').forEach(e => e.classList.remove('active'));
                     el.classList.add('active');
                     settings.radarProduct = el.dataset.product;
@@ -5147,6 +5204,7 @@
                     loadRadarData();
                 });
             });
+            syncRadarCapabilities();
 
             // Basemap buttons (sidebar only)
             document.querySelectorAll('.sidebar [data-basemap]').forEach(el => {
@@ -5369,11 +5427,7 @@
             document.querySelectorAll('[data-scheme]').forEach(el => {
                 el.classList.toggle('active', parseInt(el.dataset.scheme) === settings.colorScheme);
                 el.addEventListener('click', () => {
-                    document.querySelectorAll('[data-scheme]').forEach(e => e.classList.remove('active'));
-                    el.classList.add('active');
-                    settings.colorScheme = parseInt(el.dataset.scheme);
-                    saveSettings();
-                    loadRadarData();
+                    showToast('RainViewer currently provides the Universal Blue palette only', 'info');
                 });
             });
 
@@ -5552,11 +5606,8 @@
             content.querySelectorAll('[data-source]').forEach(el => {
                 el.classList.toggle('active', el.dataset.source === settings.source);
                 el.addEventListener('click', () => {
-                    content.querySelectorAll('[data-source]').forEach(e => e.classList.remove('active'));
-                    document.querySelectorAll('.sidebar [data-source]').forEach(e => e.classList.remove('active'));
-                    el.classList.add('active');
-                    document.querySelector(`.sidebar [data-source="${el.dataset.source}"]`)?.classList.add('active');
                     settings.source = el.dataset.source;
+                    syncRadarCapabilities();
                     saveSettings();
                     pause();
                     updatePlaybackVisibility();
@@ -5573,6 +5624,10 @@
             content.querySelectorAll('[data-product]').forEach(el => {
                 el.classList.toggle('active', el.dataset.product === settings.radarProduct);
                 el.addEventListener('click', () => {
+                    if (el.getAttribute('aria-disabled') === 'true') {
+                        showToast(`${RADAR_CAPABILITIES[settings.source].label} does not provide that product`, 'warn');
+                        return;
+                    }
                     content.querySelectorAll('[data-product]').forEach(e => e.classList.remove('active'));
                     document.querySelectorAll('.sidebar [data-product]').forEach(e => e.classList.remove('active'));
                     el.classList.add('active');

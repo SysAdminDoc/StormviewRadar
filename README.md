@@ -16,11 +16,11 @@ A modern, feature-rich weather radar visualization application built with vanill
 ## Features
 
 ### Radar & Animation
-- **Dual Radar Sources** — Switch between RainViewer (global, animated) and MRMS (US, real-time)
+- **Four Radar Sources** — Switch between HRRR forecast guidance, RainViewer global history, MRMS US products, and NOAA nowCOAST
 - **Hybrid High-Res Mode** — Automatic MRMS enhancement at high zoom levels (US only)
 - **Smooth Animation** — Play, pause, and step through radar frames with customizable speed (0.5x–3x)
-- **Nowcast/Forecast** — View predicted precipitation up to 30 minutes ahead
-- **8 Color Schemes** — Choose from multiple radar color palettes
+- **Model Forecast** — View HRRR reflectivity guidance through 18 hours
+- **RainViewer History** — Animate approximately two hours of past global radar using the provider's Universal Blue palette (native zoom 7)
 - **Adjustable Opacity** — Fine-tune radar transparency for optimal map visibility
 - **Smart Tile Caching** — Optimized loading with rate limit protection
 
@@ -91,8 +91,10 @@ Required for temperature, wind, clouds, and pressure layers.
 
 | Layer | Source | Update Frequency |
 |-------|--------|------------------|
-| Radar | [RainViewer](https://www.rainviewer.com/) | ~10 minutes |
+| Global radar history | [RainViewer](https://www.rainviewer.com/) | Provider dependent |
+| HRRR forecast radar | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/) | Model cycle |
 | MRMS | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/) | ~2 minutes |
+| NOAA radar mosaic | [nowCOAST](https://nowcoast.noaa.gov/) | Provider dependent |
 | Alerts | [NWS API](https://www.weather.gov/documentation/services-web-api) | Real-time |
 | SPC Outlook | [SPC](https://www.spc.noaa.gov/) | Daily |
 | Storm Reports | SPC | As reported |
@@ -139,7 +141,6 @@ Access the settings panel (⚙️) to customize:
 - High-res mode (MRMS enhancement)
 - Smooth interpolation
 - Snow color mode
-- Color scheme selection
 - Frame delay (200ms–1200ms)
 - Auto-refresh (5 min interval)
 - Loop animation
