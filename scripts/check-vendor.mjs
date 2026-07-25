@@ -6,7 +6,12 @@ const pairs = [
   ['vendor/leaflet/leaflet.js', 'node_modules/leaflet/dist/leaflet.js'],
   ['vendor/leaflet/LICENSE.txt', 'node_modules/leaflet/LICENSE'],
   ['vendor/topojson/topojson-client.min.js', 'node_modules/topojson-client/dist/topojson-client.min.js'],
-  ['vendor/topojson/LICENSE.txt', 'node_modules/topojson-client/LICENSE']
+  ['vendor/topojson/LICENSE.txt', 'node_modules/topojson-client/LICENSE'],
+  ['vendor/nexrad/LICENSE-nexrad-level-2-data.txt', 'node_modules/nexrad-level-2-data/license'],
+  ['vendor/nexrad/LICENSE-seek-bzip.txt', 'node_modules/seek-bzip/LICENSE'],
+  ['vendor/nexrad/LICENSE-buffer.txt', 'node_modules/buffer/LICENSE'],
+  ['vendor/nexrad/LICENSE-base64-js.txt', 'node_modules/base64-js/LICENSE'],
+  ['vendor/nexrad/LICENSE-ieee754.txt', 'node_modules/ieee754/LICENSE']
 ];
 
 function digest(content) {
@@ -27,7 +32,7 @@ const [manifest, html] = await Promise.all([
   readFile(new URL('../package.json', import.meta.url), 'utf8').then(JSON.parse),
   readFile(new URL('../index.html', import.meta.url), 'utf8')
 ]);
-for (const dependency of ['leaflet', 'topojson-client']) {
+for (const dependency of ['buffer', 'leaflet', 'nexrad-level-2-data', 'topojson-client']) {
   if (!/^\d+\.\d+\.\d+$/.test(manifest.dependencies?.[dependency] || '')) {
     throw new Error(`${dependency} must use an exact version in package.json`);
   }

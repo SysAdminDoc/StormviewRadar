@@ -28,6 +28,7 @@ All notable changes to StormviewRadar will be documented in this file.
 - Unified the v0.1.0 identity across package, page metadata, loading UI, diagnostics, README, and release notes, with automated drift and hosted-commit checks.
 - Removed the unused WAQI credential field and migrated schema v2 settings to discard that unimplemented secret surface.
 - Added schema v3 language and unit preferences, Spanish UI/forecast localization, locale-aware dates, metric provider requests, and converted observation/radar units with English fallback.
+- Added schema v4 NEXRAD Level II single-site mode with nearest-site selection, NOAA/Unidata archive discovery, off-thread bzip decoding, and native reflectivity, velocity, ZDR, and correlation-coefficient rendering.
 
 ## [v0.1.0] - 2026-07-25
 

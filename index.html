@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#1e1e2e">
     <meta charset="UTF-8">
     <meta name="application-version" content="0.1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.open-meteo.com https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://server.arcgisonline.com https://stamen-tiles.a.ssl.fastly.net https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:; upgrade-insecure-requests">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.open-meteo.com https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://server.arcgisonline.com https://stamen-tiles.a.ssl.fastly.net https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:; upgrade-insecure-requests">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StormView Radar 0.1.0</title>
     
@@ -524,7 +524,7 @@
         }
 
         .source-tabs {
-            display: flex; gap: 4px;
+            display: flex; flex-wrap: wrap; gap: 4px;
             background: var(--glass-hover);
             padding: 3px;
             border-radius: var(--radius-sm);
@@ -543,6 +543,26 @@
         }
         .source-tab:hover { color: var(--text); }
         .source-tab.active { background: var(--accent); color: #fff; }
+        .level2-site-row {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            color: var(--text-muted);
+            font-size: 10px;
+            font-weight: 600;
+        }
+        .level2-site-row.visible { display: flex; }
+        .level2-site-select {
+            min-width: 0;
+            flex: 1;
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            background: var(--bg-elevated);
+            font-size: 11px;
+        }
         .source-capability-note {
             margin-top: 8px;
             font-size: 10px;
@@ -1702,7 +1722,14 @@
                 <button class="source-tab" data-source="rainviewer" title="Past radar only; approximately 2 hours; native zoom 7">RainViewer</button>
                 <button class="source-tab" data-source="mrms">MRMS</button>
                 <button class="source-tab" data-source="nowcoast" title="NOAA 1km WMS">NOAA</button>
+                <button class="source-tab" data-source="level2" title="Latest single-site NEXRAD base data">Level II</button>
             </div>
+            <label class="level2-site-row">
+                Site
+                <select class="level2-site-select" aria-label="NEXRAD Level II radar site">
+                    <option value="">Nearest to map center</option>
+                </select>
+            </label>
             <div class="source-capability-note" id="sourceCapabilityNote"></div>
         </div>
         
@@ -1732,6 +1759,14 @@
                     <div class="layer-chip" data-product="precipAccum">
                         <span class="dot" style="background: var(--accent)"></span>
                         <span class="layer-name">Precip</span>
+                    </div>
+                    <div class="layer-chip" data-product="differentialReflectivity">
+                        <span class="dot" style="background: var(--warning)"></span>
+                        <span class="layer-name">ZDR</span>
+                    </div>
+                    <div class="layer-chip" data-product="correlationCoefficient">
+                        <span class="dot" style="background: #ec4899"></span>
+                        <span class="layer-name">Correlation</span>
                     </div>
                 </div>
             </div>
@@ -2387,6 +2422,7 @@
             hrrrLatest: 'https://mesonet.agron.iastate.edu/data/gis/images/4326/hrrr/refd_1080.json',
             mrmsLatest: 'https://mesonet.agron.iastate.edu/data/gis/images/4326/USCOMP/n0q_0.json',
             nowcoastCapabilities: 'https://nowcoast.noaa.gov/geoserver/observations/weather_radar/ows?service=WMS&version=1.3.0&request=GetCapabilities',
+            nexradSites: 'https://mesonet.agron.iastate.edu/geojson/network/NEXRAD.geojson',
             
             // Aviation - use NWS API (CORS-friendly) instead of aviationweather.gov
             pireps: 'https://api.weather.gov/alerts/active?event=SIGMET,Convective%20SIGMET',
@@ -2449,7 +2485,13 @@
         let lastRefreshTime = null;
         let radarLoadGeneration = 0;
         let radarAbortController = null;
+        let level2Worker = null;
+        let level2WorkerSequence = 0;
+        let level2LoadedKey = null;
+        let level2Sites = [];
+        const level2WorkerRequests = new Map();
         const REQUEST_TIMEOUT_MS = 15000;
+        const LEVEL2_MAX_BYTES = 80 * 1024 * 1024;
         const NOMINATIM_CONTACT = 'matt_parker@outlook.com';
         const NOMINATIM_REQUEST_INTERVAL_MS = 1250;
         const MAX_ALERT_FEATURES = 750;
@@ -2458,7 +2500,7 @@
         const activeRequests = new Map();
         const layerRequests = new Map();
         const MAX_SETTINGS_BYTES = 32768;
-        const SETTINGS_SCHEMA_VERSION = 3;
+        const SETTINGS_SCHEMA_VERSION = 4;
         const SETTINGS_STORAGE_KEY = 'stormview_settings';
         const LEGACY_SETTINGS_KEYS = ['stormview_pro_v3'];
         const WELCOME_STORAGE_KEY = 'stormview_welcomed';
@@ -2574,6 +2616,11 @@
             'Loop Animation': 'Repetir animación',
             'Radar Source': 'Fuente de radar',
             'Radar Products': 'Productos de radar',
+            'Site': 'Sitio',
+            'Nearest to map center': 'Más cercano al centro del mapa',
+            'Reflectivity': 'Reflectividad',
+            'Velocity': 'Velocidad',
+            'Correlation': 'Correlación',
             'Weather Layers': 'Capas meteorológicas',
             'Map Overlays': 'Capas del mapa',
             'Model Data': 'Datos del modelo',
@@ -2999,7 +3046,7 @@
             };
             const enumFields = {
                 source: Object.keys(RADAR_CAPABILITIES),
-                radarProduct: ['reflectivity', 'velocity', 'echoTops', 'precipAccum'],
+                radarProduct: ['reflectivity', 'velocity', 'echoTops', 'precipAccum', 'differentialReflectivity', 'correlationCoefficient'],
                 basemap: ['dark', 'light', 'satellite', 'terrain', 'clean'],
                 theme: ['dark', 'light'],
                 language: ['en', 'es'],
@@ -3022,6 +3069,9 @@
             result.countyBorderWidth = finiteNumber(candidate.countyBorderWidth, 0, 8, result.countyBorderWidth);
             result.borderOpacity = finiteNumber(candidate.borderOpacity, 0, 1, result.borderOpacity);
             if (typeof candidate.owmKey === 'string') result.owmKey = safeText(candidate.owmKey.trim(), 256);
+            if (typeof candidate.level2Site === 'string' && /^(?:|[A-Z]{4})$/.test(candidate.level2Site)) {
+                result.level2Site = candidate.level2Site;
+            }
 
             if (candidate.layers && typeof candidate.layers === 'object' && !Array.isArray(candidate.layers)) {
                 Object.keys(result.layers).forEach(key => {
@@ -3211,6 +3261,7 @@
             theme: 'dark',
             language: 'en',
             units: 'us',
+            level2Site: '',
             opacity: 0.85,
             smooth: 1,
             snowColor: 1,
@@ -3282,6 +3333,13 @@
                 note: 'Latest NOAA nowCOAST CONUS radar mosaic; single frame.',
                 animation: false,
                 coverage: { label: 'CONUS', bounds: [-125, 24, -66, 50] }
+            },
+            level2: {
+                label: 'NEXRAD Level II',
+                products: ['reflectivity', 'velocity', 'differentialReflectivity', 'correlationCoefficient'],
+                note: 'Latest native single-site base data from the NOAA/Unidata AWS archive.',
+                animation: false,
+                coverage: { label: 'selected radar range' }
             }
         });
 
@@ -3806,7 +3864,18 @@
             const coverage = capability.coverage;
             let state = 'global';
             let message = `${capability.label}: global coverage`;
-            if (coverage?.bounds) {
+            const level2Frame = settings.source === 'level2' ? frames[currentFrame] : null;
+            if (level2Frame?.siteLat && level2Frame?.siteLng && level2Frame?.maxRangeKm) {
+                const distanceKm = map.distance(map.getCenter(), [level2Frame.siteLat, level2Frame.siteLng]) / 1000;
+                const inside = distanceKm <= level2Frame.maxRangeKm;
+                state = inside ? 'inside' : 'outside';
+                message = inside
+                    ? `${capability.label}: ${level2Frame.site} radar range`
+                    : `${capability.label}: outside ${level2Frame.site} radar range`;
+            } else if (settings.source === 'level2') {
+                state = 'inside';
+                message = `${capability.label}: selected radar range`;
+            } else if (coverage?.bounds) {
                 const [west, south, east, north] = coverage.bounds;
                 const center = map.getCenter();
                 const inside = center.lng >= west && center.lng <= east && center.lat >= south && center.lat <= north;
@@ -3832,6 +3901,292 @@
         }
 
         // ==================== RADAR ====================
+        const LEVEL2_FALLBACK_SITES = Object.freeze([
+            { id: 'KTLX', name: 'Oklahoma City, OK', lat: 35.3334, lng: -97.2779 },
+            { id: 'KFTG', name: 'Denver, CO', lat: 39.7866, lng: -104.5458 },
+            { id: 'KLOT', name: 'Chicago, IL', lat: 41.6044, lng: -88.0847 },
+            { id: 'KOKX', name: 'New York City, NY', lat: 40.865, lng: -72.864 },
+            { id: 'KAMX', name: 'Miami, FL', lat: 25.6111, lng: -80.4127 }
+        ]);
+
+        function disposeLevel2Worker(reason = new DOMException('Level II worker stopped', 'AbortError')) {
+            level2Worker?.terminate();
+            level2Worker = null;
+            level2LoadedKey = null;
+            level2WorkerRequests.forEach(request => request.reject(reason));
+            level2WorkerRequests.clear();
+        }
+
+        function getLevel2Worker() {
+            if (level2Worker) return level2Worker;
+            level2Worker = new Worker('vendor/nexrad/level2-worker.js');
+            level2Worker.addEventListener('message', event => {
+                const request = level2WorkerRequests.get(event.data?.id);
+                if (!request) return;
+                clearTimeout(request.timeoutId);
+                request.signal?.removeEventListener('abort', request.abort);
+                level2WorkerRequests.delete(event.data.id);
+                if (event.data.type === 'error') request.reject(new Error(event.data.message));
+                else request.resolve(event.data);
+            });
+            level2Worker.addEventListener('error', event => {
+                const error = new Error(event.message || 'Level II worker failed');
+                disposeLevel2Worker(error);
+            });
+            return level2Worker;
+        }
+
+        function requestLevel2Worker(type, payload, transfer, signal) {
+            const worker = getLevel2Worker();
+            const id = ++level2WorkerSequence;
+            return new Promise((resolve, reject) => {
+                const abort = () => {
+                    const request = level2WorkerRequests.get(id);
+                    if (!request) return;
+                    clearTimeout(request.timeoutId);
+                    level2WorkerRequests.delete(id);
+                    reject(signal.reason || new DOMException('Level II request cancelled', 'AbortError'));
+                };
+                const timeoutId = setTimeout(() => {
+                    level2WorkerRequests.delete(id);
+                    reject(new DOMException('Level II processing timed out after 45 seconds', 'TimeoutError'));
+                    disposeLevel2Worker();
+                }, 45000);
+                level2WorkerRequests.set(id, { resolve, reject, timeoutId, signal, abort });
+                signal?.addEventListener('abort', abort, { once: true });
+                worker.postMessage({ id, type, ...payload }, transfer);
+            });
+        }
+
+        async function loadLevel2Sites(signal) {
+            if (level2Sites.length) return level2Sites;
+            try {
+                const response = await fetchWithTimeout(DATA_URLS.nexradSites, { signal });
+                const data = await response.json();
+                level2Sites = (Array.isArray(data.features) ? data.features : [])
+                    .map(feature => {
+                        const coordinates = feature.geometry?.coordinates;
+                        const stationId = safeText(feature.properties?.sid || feature.id, 8).toUpperCase();
+                        const lat = Number(coordinates?.[1]);
+                        const lng = Number(coordinates?.[0]);
+                        return {
+                            id: stationId.length === 4 ? stationId : `K${stationId}`,
+                            name: safeText(`${feature.properties?.sname || stationId}, ${feature.properties?.state || ''}`.replace(/,\s*$/, ''), 80),
+                            lat,
+                            lng,
+                            online: feature.properties?.online !== false
+                        };
+                    })
+                    .filter(site => site.online
+                        && /^K[A-Z0-9]{3}$/.test(site.id)
+                        && site.lat >= 24 && site.lat <= 50
+                        && site.lng >= -125 && site.lng <= -66)
+                    .sort((left, right) => left.name.localeCompare(right.name));
+                if (!level2Sites.length) throw new Error('No CONUS radar sites were returned');
+            } catch (error) {
+                if (signal?.aborted) throw error;
+                console.warn('NEXRAD site inventory unavailable; using fallback sites:', error);
+                level2Sites = LEVEL2_FALLBACK_SITES.map(site => ({ ...site }));
+            }
+            syncLevel2SiteControls();
+            return level2Sites;
+        }
+
+        function nearestLevel2Site() {
+            const center = map.getCenter();
+            return level2Sites.reduce((nearest, site) => {
+                const distance = map.distance(center, [site.lat, site.lng]);
+                return !nearest || distance < nearest.distance ? { ...site, distance } : nearest;
+            }, null);
+        }
+
+        function selectedLevel2Site() {
+            return level2Sites.find(site => site.id === settings.level2Site) || nearestLevel2Site();
+        }
+
+        function syncLevel2SiteControls() {
+            document.querySelectorAll('.level2-site-row').forEach(row => {
+                row.classList.toggle('visible', settings.source === 'level2');
+            });
+            document.querySelectorAll('.level2-site-select').forEach(select => {
+                const previousValue = settings.level2Site;
+                select.replaceChildren(new Option('Nearest to map center', ''));
+                level2Sites.forEach(site => select.add(new Option(`${site.id} — ${site.name}`, site.id)));
+                select.value = previousValue;
+                if (select.dataset.wired === 'true') return;
+                select.dataset.wired = 'true';
+                select.addEventListener('change', () => {
+                    settings.level2Site = select.value;
+                    document.querySelectorAll('.level2-site-select').forEach(other => {
+                        other.value = settings.level2Site;
+                    });
+                    saveSettings();
+                    if (settings.source === 'level2') loadRadarData();
+                });
+            });
+        }
+
+        function level2DatePrefix(date, siteId) {
+            const year = date.getUTCFullYear();
+            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(date.getUTCDate()).padStart(2, '0');
+            return `${year}/${month}/${day}/${siteId}/`;
+        }
+
+        async function findLatestLevel2Object(siteId, signal) {
+            for (let dayOffset = 0; dayOffset <= 1; dayOffset += 1) {
+                const date = new Date(Date.now() - dayOffset * 86400000);
+                const prefix = level2DatePrefix(date, siteId);
+                const query = new URLSearchParams({ 'list-type': '2', prefix, 'max-keys': '1000' });
+                const response = await fetchWithTimeout(
+                    `https://unidata-nexrad-level2.s3.amazonaws.com/?${query}`,
+                    { signal }
+                );
+                const xml = new DOMParser().parseFromString(await response.text(), 'application/xml');
+                if (xml.querySelector('parsererror')) throw new Error('The Level II archive returned invalid XML');
+                const keys = [...xml.getElementsByTagName('Key')]
+                    .map(node => node.textContent || '')
+                    .filter(key => /_V\d{2}$/.test(key))
+                    .sort();
+                if (!keys.length) continue;
+                const key = keys.at(-1);
+                const timestampMatch = key.match(/([0-9]{8})_([0-9]{6})_V\d{2}$/);
+                if (!timestampMatch) throw new Error('The latest Level II filename has an unknown timestamp');
+                const [, ymd, hms] = timestampMatch;
+                const time = Date.UTC(
+                    Number(ymd.slice(0, 4)),
+                    Number(ymd.slice(4, 6)) - 1,
+                    Number(ymd.slice(6, 8)),
+                    Number(hms.slice(0, 2)),
+                    Number(hms.slice(2, 4)),
+                    Number(hms.slice(4, 6))
+                ) / 1000;
+                return {
+                    key,
+                    url: `https://unidata-nexrad-level2.s3.amazonaws.com/${key}`,
+                    time
+                };
+            }
+            throw new Error(`No current Level II volume is available for ${siteId}`);
+        }
+
+        async function downloadLevel2Volume(url, signal) {
+            const response = await fetchWithTimeout(url, { signal }, 30000);
+            const declaredLength = Number(response.headers.get('content-length'));
+            if (declaredLength > LEVEL2_MAX_BYTES) {
+                throw new Error(`Level II volume exceeds the ${Math.round(LEVEL2_MAX_BYTES / 1048576)} MB safety limit`);
+            }
+            if (!response.body) return response.arrayBuffer();
+            const reader = response.body.getReader();
+            const chunks = [];
+            let total = 0;
+            while (true) {
+                if (signal.aborted) {
+                    await reader.cancel(signal.reason);
+                    throw signal.reason;
+                }
+                const { done, value } = await reader.read();
+                if (done) break;
+                total += value.byteLength;
+                if (total > LEVEL2_MAX_BYTES) {
+                    await reader.cancel();
+                    throw new Error(`Level II volume exceeds the ${Math.round(LEVEL2_MAX_BYTES / 1048576)} MB safety limit`);
+                }
+                chunks.push(value);
+                if (declaredLength > 0) updateLoadProgress(15 + Math.round(total / declaredLength * 45));
+            }
+            const result = new Uint8Array(total);
+            let offset = 0;
+            chunks.forEach(chunk => {
+                result.set(chunk, offset);
+                offset += chunk.byteLength;
+            });
+            return result.buffer;
+        }
+
+        function imageBitmapToUrl(bitmap) {
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            canvas.getContext('2d').drawImage(bitmap, 0, 0);
+            bitmap.close();
+            return new Promise((resolve, reject) => {
+                canvas.toBlob(blob => {
+                    if (blob) resolve(URL.createObjectURL(blob));
+                    else reject(new Error('Level II image encoding failed'));
+                }, 'image/png');
+            });
+        }
+
+        async function loadLevel2(signal, generation) {
+            showLoadProgress();
+            updateLoadProgress(5);
+            await loadLevel2Sites(signal);
+            ensureCurrentRadarLoad(generation, signal);
+            const site = selectedLevel2Site();
+            if (!site) throw new Error('No NEXRAD Level II site is available');
+            const object = await findLatestLevel2Object(site.id, signal);
+            ensureCurrentRadarLoad(generation, signal);
+            updateLoadProgress(15);
+            if (level2LoadedKey !== object.key) {
+                const buffer = await downloadLevel2Volume(object.url, signal);
+                ensureCurrentRadarLoad(generation, signal);
+                updateLoadProgress(65);
+                const transferable = buffer.slice(0);
+                await requestLevel2Worker('load', { buffer: transferable }, [transferable], signal);
+                level2LoadedKey = object.key;
+            }
+            updateLoadProgress(75);
+            const rendered = await requestLevel2Worker('render', { product: settings.radarProduct }, [], signal);
+            ensureCurrentRadarLoad(generation, signal);
+            const imageUrl = await imageBitmapToUrl(rendered.bitmap);
+            ensureCurrentRadarLoad(generation, signal);
+
+            const latitudeDelta = rendered.maxRangeKm / 110.574;
+            const longitudeDelta = rendered.maxRangeKm / (111.320 * Math.cos(rendered.latitude * Math.PI / 180));
+            const bounds = L.latLngBounds(
+                [rendered.latitude - latitudeDelta, rendered.longitude - longitudeDelta],
+                [rendered.latitude + latitudeDelta, rendered.longitude + longitudeDelta]
+            );
+            const layer = L.imageOverlay(imageUrl, bounds, {
+                opacity: settings.opacity,
+                pane: 'radarPane',
+                className: 'radar-layer level2-radar',
+                alt: `${rendered.site} ${settings.radarProduct} Level II radar`
+            });
+            layer.getAttribution = () => 'NEXRAD Level II: NOAA / NSF Unidata';
+            layer._stormviewObjectUrl = imageUrl;
+            layer.addTo(map);
+            frameLayers = [layer];
+            frames = [{
+                time: object.time,
+                path: object.key,
+                kind: 'latest',
+                site: rendered.site,
+                elevationAngle: rendered.elevationAngle,
+                siteLat: rendered.latitude,
+                siteLng: rendered.longitude,
+                maxRangeKm: rendered.maxRangeKm,
+                timeSource: 'NOAA/Unidata NEXRAD Level II archive filename'
+            }];
+            lastPastFrame = 0;
+            currentFrame = 0;
+            framesLoaded = 1;
+            framesTotal = 1;
+            framesReady = true;
+            lastRefreshTime = Date.now();
+            updateLoadProgress(100);
+            updateTimestamp();
+            updateTimelineUI();
+            updateLegend();
+            updateCoverageStatus();
+            if (!map.getBounds().intersects(bounds)) map.fitBounds(bounds, { maxZoom: 7 });
+            if (rendered.hasGaps || rendered.isTruncated) {
+                showToast(`${rendered.site} volume decoded with missing radials`, 'warn', 5000);
+            }
+            hideLoadProgress();
+        }
+
         function captureRadarState() {
             if (!frameLayers.length || !frames.length) return null;
             return {
@@ -3890,6 +4245,7 @@
             radarAbortController = new AbortController();
             const { signal } = radarAbortController;
             const requestedSource = settings.source;
+            if (requestedSource !== 'level2') disposeLevel2Worker();
             const previousState = captureRadarState();
             const capability = RADAR_CAPABILITIES[requestedSource] || RADAR_CAPABILITIES.mrms;
 
@@ -3907,6 +4263,8 @@
                     await loadHRRR(signal, generation);
                 } else if (requestedSource === 'nowcoast') {
                     await loadNowCOAST(signal, generation);
+                } else if (requestedSource === 'level2') {
+                    await loadLevel2(signal, generation);
                 }
                 ensureCurrentRadarLoad(generation, signal);
                 lastRefreshTime = Date.now();
@@ -4700,6 +5058,7 @@
             loadAborted = true;
             frameLayers.forEach(layer => {
                 if (map.hasLayer(layer)) map.removeLayer(layer);
+                if (layer._stormviewObjectUrl) URL.revokeObjectURL(layer._stormviewObjectUrl);
             });
             frameLayers = [];
             framesLoaded = 0;
@@ -5470,6 +5829,15 @@
                     frameEl.textContent = `F${String(hour).padStart(2, '0')} ${t('forecast')} • ${formatProviderAge(frame)} • ${currentFrame + 1}/${frames.length}`;
                 }
                 frameEl.title = `Model initialized ${new Date(frame.modelInitTime * 1000).toISOString()}`;
+            } else if (settings.source === 'level2') {
+                const productNames = {
+                    reflectivity: 'Reflectivity',
+                    velocity: 'Velocity',
+                    differentialReflectivity: 'ZDR',
+                    correlationCoefficient: 'Correlation coefficient'
+                };
+                frameEl.textContent = `${frame.site} ${frame.elevationAngle.toFixed(1)}° • ${translatedExact(productNames[settings.radarProduct])} • ${formatProviderAge(frame)}`;
+                frameEl.title = `${frame.timeSource || ''}: ${frame.path || ''}`;
             } else if (!RADAR_CAPABILITIES[settings.source]?.animation) {
                 frameEl.textContent = `${frameKind} • ${formatProviderAge(frame)}`;
                 frameEl.title = frame.timeSource || '';
@@ -5662,11 +6030,23 @@
             const labels = document.querySelector('.legend-labels');
             if (!gradient || !labels) return;
             
-            if (settings.radarProduct === 'velocity' && settings.source === 'mrms') {
+            if (settings.radarProduct === 'velocity') {
                 gradient.style.background = 'linear-gradient(to bottom, #ff0000 0%, #ff6600 15%, #ffaa00 30%, #ffffff 50%, #00aaff 70%, #0055ff 85%, #0000aa 100%)';
-                labels.innerHTML = settings.units === 'metric'
-                    ? '<span>+130 km/h</span><span>+93</span><span>+56</span><span>0</span><span>-56</span><span>-93</span><span>-130 km/h</span>'
-                    : '<span>+70 kt</span><span>+50</span><span>+30</span><span>0</span><span>-30</span><span>-50</span><span>-70 kt</span>';
+                if (settings.source === 'level2') {
+                    labels.innerHTML = settings.units === 'metric'
+                        ? '<span>+230 km/h</span><span>+145</span><span>+55</span><span>0</span><span>-55</span><span>-145</span><span>-230 km/h</span>'
+                        : '<span>+125 kt</span><span>+80</span><span>+30</span><span>0</span><span>-30</span><span>-80</span><span>-125 kt</span>';
+                } else {
+                    labels.innerHTML = settings.units === 'metric'
+                        ? '<span>+130 km/h</span><span>+93</span><span>+56</span><span>0</span><span>-56</span><span>-93</span><span>-130 km/h</span>'
+                        : '<span>+70 kt</span><span>+50</span><span>+30</span><span>0</span><span>-30</span><span>-50</span><span>-70 kt</span>';
+                }
+            } else if (settings.radarProduct === 'differentialReflectivity') {
+                gradient.style.background = 'linear-gradient(to bottom, #780082 0%, #d20064 25%, #ff8200 45%, #ffff00 65%, #e6e6e6 80%, #0096ff 100%)';
+                labels.innerHTML = '<span>+8 dB</span><span>+6</span><span>+3</span><span>+1</span><span>0</span><span>-1</span><span>-4 dB</span>';
+            } else if (settings.radarProduct === 'correlationCoefficient') {
+                gradient.style.background = 'linear-gradient(to bottom, #1e3cb4 0%, #00aaff 25%, #50d250 45%, #ffdc00 65%, #ff6400 80%, #dc008c 92%, #501e78 100%)';
+                labels.innerHTML = '<span>1.05</span><span>1.00</span><span>0.98</span><span>0.95</span><span>0.90</span><span>0.80</span><span>0.65</span>';
             } else if (settings.radarProduct === 'echoTops' && settings.source === 'mrms') {
                 gradient.style.background = 'linear-gradient(to bottom, #ff00ff 0%, #ff0000 20%, #ff8800 40%, #ffff00 60%, #00ff00 80%, #0088ff 100%)';
                 labels.innerHTML = settings.units === 'metric'
@@ -6214,6 +6594,7 @@
             document.querySelectorAll('.source-capability-note').forEach(note => {
                 note.textContent = `${capability.note} Coverage: ${capability.coverage.label}.`;
             });
+            syncLevel2SiteControls();
             updateCoverageStatus();
         }
 
@@ -6261,13 +6642,6 @@
                     el.classList.add('active');
                     settings.radarProduct = el.dataset.product;
                     saveSettings();
-                    // Auto-switch to MRMS since products only work with MRMS
-                    if (settings.source !== 'mrms') {
-                        settings.source = 'mrms';
-                        document.querySelectorAll('[data-source]').forEach(e => e.classList.remove('active'));
-                        document.querySelector('[data-source="mrms"]')?.classList.add('active');
-                        updatePlaybackVisibility();
-                    }
                     pause();
                     updateLegend();
                     loadRadarData();
@@ -6794,6 +7168,7 @@
                     layersTab.appendChild(clone);
                 }
             });
+            syncLevel2SiteControls();
 
             // Tab switching
             document.querySelectorAll('.sheet-tab[data-sheet-tab]').forEach(tab => {
@@ -6851,14 +7226,6 @@
                     document.querySelector(`.sidebar [data-product="${el.dataset.product}"]`)?.classList.add('active');
                     settings.radarProduct = el.dataset.product;
                     saveSettings();
-                    if (settings.source !== 'mrms') {
-                        settings.source = 'mrms';
-                        content.querySelectorAll('[data-source]').forEach(e => e.classList.remove('active'));
-                        content.querySelector('[data-source="mrms"]')?.classList.add('active');
-                        document.querySelectorAll('.sidebar [data-source]').forEach(e => e.classList.remove('active'));
-                        document.querySelector('.sidebar [data-source="mrms"]')?.classList.add('active');
-                        updatePlaybackVisibility();
-                    }
                     pause();
                     updateLegend();
                     loadRadarData();

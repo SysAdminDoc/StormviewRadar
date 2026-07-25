@@ -4,16 +4,20 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:level2": "node scripts/build-level2-worker.mjs",
     "test": "npm run test:static && playwright test",
-    "test:static": "node scripts/check-version.mjs && node scripts/check-vendor.mjs && node scripts/check-static.mjs",
+    "test:static": "npm run build:level2 && node scripts/check-version.mjs && node scripts/check-vendor.mjs && node scripts/check-static.mjs",
     "release:check": "npm test && npm audit --audit-level=high"
   },
   "dependencies": {
+    "buffer": "6.0.3",
     "leaflet": "1.9.4",
+    "nexrad-level-2-data": "2.4.3",
     "topojson-client": "3.1.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.12.1",
-    "@playwright/test": "1.62.0"
+    "@playwright/test": "1.62.0",
+    "esbuild": "0.25.6"
   }
 }

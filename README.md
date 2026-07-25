@@ -17,7 +17,8 @@ A modern, feature-rich weather radar visualization application built with vanill
 ## Features
 
 ### Radar & Animation
-- **Four Radar Sources** — Switch between HRRR forecast guidance, RainViewer global history, MRMS US products, and NOAA nowCOAST
+- **Five Radar Sources** — Switch between HRRR forecast guidance, RainViewer global history, MRMS US products, NOAA nowCOAST, and native NEXRAD Level II
+- **NEXRAD Level II** — Select the nearest or a named CONUS site and render current 0.5° reflectivity, velocity, ZDR, or correlation coefficient directly from the NOAA/Unidata AWS archive
 - **Hybrid High-Res Mode** — Automatic MRMS enhancement at high zoom levels (US only)
 - **Smooth Animation** — Play, pause, and step through radar frames with customizable speed (0.5x–3x)
 - **Model Forecast** — View HRRR reflectivity guidance through 18 hours
@@ -103,6 +104,7 @@ API keys are stored unencrypted in the current browser profile and sent directly
 | HRRR forecast radar | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/) | Model cycle |
 | MRMS | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/) | ~2 minutes |
 | NOAA radar mosaic | [nowCOAST](https://nowcoast.noaa.gov/) | Provider dependent |
+| NEXRAD Level II | [NOAA / NSF Unidata on AWS](https://registry.opendata.aws/noaa-nexrad/) | Per volume scan |
 | Alerts | [NWS API](https://www.weather.gov/documentation/services-web-api) | Real-time |
 | SPC Outlook | [SPC](https://www.spc.noaa.gov/) | Daily |
 | Storm Reports | SPC | As reported |
@@ -126,13 +128,14 @@ viewports. Firefox and Safari remain supported manual-test targets.
 - **Leaflet** — Interactive mapping
 - **TopoJSON Client** — Bundled boundary conversion
 - **OpenStreetMap** — Base map tiles and geocoding
-- **Vanilla JS** — No frameworks, no build tools
+- **Vanilla JS** — No runtime framework or server component
 - **CSS Variables** — Dynamic theming
 - **LocalStorage** — Settings persistence
 
-Leaflet 1.9.4 and TopoJSON Client 3.1.0 are vendored from exact npm package
-versions. A Content Security Policy blocks unapproved executable, style, and
-network origins. To verify a change locally:
+Leaflet 1.9.4, TopoJSON Client 3.1.0, and the Level II worker dependencies are
+vendored or bundled from exact npm package versions. Level II bzip decoding and
+polar image rendering run off the main thread. A Content Security Policy blocks
+unapproved executable, style, and network origins. To verify a change locally:
 
 ```bash
 npm ci
@@ -182,9 +185,10 @@ Access the settings panel (⚙️) to customize:
 StormviewRadar/
 ├── index.html          # Single-file application
 ├── package.json        # Locked test and vendored-runtime dependencies
-├── scripts/            # Static and vendor integrity checks
+├── scripts/            # Static checks and Level II worker build
+├── src/                # Level II worker source and browser shims
 ├── tests/              # Deterministic Playwright browser tests
-├── vendor/             # Pinned Leaflet and TopoJSON runtime assets
+├── vendor/             # Pinned Leaflet, TopoJSON, and NEXRAD runtime assets
 ├── README.md           # Documentation
 ├── LICENSE             # MIT License
 └── logo/               # App icons and favicons
@@ -220,6 +224,7 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 - [National Weather Service](https://www.weather.gov/) for alerts and forecasts
 - [Storm Prediction Center](https://www.spc.noaa.gov/) for severe weather outlooks
 - [USGS](https://waterservices.usgs.gov/) for river gauge data
+- [NOAA and NSF Unidata](https://registry.opendata.aws/noaa-nexrad/) for the public NEXRAD Level II archive
 - [Leaflet](https://leafletjs.com/) for the mapping library
 - [OpenStreetMap](https://www.openstreetmap.org/) contributors
 - [CARTO](https://carto.com/) for basemap tiles

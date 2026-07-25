@@ -27,7 +27,8 @@ const requiredAssets = [
   ['index.html', 'text/html'],
   ['logo/StormView-512x512.png', 'image/png'],
   ['vendor/leaflet/leaflet.css', 'text/css'],
-  ['vendor/leaflet/leaflet.js', 'javascript']
+  ['vendor/leaflet/leaflet.js', 'javascript'],
+  ['vendor/nexrad/level2-worker.js', 'javascript']
 ];
 for (const [path, expectedType] of requiredAssets) {
   const response = await fetch(new URL(`${path}?${cacheBust}`, baseUrl), { cache: 'no-store' });
