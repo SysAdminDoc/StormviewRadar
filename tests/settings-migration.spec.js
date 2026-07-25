@@ -46,15 +46,16 @@ test('legacy settings migrate once into the versioned schema', async ({ page }) 
     legacy: localStorage.getItem('stormview_pro_v3')
   }));
 
-  expect(storage.current.schemaVersion).toBe(1);
+  expect(storage.current.schemaVersion).toBe(2);
   expect(storage.current.settings.basemap).toBe('terrain');
   expect(storage.current.settings.theme).toBe('light');
   expect(storage.current.settings.owmKey).toBe('secret-owm-value');
+  expect(storage.current.settings).not.toHaveProperty('waqiKey');
   expect(storage.legacy).toBeNull();
   await expect(page.locator('.sidebar [data-basemap="terrain"]')).toHaveClass(/active/);
 });
 
-test('settings export is versioned and excludes API keys', async ({ page }) => {
+test('settings export is versioned and excludes the API key', async ({ page }) => {
   await page.goto('/');
   await page.locator('#settingsBtn').click();
   const downloadPromise = page.waitForEvent('download');
@@ -66,8 +67,8 @@ test('settings export is versioned and excludes API keys', async ({ page }) => {
   const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
 
   expect(download.suggestedFilename()).toBe('stormview-settings.json');
-  expect(payload.schemaVersion).toBe(1);
-  expect(payload.secretsOmitted).toEqual(['owmKey', 'waqiKey']);
+  expect(payload.schemaVersion).toBe(2);
+  expect(payload.secretsOmitted).toEqual(['owmKey']);
   expect(payload.settings).not.toHaveProperty('owmKey');
   expect(payload.settings).not.toHaveProperty('waqiKey');
   expect(payload.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
@@ -80,7 +81,7 @@ test('future imports and browser quota failures are visible and recoverable', as
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ schemaVersion: 999, settings: {} }))
   });
-  await expect(page.locator('.toast').last()).toContainText('supports 1');
+  await expect(page.locator('.toast').last()).toContainText('supports 2');
 
   await page.evaluate(() => {
     Storage.prototype.setItem = () => {

@@ -84,7 +84,7 @@ python -m http.server 8000
 
 ## API Keys (Optional)
 
-Some features require free API keys:
+The optional OpenWeatherMap overlays require a free API key:
 
 ### OpenWeatherMap
 Required for temperature, wind, clouds, and pressure layers.

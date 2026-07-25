@@ -2234,15 +2234,6 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
                     </a>
                 </div>
-                <div class="settings-section">
-                    <div class="settings-section-title">WAQI (Air Quality)</div>
-                    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Optional - for air quality overlay</p>
-                    <input type="password" class="api-input" id="waqiKeyInput" placeholder="Enter your WAQI API key" aria-label="WAQI API key" autocomplete="off" spellcheck="false">
-                    <a class="api-link" href="https://aqicn.org/data-platform/token/" target="_blank">
-                        Get free API key
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
-                    </a>
-                </div>
                 <p class="setting-hint" role="note">Keys are stored unencrypted in this browser profile and sent directly to their providers. Anyone with local browser access can read them. Settings exports always omit keys.</p>
                 <button class="btn" id="saveKeysBtn" style="width:100%;margin-top:20px;background:var(--accent);color:#fff;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
@@ -2453,7 +2444,7 @@
         const activeRequests = new Map();
         const layerRequests = new Map();
         const MAX_SETTINGS_BYTES = 32768;
-        const SETTINGS_SCHEMA_VERSION = 1;
+        const SETTINGS_SCHEMA_VERSION = 2;
         const SETTINGS_STORAGE_KEY = 'stormview_settings';
         const LEGACY_SETTINGS_KEYS = ['stormview_pro_v3'];
         const WELCOME_STORAGE_KEY = 'stormview_welcomed';
@@ -2805,9 +2796,7 @@
             result.stateBorderWidth = finiteNumber(candidate.stateBorderWidth, 0, 8, result.stateBorderWidth);
             result.countyBorderWidth = finiteNumber(candidate.countyBorderWidth, 0, 8, result.countyBorderWidth);
             result.borderOpacity = finiteNumber(candidate.borderOpacity, 0, 1, result.borderOpacity);
-            ['owmKey', 'waqiKey'].forEach(key => {
-                if (typeof candidate[key] === 'string') result[key] = safeText(candidate[key].trim(), 256);
-            });
+            if (typeof candidate.owmKey === 'string') result.owmKey = safeText(candidate.owmKey.trim(), 256);
 
             if (candidate.layers && typeof candidate.layers === 'object' && !Array.isArray(candidate.layers)) {
                 Object.keys(result.layers).forEach(key => {
@@ -3005,7 +2994,6 @@
             showLegend: true,
             highResMode: true,
             owmKey: '',
-            waqiKey: '',
             useLocalTime: true,
             stateBorderWidth: 2,
             countyBorderWidth: 1,
@@ -6302,11 +6290,9 @@
 
             // API keys
             document.getElementById('owmKeyInput').value = settings.owmKey;
-            document.getElementById('waqiKeyInput').value = settings.waqiKey || '';
             
             document.getElementById('saveKeysBtn').addEventListener('click', () => {
                 settings.owmKey = document.getElementById('owmKeyInput').value.trim();
-                settings.waqiKey = document.getElementById('waqiKeyInput').value.trim();
                 if (saveSettings()) showToast('API keys saved in this browser profile', 'success', 2500);
             });
 
@@ -6314,11 +6300,10 @@
             document.getElementById('exportBtn').addEventListener('click', () => {
                 const exportSettings = validateSettingsPayload(settings);
                 delete exportSettings.owmKey;
-                delete exportSettings.waqiKey;
                 const payload = {
                     schemaVersion: SETTINGS_SCHEMA_VERSION,
                     exportedAt: new Date().toISOString(),
-                    secretsOmitted: ['owmKey', 'waqiKey'],
+                    secretsOmitted: ['owmKey'],
                     settings: exportSettings
                 };
                 const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
