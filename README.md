@@ -27,6 +27,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Smooth Animation** — Play, pause, and step through radar frames with customizable speed (0.5x–3x)
 - **Model Forecast** — View HRRR reflectivity guidance through 18 hours
 - **RainViewer History** — Animate approximately two hours of past global radar using the provider's Universal Blue palette (native zoom 7)
+- **Historical Event Replay** — Select up to six hours and replay five-minute IEM NEXRAD composites with storm-based warning polygons synchronized to each frame
 - **Provider-Time Timeline** — Show model initialization, valid time, forecast lead, data age, timezone, and source coverage without substituting the client clock
 - **Accessible Controls** — Keyboard-operable layers and timeline, labeled search suggestions, focus-managed dialogs, and reduced-motion/forced-colors support
 - **Adjustable Opacity** — Fine-tune radar transparency for optimal map visibility
@@ -115,6 +116,7 @@ API keys are stored unencrypted in the current browser profile and sent directly
 | MRMS MESH | [NOAA Open Data on AWS](https://registry.opendata.aws/noaa-mrms-pds/) | ~2 minutes |
 | NOAA radar mosaic | [nowCOAST](https://nowcoast.noaa.gov/) | Provider dependent |
 | NEXRAD Level II | [NOAA / NSF Unidata on AWS](https://registry.opendata.aws/noaa-nexrad/) | Per volume scan |
+| Historical radar and warnings | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/GIS/rasters.php?rid=2) | 5-minute frames |
 | Alerts | [NWS API](https://www.weather.gov/documentation/services-web-api) | Real-time |
 | SPC Outlook | [SPC](https://www.spc.noaa.gov/) | Daily |
 | Storm Reports | SPC | As reported |

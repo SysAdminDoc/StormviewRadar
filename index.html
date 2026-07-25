@@ -2343,6 +2343,23 @@
                         <div class="toggle on" id="loopToggle"></div>
                     </div>
                 </div>
+                <div class="settings-section">
+                    <div class="settings-section-title">Historical Replay</div>
+                    <p class="setting-hint" role="note" style="margin-bottom:10px;">Replay IEM NEXRAD composites and storm-based warning polygons. Times use your browser timezone; ranges are limited to 6 hours.</p>
+                    <div class="setting-row">
+                        <label class="setting-label" for="replayStartInput">Start</label>
+                        <input class="api-input" id="replayStartInput" type="datetime-local" style="width:190px;padding:8px;">
+                    </div>
+                    <div class="setting-row">
+                        <label class="setting-label" for="replayEndInput">End</label>
+                        <input class="api-input" id="replayEndInput" type="datetime-local" style="width:190px;padding:8px;">
+                    </div>
+                    <div class="btn-row" style="margin-top:12px;">
+                        <button class="btn" id="startReplayBtn" type="button">Start Replay</button>
+                        <button class="btn" id="exitReplayBtn" type="button" disabled>Return Live</button>
+                    </div>
+                    <div class="setting-hint" id="replayStatus" role="status" aria-live="polite" style="margin-top:10px;">Live mode</div>
+                </div>
             </div>
             <!-- Alerts Tab -->
             <div class="settings-tab-content" data-tab-content="alerts" style="display:none;">
@@ -2530,6 +2547,7 @@
             
             // NWS Alerts
             nwsAlerts: 'https://api.weather.gov/alerts/active?status=actual',
+            iemStormBasedWarnings: 'https://mesonet.agron.iastate.edu/geojson/sbw.geojson',
             
             // SPC Products - Categorical Outlooks
             spcOutlookDay1: 'https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson',
@@ -2651,6 +2669,10 @@
         let currentAlertFeatures = [];
         let geofences = [];
         const seenAlertIds = new Set();
+        let historicalReplayToolsPromise = null;
+        let replayAbortController = null;
+        let replayMode = false;
+        let replayWarnings = [];
         const meshWorkerRequests = new Map();
         const level2WorkerRequests = new Map();
         const REQUEST_TIMEOUT_MS = 15000;
@@ -2800,6 +2822,14 @@
             'Export': 'Exportar',
             'Import': 'Importar',
             'Radar Display': 'Pantalla de radar',
+            'Historical Replay': 'Repetición histórica',
+            'Replay IEM NEXRAD composites and storm-based warning polygons. Times use your browser timezone; ranges are limited to 6 hours.': 'Reproduce mosaicos NEXRAD de IEM y polígonos históricos de alertas. Las horas usan la zona del navegador; el intervalo máximo es de 6 horas.',
+            'Start': 'Inicio',
+            'End': 'Fin',
+            'Start Replay': 'Iniciar repetición',
+            'Return Live': 'Volver a tiempo real',
+            'Live mode': 'Modo en vivo',
+            'Replay': 'Repetición',
             'Opacity': 'Opacidad',
             'Smooth Radar': 'Radar suavizado',
             'Snow Colors': 'Colores de nieve',
@@ -4849,6 +4879,7 @@
         }
 
         async function loadRadarData() {
+            if (replayMode) return;
             const generation = ++radarLoadGeneration;
             radarAbortController?.abort(new DOMException('Superseded radar request', 'AbortError'));
             radarAbortController = new AbortController();
@@ -5676,33 +5707,49 @@
                 }
             }
             
-            // Memory management: remove distant frames, but keep a wider buffer
-            // so we always have pre-loaded frames ready for smooth playback
-            frameLayers.forEach((layer, i) => {
-                if (!layer || i === idx || i === prevFrame) return;
-                const distance = Math.min(
-                    Math.abs(i - currentFrame),
-                    // Wrap-around distance for looping
-                    frameLayers.length - Math.abs(i - currentFrame)
-                );
-                if (distance > 4) {
-                    if (map.hasLayer(layer)) {
-                        map.removeLayer(layer);
+            if (replayMode) {
+                // Archived composites are large single images. Preserve the cross-fade,
+                // then release every inactive image instead of retaining the live-radar
+                // preload buffer.
+                const replayLayers = frameLayers;
+                const activeLayer = frameLayers[idx];
+                setTimeout(() => {
+                    replayLayers.forEach(layer => {
+                        if (layer && layer !== activeLayer && map.hasLayer(layer)) {
+                            map.removeLayer(layer);
+                        }
+                    });
+                }, 320);
+            } else {
+                // Memory management: remove distant frames, but keep a wider buffer
+                // so we always have pre-loaded frames ready for smooth playback
+                frameLayers.forEach((layer, i) => {
+                    if (!layer || i === idx || i === prevFrame) return;
+                    const distance = Math.min(
+                        Math.abs(i - currentFrame),
+                        // Wrap-around distance for looping
+                        frameLayers.length - Math.abs(i - currentFrame)
+                    );
+                    if (distance > 4) {
+                        if (map.hasLayer(layer)) {
+                            map.removeLayer(layer);
+                        }
+                    } else if (i !== currentFrame) {
+                        // Keep nearby frames on map but hidden (no transition needed)
+                        const cont = layer.getContainer?.();
+                        if (cont) {
+                            cont.classList.remove('radar-crossfade');
+                            cont.style.opacity = '0';
+                        } else {
+                            layer.setOpacity(0);
+                        }
                     }
-                } else if (i !== currentFrame) {
-                    // Keep nearby frames on map but hidden (no transition needed)
-                    const cont = layer.getContainer?.();
-                    if (cont) {
-                        cont.classList.remove('radar-crossfade');
-                        cont.style.opacity = '0';
-                    } else {
-                        layer.setOpacity(0);
-                    }
-                }
-            });
+                });
+            }
             
             updateTimestamp();
             updateTimelineFill();
+            if (replayMode) renderReplayAlerts(frames[idx].time * 1000);
         }
 
         function clearAllFrameLayers() {
@@ -5734,6 +5781,7 @@
         }
 
         function preloadNearbyFrames(idx, count) {
+            if (replayMode) return;
             // Preload upcoming frames by adding them to map (but hidden)
             for (let i = 1; i <= count; i++) {
                 const nextIdx = (idx + i) % frameLayers.length;
@@ -5820,7 +5868,11 @@
                     on ? renderLevel2Couplets() : removeLayer('couplets');
                     break;
                 case 'alerts':
-                    on ? loadAlerts() : removeLayer('alerts');
+                    if (replayMode) {
+                        on ? renderReplayAlerts(frames[currentFrame].time * 1000) : removeLayer('alerts');
+                    } else {
+                        on ? loadAlerts() : removeLayer('alerts');
+                    }
                     break;
                 case 'spcOutlook':
                     on ? loadSPCOutlook() : removeLayer('spcOutlook');
@@ -5980,6 +6032,145 @@
         function alertAudioTools() {
             if (!alertAudioToolsPromise) alertAudioToolsPromise = import('./src/alert-audio.js');
             return alertAudioToolsPromise;
+        }
+
+        function historicalReplayTools() {
+            if (!historicalReplayToolsPromise) historicalReplayToolsPromise = import('./src/historical-replay.js');
+            return historicalReplayToolsPromise;
+        }
+
+        function localDateTimeInputValue(date) {
+            const pad = value => String(value).padStart(2, '0');
+            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+                + `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        }
+
+        function setReplayControlState(status) {
+            const statusElement = document.getElementById('replayStatus');
+            if (statusElement) statusElement.textContent = status;
+            const startButton = document.getElementById('startReplayBtn');
+            const exitButton = document.getElementById('exitReplayBtn');
+            if (startButton) startButton.disabled = replayMode || status === 'Loading replay…';
+            if (exitButton) exitButton.disabled = !replayMode;
+        }
+
+        async function renderReplayAlerts(timestamp) {
+            if (!replayMode) return;
+            const tools = await historicalReplayTools();
+            removeLayer('alerts');
+            if (!settings.layers.alerts) return;
+            const activeWarnings = replayWarnings
+                .filter(feature => tools.warningActiveAt(feature, timestamp))
+                .slice(0, MAX_ALERT_FEATURES);
+            layerRefs.alerts = L.geoJSON({ type: 'FeatureCollection', features: activeWarnings }, {
+                pane: 'alertPane',
+                style: feature => {
+                    const phenomena = safeText(feature.properties?.phenomena, 4).toUpperCase();
+                    const color = phenomena === 'TO' ? '#ff0000'
+                        : phenomena === 'SV' ? '#ff6600'
+                            : phenomena === 'FF' ? '#00cc66' : '#ffcc00';
+                    return { color, weight: 2, fillColor: color, fillOpacity: 0.2 };
+                },
+                onEachFeature: (feature, layer) => {
+                    const properties = feature.properties || {};
+                    const event = properties.ps || 'Historical warning';
+                    const tags = [
+                        properties.max_windtag ? `${properties.max_windtag} mph wind` : '',
+                        properties.max_hailtag ? `${properties.max_hailtag} in hail` : '',
+                        properties.max_is_pds ? 'PDS' : '',
+                        properties.max_is_emergency ? 'Emergency' : ''
+                    ].filter(Boolean).join(' · ');
+                    layer.bindPopup(`
+                        <div class="popup-content">
+                            <h4>${escapeHTML(event, 120)}</h4>
+                            <p><strong>WFO:</strong> ${escapeHTML(properties.wfo || 'N/A', 8)}</p>
+                            ${tags ? `<p>${escapeHTML(tags, 120)}</p>` : ''}
+                            <div class="meta">Issued: ${escapeHTML(formatExternalDate(properties.issue))}<br>Polygon valid to: ${escapeHTML(formatExternalDate(properties.polygon_end || properties.expire_utc))}</div>
+                        </div>
+                    `);
+                }
+            }).addTo(map);
+            setLayerFeatureCount('alerts', activeWarnings.length);
+            updateAlertCount(activeWarnings.length);
+        }
+
+        async function startHistoricalReplay() {
+            const startInput = document.getElementById('replayStartInput');
+            const endInput = document.getElementById('replayEndInput');
+            setReplayControlState('Loading replay…');
+            replayAbortController?.abort(new DOMException('Replay superseded', 'AbortError'));
+            const controller = new AbortController();
+            replayAbortController = controller;
+            try {
+                const tools = await historicalReplayTools();
+                const replayFrames = tools.buildReplayFrames(startInput.value, endInput.value);
+                const start = new Date(replayFrames[0].time * 1000);
+                const end = new Date(replayFrames.at(-1).time * 1000);
+                const warningUrl = new URL(DATA_URLS.iemStormBasedWarnings);
+                warningUrl.searchParams.set('sts', start.toISOString());
+                warningUrl.searchParams.set('ets', end.toISOString());
+                const response = await fetchWithTimeout(warningUrl.toString(), { signal: controller.signal });
+                const warningPayload = await response.json();
+                const warnings = featureList(warningPayload, 5000)
+                    .filter(feature => ['Polygon', 'MultiPolygon'].includes(feature.geometry?.type));
+                if (controller.signal.aborted) return;
+
+                pause();
+                radarAbortController?.abort(new DOMException('Historical replay started', 'AbortError'));
+                radarLoadGeneration += 1;
+                clearAllFrameLayers();
+                removeLayer('alerts');
+                replayMode = true;
+                replayWarnings = warnings;
+                frames = replayFrames;
+                framesTotal = frames.length;
+                framesLoaded = frames.length;
+                framesReady = true;
+                currentFrame = 0;
+                lastPastFrame = frames.length - 1;
+                loadAborted = false;
+                frameLayers = frames.map(frame => L.imageOverlay(
+                    frame.path,
+                    [[23, -126], [50, -65]],
+                    {
+                        opacity: 0,
+                        pane: 'radarPane',
+                        className: 'radar-layer historical-replay-frame',
+                        alt: `Archived IEM NEXRAD composite ${new Date(frame.time * 1000).toISOString()}`
+                    }
+                ));
+                frameLayers[0].addTo(map);
+                frameLayers[0].setOpacity(settings.opacity);
+                await renderReplayAlerts(frames[0].time * 1000);
+                updatePlaybackVisibility();
+                updateTimestamp();
+                updateTimelineUI();
+                setProviderStatus('current', `IEM replay: ${frames.length} frames`);
+                setReplayControlState(`${frames.length} frames · ${warnings.length} warning polygons`);
+                showToast(`Historical replay loaded: ${frames.length} frames`, 'success', 3500);
+            } catch (error) {
+                if (error?.name === 'AbortError') return;
+                console.error('Historical replay error:', error);
+                setReplayControlState(`Replay failed: ${safeText(error.message, 120)}`);
+                showToast(`Replay failed: ${safeText(error.message, 120)}`, 'error', 5000);
+            } finally {
+                if (replayAbortController === controller) replayAbortController = null;
+            }
+        }
+
+        function exitHistoricalReplay() {
+            replayAbortController?.abort(new DOMException('Replay exited', 'AbortError'));
+            replayAbortController = null;
+            pause();
+            replayMode = false;
+            replayWarnings = [];
+            clearAllFrameLayers();
+            removeLayer('alerts');
+            setReplayControlState(translatedExact('Live mode'));
+            updatePlaybackVisibility();
+            loadRadarData();
+            if (settings.layers.alerts) loadAlerts();
+            showToast('Returned to live data', 'info', 2500);
         }
 
         async function playAlertTone(urgency = 'standard') {
@@ -6697,7 +6888,7 @@
             const playback = document.getElementById('playback');
             if (!playback) return;
             const capability = RADAR_CAPABILITIES[settings.source] || RADAR_CAPABILITIES.mrms;
-            playback.style.display = capability.animation ? '' : 'none';
+            playback.style.display = replayMode || capability.animation ? '' : 'none';
         }
 
         function updateTimestamp() {
@@ -6735,7 +6926,7 @@
             }
 
             const isForecast = frame.isForecast === true;
-            const frameKinds = { forecast: t('forecast'), analysis: t('analysis'), past: t('past'), latest: t('latest') };
+            const frameKinds = { forecast: t('forecast'), analysis: t('analysis'), past: t('past'), latest: t('latest'), replay: translatedExact('Replay') };
             const frameKind = frameKinds[frame.kind] || (isForecast ? t('forecast') : t('latest'));
             document.getElementById('timestampText').textContent = `${timeStr} (${frameKind})`;
             const timestampBox = document.getElementById('timestampBox');
@@ -6773,10 +6964,13 @@
             
             if (!sourceEl || !frameEl || !frame) return;
             
-            sourceEl.textContent = RADAR_CAPABILITIES[settings.source]?.label || settings.source;
+            sourceEl.textContent = replayMode ? 'IEM Replay' : (RADAR_CAPABILITIES[settings.source]?.label || settings.source);
             sourceEl.classList.toggle('forecast', isForecast);
             
-            if (settings.source === 'hrrr') {
+            if (replayMode) {
+                frameEl.textContent = `${translatedExact('Replay')} • ${currentFrame + 1}/${frames.length}`;
+                frameEl.title = frame.timeSource || '';
+            } else if (settings.source === 'hrrr') {
                 const hour = frame.forecastHour || 0;
                 if (hour === 0) {
                     frameEl.textContent = `${t('analysis')} • ${formatProviderAge(frame)} • 1/${frames.length}`;
@@ -7703,6 +7897,10 @@
             });
 
             document.getElementById('refreshBtn').addEventListener('click', async () => {
+                if (replayMode) {
+                    showToast('Exit historical replay before refreshing live data', 'info', 3000);
+                    return;
+                }
                 showToast('Refreshing all data...', 'info', 2000);
                 await loadRadarData();
                 if (settings.layers.alerts) loadAlerts();
@@ -7896,6 +8094,14 @@
                 document.getElementById('loopBtn').classList.toggle('active', settings.loop);
                 saveSettings();
             });
+
+            const replayEndDefault = new Date(Date.now() - 10 * 60 * 1000);
+            const replayStartDefault = new Date(replayEndDefault.getTime() - 60 * 60 * 1000);
+            document.getElementById('replayStartInput').value = localDateTimeInputValue(replayStartDefault);
+            document.getElementById('replayEndInput').value = localDateTimeInputValue(replayEndDefault);
+            document.getElementById('startReplayBtn').addEventListener('click', startHistoricalReplay);
+            document.getElementById('exitReplayBtn').addEventListener('click', exitHistoricalReplay);
+            setReplayControlState(translatedExact('Live mode'));
 
             // Color schemes
             document.querySelectorAll('[data-scheme]').forEach(el => {
@@ -8304,7 +8510,7 @@
         function startAutoRefresh() {
             // Main refresh interval
             setInterval(() => {
-                if (settings.autoRefresh && !isPlaying && !document.hidden) {
+                if (settings.autoRefresh && !replayMode && !isPlaying && !document.hidden) {
                     loadRadarData();
                     if (settings.layers.alerts) loadAlerts();
                     if (settings.layers.stormTracks) loadStormTracks();
@@ -8326,7 +8532,7 @@
             
             // Refresh when returning to tab after being away > 3 min
             document.addEventListener('visibilitychange', () => {
-                if (!document.hidden && settings.autoRefresh && lastRefreshTime) {
+                if (!document.hidden && settings.autoRefresh && !replayMode && lastRefreshTime) {
                     const staleMs = Date.now() - lastRefreshTime;
                     if (staleMs > 3 * 60 * 1000) {
                         showToast('Refreshing stale data...', 'info', 2000);
