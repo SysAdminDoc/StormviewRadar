@@ -38,6 +38,7 @@ All notable changes to StormviewRadar will be documented in this file.
 - Added named local geofences with bounded validation, optional map overlays, persistent browser-only storage, and polygon-distance alert-audio matching.
 - Added six-hour historical event replay with five-minute IEM NEXRAD composites, frame-synchronized warning polygons, and bounded single-image rendering.
 - Added a mobile-first visible-map alert banner with threat prioritization, session dismissal, polygon focus, accessible touch targets, and reduced-motion behavior.
+- Added an on-demand Cesium 3D storm-top globe with measured IEM echo-top labels, threat-prioritized columns, explicit display scaling, local imagery, and CSP-safe teardown.
 
 ## [v0.1.0] - 2026-07-25
 

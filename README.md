@@ -40,6 +40,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **SPC Outlooks** — Storm Prediction Center convective outlooks
 - **Storm Reports** — View tornado, hail, and wind damage reports
 - **Storm Tracks** — Plot current NEXRAD storm cells with an hour of observed positions, 30/60-minute motion projections, and TVS, mesocyclone, hail, VIL, and echo-top details
+- **3D Storm Tops** — Toggle a Cesium globe that extrudes current IEM NEXRAD echo-top estimates, prioritizes threat cells, labels measured heights, and discloses its zoom-dependent display scale
 - **Lightning** — Near real-time lightning strike data
 - **Satellite** — GOES satellite imagery overlay
 - **River Gauges** — USGS water level monitoring stations
@@ -140,16 +141,19 @@ viewports. Firefox and Safari remain supported manual-test targets.
 ## Technology Stack
 
 - **Leaflet** — Interactive mapping
+- **CesiumJS Engine** — On-demand 3D storm-top globe rendered from bundled assets
 - **TopoJSON Client** — Bundled boundary conversion
 - **OpenStreetMap** — Base map tiles and geocoding
 - **Vanilla JS** — No runtime framework or server component
 - **CSS Variables** — Dynamic theming
 - **LocalStorage** — Settings persistence
 
-Leaflet 1.9.4, TopoJSON Client 3.1.0, and the Level II worker dependencies are
-vendored or bundled from exact npm package versions. Level II bzip decoding and
-polar image rendering run off the main thread. A Content Security Policy blocks
-unapproved executable, style, and network origins. To verify a change locally:
+Leaflet 1.9.4, CesiumJS 1.143.0, TopoJSON Client 3.1.0, and the Level II worker
+dependencies are vendored or bundled from exact npm package versions. The
+Cesium engine is tree-shaken into a lazy, CSP-safe bundle and uses its local
+Natural Earth imagery. Level II bzip decoding and polar image rendering run off
+the main thread. A Content Security Policy blocks unapproved executable, style,
+and network origins. To verify a change locally:
 
 ```bash
 npm ci

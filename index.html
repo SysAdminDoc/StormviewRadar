@@ -20,6 +20,7 @@
     <link rel="apple-touch-icon" sizes="192x192" href="logo/StormView-192x192.png">
     
     <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+    <link rel="stylesheet" href="vendor/cesium/Widgets/widgets.css">
     <style>
         :root {
             --glass-bg: rgba(15, 23, 42, 0.92);
@@ -66,6 +67,35 @@
         }
 
         #map { position: absolute; inset: 0; z-index: 1; }
+        .storm-3d-view {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            background: #050b14;
+        }
+        .storm-3d-view[hidden] { display: none; }
+        #cesiumContainer { width: 100%; height: 100%; }
+        .storm-3d-info {
+            position: absolute;
+            right: 12px;
+            bottom: 42px;
+            z-index: 10;
+            width: min(330px, calc(100vw - 24px));
+            padding: 12px 14px;
+            color: var(--text);
+            pointer-events: none;
+        }
+        .storm-3d-info strong { display: block; margin-bottom: 3px; font-size: 13px; }
+        .storm-3d-info-status { color: var(--accent); font-size: 11px; font-weight: 700; }
+        .storm-3d-info-note { margin-top: 5px; color: var(--text-dim); font-size: 10px; line-height: 1.4; }
+        .storm-3d-legend { display: flex; flex-wrap: wrap; gap: 5px 10px; margin-top: 7px; font-size: 9px; color: var(--text-dim); }
+        .storm-3d-legend span { display: inline-flex; align-items: center; gap: 4px; }
+        .storm-3d-legend i { width: 7px; height: 7px; border-radius: 50%; }
+        body.storm-3d-mode #map { visibility: hidden; }
+        body.storm-3d-mode .playback,
+        body.storm-3d-mode .legend,
+        body.storm-3d-mode .loc-btn,
+        body.storm-3d-mode .status-bar { display: none !important; }
 
         /* Aggressively hide ALL broken image icons */
         .leaflet-tile-pane img[src=""],
@@ -1537,6 +1567,12 @@
                 -webkit-backdrop-filter: blur(16px);
                 animation: mobile-alert-in 0.22s ease-out;
             }
+            .storm-3d-info {
+                right: 10px;
+                bottom: 12px;
+                left: 10px;
+                width: auto;
+            }
         }
 
         @keyframes mobile-alert-in {
@@ -1759,6 +1795,20 @@
     </div>
 
     <div id="map"></div>
+    <section class="storm-3d-view" id="cesiumView" aria-label="Three-dimensional storm-top view" aria-hidden="true" hidden>
+        <div id="cesiumContainer"></div>
+        <div class="storm-3d-info glass">
+            <strong>3D Storm Tops</strong>
+            <div class="storm-3d-info-status" id="storm3dStatus" role="status" aria-live="polite">Loading storm cells…</div>
+            <div class="storm-3d-info-note"><span id="storm3dScale">Display height scale: 20×.</span> Labels show measured IEM NEXRAD echo-top estimates. Footprint width is symbolic, not storm size. Automated guidance, not an official warning.</div>
+            <div class="storm-3d-legend" aria-label="Threat colors">
+                <span><i style="background:#ef4444"></i>TVS</span>
+                <span><i style="background:#a855f7"></i>Mesocyclone</span>
+                <span><i style="background:#f97316"></i>Hail</span>
+                <span><i style="background:#22d3ee"></i>Other</span>
+            </div>
+        </div>
+    </section>
 
     <header class="header glass">
         <div class="logo">
@@ -2196,6 +2246,10 @@
         <button class="qt-btn" data-qt="stormReports">
             <span class="qt-dot" style="background: var(--purple)"></span>
             <span class="qt-label">Reports</span>
+        </button>
+        <button class="qt-btn" id="stormTop3dBtn" type="button" title="Toggle 3D storm-top heights" aria-label="Toggle 3D storm-top heights" aria-pressed="false">
+            <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path d="m12 2 8 4.5v9L12 20l-8-4.5v-9L12 2Z"/><path d="m4 6.5 8 4.5 8-4.5M12 11v9"/></svg>
+            <span class="qt-label">3D Tops</span>
         </button>
     </div>
 
@@ -2767,7 +2821,12 @@
         let meshMaximumMm = 0;
         let stormTrackToolsPromise = null;
         let stormTrackHistoryHydrated = false;
+        let currentStormCells = [];
         const stormTrackHistory = new Map();
+        let stormTop3dToolsPromise = null;
+        let cesiumRuntimePromise = null;
+        let cesiumViewer = null;
+        let stormTop3dMode = false;
         let alertAudioToolsPromise = null;
         let alertAudioContext = null;
         let alertAudioUnlocked = false;
@@ -2862,7 +2921,15 @@
                 alertsInMap: '{value} alert(s) in map',
                 activeWeatherAlert: 'Active weather alert',
                 viewAlert: 'View',
-                dismissAlert: 'Dismiss alert'
+                dismissAlert: 'Dismiss alert',
+                stormTopsLoading: 'Loading storm cells…',
+                stormTopsCount: '{value} storm top(s) in the current map view',
+                stormTopsScale: 'Display height scale: {value}×.',
+                stormTopsEmpty: 'No current storm tops are available in this map view',
+                stormTopsUnavailable: '3D storm tops are unavailable',
+                stormTopsToggle: 'Toggle 3D storm-top heights',
+                stormTopsViewLabel: 'Three-dimensional storm-top view',
+                stormTopsThreatColors: 'Storm-top threat colors'
             },
             es: {
                 loading: 'Cargando...',
@@ -2917,7 +2984,15 @@
                 alertsInMap: '{value} alerta(s) en el mapa',
                 activeWeatherAlert: 'Alerta meteorológica activa',
                 viewAlert: 'Ver',
-                dismissAlert: 'Descartar alerta'
+                dismissAlert: 'Descartar alerta',
+                stormTopsLoading: 'Cargando celdas de tormenta…',
+                stormTopsCount: '{value} cima(s) de tormenta en la vista actual',
+                stormTopsScale: 'Escala de altura visual: {value}×.',
+                stormTopsEmpty: 'No hay cimas de tormenta actuales en esta vista',
+                stormTopsUnavailable: 'Las cimas de tormenta 3D no están disponibles',
+                stormTopsToggle: 'Alternar alturas 3D de cimas de tormenta',
+                stormTopsViewLabel: 'Vista tridimensional de cimas de tormenta',
+                stormTopsThreatColors: 'Colores de amenaza de las cimas'
             }
         };
         const SPANISH_EXACT_TEXT = {
@@ -3031,7 +3106,12 @@
             'stale': 'antiguo',
             'error': 'error',
             'success': 'correcto',
-            'cancelled': 'cancelado'
+            'cancelled': 'cancelado',
+            '3D Storm Tops': 'Cimas de tormenta 3D',
+            'Labels show measured IEM NEXRAD echo-top estimates. Footprint width is symbolic, not storm size. Automated guidance, not an official warning.': 'Las etiquetas muestran estimaciones medidas de la cima del eco NEXRAD de IEM. El ancho de la huella es simbólico, no el tamaño de la tormenta. Guía automatizada; no es una alerta oficial.',
+            'Mesocyclone': 'Mesociclón',
+            'Hail': 'Granizo',
+            'Other': 'Otro'
         };
         const originalTextNodes = new WeakMap();
 
@@ -3095,6 +3175,15 @@
         function applyLanguage() {
             document.documentElement.lang = languageCode();
             localizeTextTree();
+            const stormTopButton = document.getElementById('stormTop3dBtn');
+            const stormTopView = document.getElementById('cesiumView');
+            const stormTopLegend = document.querySelector('.storm-3d-legend');
+            if (stormTopButton) {
+                stormTopButton.title = t('stormTopsToggle');
+                stormTopButton.setAttribute('aria-label', t('stormTopsToggle'));
+            }
+            if (stormTopView) stormTopView.setAttribute('aria-label', t('stormTopsViewLabel'));
+            if (stormTopLegend) stormTopLegend.setAttribute('aria-label', t('stormTopsThreatColors'));
             const geofenceNameInput = document.getElementById('geofenceNameInput');
             if (geofenceNameInput) {
                 geofenceNameInput.placeholder = languageCode() === 'es'
@@ -6649,6 +6738,25 @@
             return stormTrackToolsPromise;
         }
 
+        function stormTop3dTools() {
+            if (!stormTop3dToolsPromise) stormTop3dToolsPromise = import('./src/storm-top-3d.js');
+            return stormTop3dToolsPromise;
+        }
+
+        function loadCesiumRuntime() {
+            if (window.Cesium) return Promise.resolve(window.Cesium);
+            if (cesiumRuntimePromise) return cesiumRuntimePromise;
+            window.CESIUM_BASE_URL = new URL('vendor/cesium/', document.baseURI).href;
+            cesiumRuntimePromise = import('./vendor/cesium/engine.js').then(Cesium => {
+                window.Cesium = Cesium;
+                return Cesium;
+            }).catch(error => {
+                cesiumRuntimePromise = null;
+                throw error;
+            });
+            return cesiumRuntimePromise;
+        }
+
         async function fetchStormAttributes(signal, valid = null) {
             const url = new URL(DATA_URLS.iemStormAttributes);
             if (valid) url.searchParams.set('valid', valid);
@@ -6769,6 +6877,147 @@
             setLayerFeatureCount('stormTracks', cells.length);
         }
 
+        async function renderStormTop3d() {
+            if (!stormTop3dMode || !cesiumViewer) return [];
+            const Cesium = window.Cesium;
+            const tools = await stormTop3dTools();
+            const columns = tools.buildStormTopColumns(currentStormCells, 200);
+            const displayScale = tools.stormTopDisplayScale(map.getZoom());
+            const radiusScale = Math.min(4, Math.sqrt(displayScale));
+            cesiumViewer.entities.removeAll();
+            for (const [index, column] of columns.entries()) {
+                const color = Cesium.Color.fromCssColorString(column.color);
+                const topLabel = settings.units === 'metric'
+                    ? `${(column.heightMeters / 1000).toFixed(1)} km`
+                    : `${column.topKft.toFixed(1)} kft`;
+                const displayHeight = column.heightMeters * displayScale;
+                cesiumViewer.entities.add({
+                    id: `storm-top-${column.id}`,
+                    name: `Storm ${column.id}`,
+                    position: Cesium.Cartesian3.fromDegrees(
+                        column.longitude,
+                        column.latitude,
+                        displayHeight / 2
+                    ),
+                    cylinder: {
+                        length: displayHeight,
+                        topRadius: column.radiusMeters * radiusScale * 0.55,
+                        bottomRadius: column.radiusMeters * radiusScale,
+                        material: color.withAlpha(0.68),
+                        outline: true,
+                        outlineColor: color.brighten(0.35, new Cesium.Color()),
+                        numberOfVerticalLines: 8
+                    },
+                    label: {
+                        show: index < 16,
+                        text: `${column.id}\n${topLabel}`,
+                        font: '600 13px sans-serif',
+                        fillColor: Cesium.Color.WHITE,
+                        outlineColor: Cesium.Color.BLACK,
+                        outlineWidth: 3,
+                        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                        showBackground: true,
+                        backgroundColor: Cesium.Color.BLACK.withAlpha(0.65),
+                        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                        pixelOffset: new Cesium.Cartesian2(0, -8),
+                        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 3000000),
+                        disableDepthTestDistance: Number.POSITIVE_INFINITY
+                    },
+                    properties: {
+                        echoTopKft: column.topKft,
+                        maximumDbz: column.maxDbz,
+                        probabilityOfSevereHail: column.posh
+                    }
+                });
+            }
+            const view = document.getElementById('cesiumView');
+            view.dataset.entityCount = String(columns.length);
+            view.dataset.heightScale = String(displayScale);
+            document.getElementById('storm3dStatus').textContent = columns.length
+                ? t('stormTopsCount', { value: columns.length })
+                : t('stormTopsEmpty');
+            document.getElementById('storm3dScale').textContent = t('stormTopsScale', { value: displayScale });
+            cesiumViewer.scene.requestRender();
+            return columns;
+        }
+
+        async function loadStormCellsFor3d(force = false) {
+            if (!force && currentStormCells.length) return currentStormCells;
+            const controller = new AbortController();
+            const tools = await stormTrackTools();
+            const payload = await fetchStormAttributes(controller.signal);
+            currentStormCells = stormCellsInView(payload, tools);
+            return currentStormCells;
+        }
+
+        async function enterStormTop3d() {
+            const button = document.getElementById('stormTop3dBtn');
+            const view = document.getElementById('cesiumView');
+            button.disabled = true;
+            view.hidden = false;
+            view.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('storm-3d-mode');
+            document.getElementById('storm3dStatus').textContent = t('stormTopsLoading');
+            try {
+                const [Cesium] = await Promise.all([loadCesiumRuntime(), loadStormCellsFor3d(true)]);
+                if (!cesiumViewer) {
+                    cesiumViewer = new Cesium.CesiumWidget('cesiumContainer', {
+                        baseLayer: false,
+                        terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+                        requestRenderMode: true
+                    });
+                    const naturalEarth = await Cesium.TileMapServiceImageryProvider.fromUrl(
+                        'vendor/cesium/Assets/Textures/NaturalEarthII'
+                    );
+                    cesiumViewer.imageryLayers.addImageryProvider(naturalEarth);
+                    cesiumViewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#050b14');
+                    cesiumViewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#07111f');
+                    cesiumViewer.scene.screenSpaceCameraController.minimumZoomDistance = 50000;
+                }
+                stormTop3dMode = true;
+                button.classList.add('active');
+                button.setAttribute('aria-pressed', 'true');
+                await renderStormTop3d();
+                const center = map.getCenter();
+                const altitude = Math.max(180000, Math.min(8000000, 60000000 / (2 ** map.getZoom())));
+                cesiumViewer.camera.flyTo({
+                    destination: Cesium.Cartesian3.fromDegrees(center.lng, center.lat, altitude),
+                    orientation: {
+                        heading: 0,
+                        pitch: Cesium.Math.toRadians(-48),
+                        roll: 0
+                    },
+                    duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 0.8
+                });
+            } catch (error) {
+                console.error('3D storm-top error:', error);
+                exitStormTop3d();
+                showToast(t('stormTopsUnavailable'), 'error', 4500);
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        function exitStormTop3d() {
+            stormTop3dMode = false;
+            const button = document.getElementById('stormTop3dBtn');
+            button.classList.remove('active');
+            button.setAttribute('aria-pressed', 'false');
+            document.body.classList.remove('storm-3d-mode');
+            const view = document.getElementById('cesiumView');
+            view.hidden = true;
+            view.setAttribute('aria-hidden', 'true');
+            view.dataset.entityCount = '0';
+            if (cesiumViewer && !cesiumViewer.isDestroyed()) cesiumViewer.destroy();
+            cesiumViewer = null;
+            document.getElementById('cesiumContainer').replaceChildren();
+        }
+
+        function toggleStormTop3d() {
+            if (stormTop3dMode) exitStormTop3d();
+            else enterStormTop3d();
+        }
+
         async function loadStormTracks() {
             removeLayer('stormTracks');
             const controller = beginLayerRequest('stormTracks');
@@ -6777,6 +7026,7 @@
                 const currentPayload = await fetchStormAttributes(controller.signal);
                 if (controller.signal.aborted || !settings.layers.stormTracks) return;
                 const cells = stormCellsInView(currentPayload, tools);
+                currentStormCells = cells;
                 const latestCellTime = cells.reduce((latest, cell) => Math.max(latest, cell.valid), 0);
                 const referenceTime = latestCellTime || Date.now();
 
@@ -6807,6 +7057,7 @@
                 tools.mergeStormHistory(stormTrackHistory, cells, referenceTime);
                 if (controller.signal.aborted || !settings.layers.stormTracks) return;
                 renderStormTracks(cells, tools);
+                if (stormTop3dMode) renderStormTop3d();
             } catch (error) {
                 if (error?.name === 'AbortError') return;
                 console.error('Storm tracks error:', error);
@@ -8019,6 +8270,10 @@
 
             document.getElementById('mobileAlertView').addEventListener('click', focusMobileAlert);
             document.getElementById('mobileAlertDismiss').addEventListener('click', dismissMobileAlert);
+            document.getElementById('stormTop3dBtn').addEventListener('click', toggleStormTop3d);
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && stormTop3dMode) exitStormTop3d();
+            });
 
             // Basemap buttons (sidebar only)
             document.querySelectorAll('.sidebar [data-basemap]').forEach(el => {
@@ -8120,6 +8375,7 @@
                 if (settings.layers.spcOutlook) loadSPCOutlook();
                 if (settings.layers.stormReports) loadStormReports();
                 if (settings.layers.stormTracks) loadStormTracks();
+                else if (stormTop3dMode) loadStormCellsFor3d(true).then(renderStormTop3d);
                 if (settings.layers.hailMesh) loadHailMesh();
                 if (settings.layers.satellite) loadSatelliteLayer('visible');
                 if (settings.layers.satelliteIR) loadSatelliteLayer('ir');
@@ -8223,6 +8479,7 @@
                 saveSettings();
                 applyLanguage();
                 updateMobileAlertBanner(currentAlertFeatures);
+                if (stormTop3dMode) renderStormTop3d();
                 showToast(t('languageUpdated'), 'success', 2200);
                 if (layerRefs.hailMesh) showMeshLegend();
                 if (currentForecastLocation) openForecast(currentForecastLocation.lat, currentForecastLocation.lng);
@@ -8239,6 +8496,7 @@
                 if (settings.layers.riverGauges) loadRiverGauges();
                 if (layerRefs.couplets) renderLevel2Couplets();
                 if (layerRefs.hailMesh) showMeshLegend();
+                if (stormTop3dMode) renderStormTop3d();
                 if (currentForecastLocation) openForecast(currentForecastLocation.lat, currentForecastLocation.lng);
             });
 
@@ -8728,6 +8986,7 @@
                     loadRadarData();
                     if (settings.layers.alerts) loadAlerts();
                     if (settings.layers.stormTracks) loadStormTracks();
+                    else if (stormTop3dMode) loadStormCellsFor3d(true).then(renderStormTop3d);
                 }
             }, 5 * 60 * 1000);
             
@@ -8753,6 +9012,7 @@
                         loadRadarData();
                         if (settings.layers.alerts) loadAlerts();
                         if (settings.layers.stormTracks) loadStormTracks();
+                        else if (stormTop3dMode) loadStormCellsFor3d(true).then(renderStormTop3d);
                     }
                 }
             });
