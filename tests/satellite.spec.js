@@ -56,4 +56,11 @@ test('satellite enhancements load GeoColor and fully dispose multi-layer IR sand
   await expect(page.locator('.satellite-layer-water-vapor')).toHaveCount(1);
   await toggle('satelliteWV');
   await expect(page.locator('.satellite-layer-water-vapor')).toHaveCount(0);
+
+  await toggle('satelliteMesoscale');
+  await expect(page.locator('.satellite-mesoscale-1')).toHaveCount(1);
+  await expect(page.locator('.satellite-mesoscale-2')).toHaveCount(1);
+  await expect(page.locator('.sidebar [data-layer="satelliteMesoscale"]')).toHaveAttribute('data-feature-count', '2');
+  await toggle('satelliteMesoscale');
+  await expect(page.locator('.satellite-mesoscale')).toHaveCount(0);
 });

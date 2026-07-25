@@ -32,6 +32,7 @@ All notable changes to StormviewRadar will be documented in this file.
 - Added a bounded Level II rotation-candidate overlay that requires sustained adjacent-gate shear inside precipitation, clusters nearby detections, and labels every result as an automated heuristic rather than a warning.
 - Added an optional NOAA MRMS MESH hail-size overlay with direct S3 discovery, worker-based GRIB2/PNG decoding, safety limits, localized units, and explicit estimate-not-warning guidance.
 - Added NOAA/NESDIS GeoColor and IR-sandwich satellite layers, and fixed infrared/water-vapor toggles so disabling them releases the correct tile resources.
+- Added a combined current GOES-East M1/M2 mesoscale-sector overlay with lifecycle diagnostics and full resource cleanup.
 
 ## [v0.1.0] - 2026-07-25
 

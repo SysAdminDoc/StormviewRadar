@@ -1930,6 +1930,11 @@
                         <span class="layer-name">IR Sandwich</span>
                         <span class="badge">NOAA</span>
                     </div>
+                    <div class="layer-chip full-width" data-layer="satelliteMesoscale">
+                        <span class="dot" style="background: #a855f7"></span>
+                        <span class="layer-name">Mesoscale Sectors</span>
+                        <span class="badge live">M1+M2</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2502,7 +2507,9 @@
             ir: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes_east_conus_ch13/{z}/{x}/{y}.png',
             waterVapor: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes_east_conus_ch09/{z}/{x}/{y}.png',
             geoColor: 'https://satellitemaps.nesdis.noaa.gov/arcgis/rest/services/MERGEDGC_current/ImageServer/tile/{z}/{y}/{x}',
-            enhancedIR: 'https://satellitemaps.nesdis.noaa.gov/arcgis/rest/services/ABI13_current/ImageServer/tile/{z}/{y}/{x}'
+            enhancedIR: 'https://satellitemaps.nesdis.noaa.gov/arcgis/rest/services/ABI13_current/ImageServer/tile/{z}/{y}/{x}',
+            mesoscale1: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes_east_mesoscale-1_ch02/{z}/{x}/{y}.png',
+            mesoscale2: 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes_east_mesoscale-2_ch02/{z}/{x}/{y}.png'
         };
         
         // NHC Tropical Services
@@ -2691,6 +2698,7 @@
             'Hail Size': 'Tamaño del granizo',
             'GeoColor': 'GeoColor',
             'IR Sandwich': 'Sándwich IR',
+            'Mesoscale Sectors': 'Sectores de mesoescala',
             'Weather Layers': 'Capas meteorológicas',
             'Map Overlays': 'Capas del mapa',
             'Model Data': 'Datos del modelo',
@@ -3304,7 +3312,8 @@
             // Weather
             alerts: null, spcOutlook: null, stormReports: null, couplets: null, hailMesh: null,
             lightning: null, satellite: null, satelliteIR: null, satelliteWV: null,
-            satelliteGeoColor: null, satelliteSandwich: null, riverGauges: null, surfaceObs: null,
+            satelliteGeoColor: null, satelliteSandwich: null, satelliteMesoscale: null,
+            riverGauges: null, surfaceObs: null,
             temp: null, wind: null, clouds: null, pressure: null,
             
             // New layers
@@ -3369,7 +3378,8 @@
                 pireps: false, sigmets: false,
                 
                 // Satellite channels
-                satelliteIR: false, satelliteWV: false, satelliteGeoColor: false, satelliteSandwich: false,
+                satelliteIR: false, satelliteWV: false, satelliteGeoColor: false,
+                satelliteSandwich: false, satelliteMesoscale: false,
                 
                 // Map overlays
                 states: true, counties: true, labels: true, highways: false
@@ -5148,7 +5158,8 @@
                 ir: 'satelliteIR',
                 wv: 'satelliteWV',
                 geocolor: 'satelliteGeoColor',
-                sandwich: 'satelliteSandwich'
+                sandwich: 'satelliteSandwich',
+                mesoscale: 'satelliteMesoscale'
             };
             const layerKey = layerKeys[type] || 'satellite';
             removeLayer(layerKey);
@@ -5177,6 +5188,21 @@
                 const geoColor = createLayer(SATELLITE_LAYERS.geoColor, 'satellite-geocolor', 0.68, 'NOAA / NESDIS');
                 const enhancedIR = createLayer(SATELLITE_LAYERS.enhancedIR, 'satellite-ir-sandwich', 0.78, 'NOAA / NESDIS');
                 layerRefs[layerKey] = L.layerGroup([geoColor, enhancedIR]).addTo(map);
+                setLayerFeatureCount(layerKey, 2);
+                return;
+            }
+            if (type === 'mesoscale') {
+                const firstSector = createLayer(
+                    SATELLITE_LAYERS.mesoscale1,
+                    'satellite-mesoscale satellite-mesoscale-1',
+                    0.82
+                );
+                const secondSector = createLayer(
+                    SATELLITE_LAYERS.mesoscale2,
+                    'satellite-mesoscale satellite-mesoscale-2',
+                    0.82
+                );
+                layerRefs[layerKey] = L.layerGroup([firstSector, secondSector]).addTo(map);
                 setLayerFeatureCount(layerKey, 2);
                 return;
             }
@@ -5518,6 +5544,9 @@
                 case 'satelliteSandwich':
                     on ? loadSatelliteLayer('sandwich') : removeLayer('satelliteSandwich');
                     break;
+                case 'satelliteMesoscale':
+                    on ? loadSatelliteLayer('mesoscale') : removeLayer('satelliteMesoscale');
+                    break;
                 case 'riverGauges':
                     on ? loadRiverGauges() : removeLayer('riverGauges');
                     break;
@@ -5619,6 +5648,7 @@
                 stormReports: 'Storm Reports', hailMesh: 'MRMS Hail Size', lightning: 'Lightning', satellite: 'Satellite',
                 satelliteIR: 'Infrared Sat', satelliteWV: 'Water Vapor',
                 satelliteGeoColor: 'NOAA GeoColor', satelliteSandwich: 'IR Sandwich',
+                satelliteMesoscale: 'GOES Mesoscale Sectors',
                 riverGauges: 'River Gauges', surfaceObs: 'Surface Obs',
                 temp: 'Temperature', wind: 'Wind', clouds: 'Clouds', pressure: 'Pressure',
                 spcWatches: 'SPC Watches', spcMCD: 'Mesoscale Discussions',
@@ -7100,6 +7130,7 @@
                 if (settings.layers.satelliteWV) loadSatelliteLayer('wv');
                 if (settings.layers.satelliteGeoColor) loadSatelliteLayer('geocolor');
                 if (settings.layers.satelliteSandwich) loadSatelliteLayer('sandwich');
+                if (settings.layers.satelliteMesoscale) loadSatelliteLayer('mesoscale');
                 if (settings.layers.spcWatches) loadSPCWatches();
                 if (settings.layers.spcMCD) loadSPCMCD();
                 if (settings.layers.tropical) loadTropical();
