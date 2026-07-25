@@ -69,6 +69,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Language & Units** — Persist English or Spanish UI plus US customary or metric weather units, with locale-aware dates and safe English fallback
 - **Quiet-by-Default Audio** — The first alert load is silent; a user gesture unlocks audio and only unseen matching alerts can sound
 - **Local-Only Alert Areas** — Geofences remain in the current browser profile and are not sent to StormView or included in settings exports
+- **Mobile Alert Banner** — Prioritize alerts intersecting the visible map with dismissible, 44px actions and reduced-motion support
 
 ## Quick Start
 

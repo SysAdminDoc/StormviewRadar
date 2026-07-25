@@ -37,6 +37,7 @@ All notable changes to StormviewRadar will be documented in this file.
 - Added opt-in Web Audio alert tones with silent first-load priming, unseen-alert deduplication, urgency patterns, and configurable severity, event-type, and map-center distance filters.
 - Added named local geofences with bounded validation, optional map overlays, persistent browser-only storage, and polygon-distance alert-audio matching.
 - Added six-hour historical event replay with five-minute IEM NEXRAD composites, frame-synchronized warning polygons, and bounded single-image rendering.
+- Added a mobile-first visible-map alert banner with threat prioritization, session dismissal, polygon focus, accessible touch targets, and reduced-motion behavior.
 
 ## [v0.1.0] - 2026-07-25
 

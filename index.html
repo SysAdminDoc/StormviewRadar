@@ -1381,6 +1381,74 @@
         .layer-chip .alert-count:empty,
         .layer-chip .analysis-count:empty { display: none; }
 
+        .mobile-alert-banner {
+            display: none;
+        }
+        .mobile-alert-banner-indicator {
+            width: 5px;
+            align-self: stretch;
+            border-radius: 999px;
+            background: var(--warning);
+        }
+        .mobile-alert-banner[data-severity="extreme"] .mobile-alert-banner-indicator,
+        .mobile-alert-banner[data-severity="severe"] .mobile-alert-banner-indicator {
+            background: var(--danger);
+        }
+        .mobile-alert-banner-content {
+            min-width: 0;
+            flex: 1;
+        }
+        .mobile-alert-banner-meta {
+            color: var(--text-muted);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .mobile-alert-banner-title {
+            display: block;
+            margin-top: 2px;
+            color: var(--text);
+            font-size: 13px;
+            line-height: 1.25;
+        }
+        .mobile-alert-banner-headline {
+            margin-top: 2px;
+            overflow: hidden;
+            color: var(--text-dim);
+            font-size: 11px;
+            line-height: 1.3;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .mobile-alert-banner-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .mobile-alert-banner-view,
+        .mobile-alert-banner-dismiss {
+            min-height: 44px;
+            border: 1px solid var(--glass-border);
+            border-radius: 9px;
+            background: var(--glass-hover);
+            color: var(--text);
+            cursor: pointer;
+            font: inherit;
+        }
+        .mobile-alert-banner-view {
+            padding: 0 10px;
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .mobile-alert-banner-dismiss {
+            width: 44px;
+            padding: 0;
+            font-size: 18px;
+            line-height: 1;
+        }
+
         .layer-legend {
             display: flex; flex-wrap: wrap; gap: 4px 8px;
             padding: 5px 0 0 0;
@@ -1450,6 +1518,30 @@
                 color: #fff;
             }
             .loc-btn { bottom: 110px; }
+            .mobile-alert-banner:not([hidden]) {
+                position: fixed;
+                top: 110px;
+                right: 10px;
+                left: 10px;
+                z-index: 1001;
+                display: flex;
+                align-items: center;
+                gap: 9px;
+                min-height: 66px;
+                padding: 9px 10px;
+                border: 1px solid var(--glass-border);
+                border-radius: 13px;
+                background: var(--glass-heavy);
+                box-shadow: var(--shadow);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                animation: mobile-alert-in 0.22s ease-out;
+            }
+        }
+
+        @keyframes mobile-alert-in {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         @media (max-width: 480px) {
@@ -2125,6 +2217,20 @@
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer" role="status" aria-live="polite" aria-atomic="false"></div>
 
+    <!-- Mobile active alert summary -->
+    <section class="mobile-alert-banner" id="mobileAlertBanner" data-severity="unknown" role="region" aria-label="Active weather alert" aria-live="polite" aria-atomic="true" hidden>
+        <span class="mobile-alert-banner-indicator" aria-hidden="true"></span>
+        <div class="mobile-alert-banner-content">
+            <div class="mobile-alert-banner-meta" id="mobileAlertMeta"></div>
+            <strong class="mobile-alert-banner-title" id="mobileAlertTitle"></strong>
+            <div class="mobile-alert-banner-headline" id="mobileAlertHeadline"></div>
+        </div>
+        <div class="mobile-alert-banner-actions">
+            <button class="mobile-alert-banner-view" id="mobileAlertView" type="button">View</button>
+            <button class="mobile-alert-banner-dismiss" id="mobileAlertDismiss" type="button" aria-label="Dismiss alert">×</button>
+        </div>
+    </section>
+
     <!-- Forecast Panel -->
     <div class="forecast-overlay" id="fcOverlay" aria-hidden="true"></div>
     <div class="forecast-panel" id="fcPanel" role="dialog" aria-modal="true" aria-labelledby="fcLocation" aria-hidden="true" inert>
@@ -2667,6 +2773,9 @@
         let alertAudioUnlocked = false;
         let alertAudioPrimed = false;
         let currentAlertFeatures = [];
+        let mobileAlertBannerToolsPromise = null;
+        let mobileAlertBannerSelection = null;
+        const dismissedMobileAlertIds = new Set();
         let geofences = [];
         const seenAlertIds = new Set();
         let historicalReplayToolsPromise = null;
@@ -2749,7 +2858,11 @@
                 alertAudioReady: 'Alert sounds enabled',
                 alertAudioUnavailable: 'Audio is unavailable in this browser',
                 alertAudioActivation: 'Use Test Sound to activate alert audio in this tab',
-                newMatchingAlerts: '{value} new matching alert(s)'
+                newMatchingAlerts: '{value} new matching alert(s)',
+                alertsInMap: '{value} alert(s) in map',
+                activeWeatherAlert: 'Active weather alert',
+                viewAlert: 'View',
+                dismissAlert: 'Dismiss alert'
             },
             es: {
                 loading: 'Cargando...',
@@ -2800,7 +2913,11 @@
                 alertAudioReady: 'Sonidos de alerta activados',
                 alertAudioUnavailable: 'El audio no está disponible en este navegador',
                 alertAudioActivation: 'Usa Probar sonido para activar el audio en esta pestaña',
-                newMatchingAlerts: '{value} alerta(s) nueva(s) coincidente(s)'
+                newMatchingAlerts: '{value} alerta(s) nueva(s) coincidente(s)',
+                alertsInMap: '{value} alerta(s) en el mapa',
+                activeWeatherAlert: 'Alerta meteorológica activa',
+                viewAlert: 'Ver',
+                dismissAlert: 'Descartar alerta'
             }
         };
         const SPANISH_EXACT_TEXT = {
@@ -3870,6 +3987,7 @@
             
             setBasemap(settings.basemap);
             map.on('moveend', updateCoverageStatus);
+            map.on('moveend', () => updateMobileAlertBanner(currentAlertFeatures));
             updateCoverageStatus();
         }
 
@@ -5869,9 +5987,17 @@
                     break;
                 case 'alerts':
                     if (replayMode) {
-                        on ? renderReplayAlerts(frames[currentFrame].time * 1000) : removeLayer('alerts');
+                        if (on) renderReplayAlerts(frames[currentFrame].time * 1000);
+                        else {
+                            removeLayer('alerts');
+                            updateMobileAlertBanner([]);
+                        }
                     } else {
-                        on ? loadAlerts() : removeLayer('alerts');
+                        if (on) loadAlerts();
+                        else {
+                            removeLayer('alerts');
+                            updateMobileAlertBanner([]);
+                        }
                     }
                     break;
                 case 'spcOutlook':
@@ -6058,10 +6184,12 @@
             if (!replayMode) return;
             const tools = await historicalReplayTools();
             removeLayer('alerts');
-            if (!settings.layers.alerts) return;
             const activeWarnings = replayWarnings
                 .filter(feature => tools.warningActiveAt(feature, timestamp))
                 .slice(0, MAX_ALERT_FEATURES);
+            currentAlertFeatures = activeWarnings;
+            updateMobileAlertBanner(settings.layers.alerts ? activeWarnings : []);
+            if (!settings.layers.alerts) return;
             layerRefs.alerts = L.geoJSON({ type: 'FeatureCollection', features: activeWarnings }, {
                 pane: 'alertPane',
                 style: feature => {
@@ -6260,9 +6388,90 @@
             showToast(t('newMatchingAlerts', { value: matches.length }), 'warn', 4000);
         }
 
+        function mobileAlertBannerTools() {
+            if (!mobileAlertBannerToolsPromise) {
+                mobileAlertBannerToolsPromise = import('./src/mobile-alert-banner.js');
+            }
+            return mobileAlertBannerToolsPromise;
+        }
+
+        function currentMapBounds() {
+            if (!map) return null;
+            const bounds = map.getBounds();
+            return {
+                west: bounds.getWest(),
+                east: bounds.getEast(),
+                south: bounds.getSouth(),
+                north: bounds.getNorth()
+            };
+        }
+
+        async function updateMobileAlertBanner(features = currentAlertFeatures) {
+            const banner = document.getElementById('mobileAlertBanner');
+            if (!banner || !map) return;
+            try {
+                const tools = await mobileAlertBannerTools();
+                const selection = tools.selectMobileAlert(features, currentMapBounds(), dismissedMobileAlertIds);
+                mobileAlertBannerSelection = selection.feature
+                    ? { ...selection, feature: selection.feature }
+                    : null;
+                if (!selection.feature) {
+                    banner.hidden = true;
+                    return;
+                }
+                const properties = selection.feature.properties || {};
+                const event = safeText(properties.event || properties.ps || 'Weather Alert', 120);
+                const headline = safeText(properties.headline || properties.areaDesc || '', 220);
+                const severity = safeText(properties.severity || 'unknown', 20).toLowerCase();
+                banner.dataset.severity = ['extreme', 'severe', 'moderate', 'minor'].includes(severity)
+                    ? severity : 'unknown';
+                banner.setAttribute('aria-label', t('activeWeatherAlert'));
+                document.getElementById('mobileAlertMeta').textContent = t('alertsInMap', { value: selection.count });
+                document.getElementById('mobileAlertTitle').textContent = event;
+                document.getElementById('mobileAlertHeadline').textContent = headline;
+                document.getElementById('mobileAlertView').textContent = t('viewAlert');
+                document.getElementById('mobileAlertDismiss').setAttribute('aria-label', t('dismissAlert'));
+                banner.hidden = false;
+            } catch (error) {
+                console.warn('Mobile alert banner unavailable:', error);
+                banner.hidden = true;
+            }
+        }
+
+        async function focusMobileAlert() {
+            if (!mobileAlertBannerSelection) return;
+            const tools = await mobileAlertBannerTools();
+            let targetLayer = null;
+            layerRefs.alerts?.eachLayer?.(layer => {
+                if (tools.alertBannerIdentifier(layer.feature) === mobileAlertBannerSelection.id) {
+                    targetLayer = layer;
+                }
+            });
+            if (targetLayer?.getBounds) {
+                map.fitBounds(targetLayer.getBounds(), { padding: [28, 28], maxZoom: 9 });
+                targetLayer.openPopup?.();
+                return;
+            }
+            const bounds = tools.featureBounds(mobileAlertBannerSelection.feature);
+            if (bounds) {
+                map.fitBounds([[bounds.south, bounds.west], [bounds.north, bounds.east]], {
+                    padding: [28, 28],
+                    maxZoom: 9
+                });
+            }
+        }
+
+        async function dismissMobileAlert() {
+            if (!mobileAlertBannerSelection) return;
+            dismissedMobileAlertIds.add(mobileAlertBannerSelection.id);
+            await updateMobileAlertBanner(currentAlertFeatures);
+        }
+
         // NWS Alerts
         async function loadAlerts() {
             removeLayer('alerts');
+            currentAlertFeatures = [];
+            updateMobileAlertBanner([]);
             const controller = beginLayerRequest('alerts');
             try {
                 const resp = await fetchWithTimeout(DATA_URLS.nwsAlerts, { signal: controller.signal });
@@ -6314,6 +6523,7 @@
                     return evt.includes('warning') || evt.includes('tornado') || evt.includes('severe');
                 }).length;
                 updateAlertCount(warningCount || features.length);
+                updateMobileAlertBanner(features);
                 await processAlertAudio(features);
             } catch(e) {
                 if (e?.name === 'AbortError') return;
@@ -7807,6 +8017,9 @@
             });
             syncRadarCapabilities();
 
+            document.getElementById('mobileAlertView').addEventListener('click', focusMobileAlert);
+            document.getElementById('mobileAlertDismiss').addEventListener('click', dismissMobileAlert);
+
             // Basemap buttons (sidebar only)
             document.querySelectorAll('.sidebar [data-basemap]').forEach(el => {
                 el.classList.toggle('active', el.dataset.basemap === settings.basemap);
@@ -8009,6 +8222,7 @@
                 settings.language = languageSelect.value;
                 saveSettings();
                 applyLanguage();
+                updateMobileAlertBanner(currentAlertFeatures);
                 showToast(t('languageUpdated'), 'success', 2200);
                 if (layerRefs.hailMesh) showMeshLegend();
                 if (currentForecastLocation) openForecast(currentForecastLocation.lat, currentForecastLocation.lng);
