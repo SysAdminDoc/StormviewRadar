@@ -77,11 +77,17 @@ test('Spanish and metric preferences localize UI, dates, and weather units with 
   await page.goto('/');
   await expect(page.locator('html')).toHaveAttribute('lang', 'es');
   await expect(page.locator('#dataStatusText')).toHaveText('HRRR: actual');
+  await expect(page.locator('#map')).toHaveAttribute('aria-label', /Mapa meteorológico interactivo/);
+  await expect(page.locator('#searchInput')).toHaveAttribute('placeholder', 'Buscar ubicación…');
+  await expect(page.locator('#settingsBtn')).toHaveAttribute('aria-label', 'Configuración');
+  await expect(page.locator('#locBtn')).toHaveAttribute('aria-label', 'Mi ubicación');
+  await expect(page.locator('#mobileFab')).toHaveAttribute('aria-label', 'Abrir controles de capas');
   await page.locator('#settingsBtn').click();
   await expect(page.locator('#settingsTitle')).toHaveText('Configuración');
   await expect(page.locator('.settings-tab[data-tab="display"]')).toHaveText('Pantalla');
   await expect(page.locator('#languageSelect')).toHaveValue('es');
   await expect(page.locator('#unitsSelect')).toHaveValue('metric');
+  await expect(page.locator('#settingsClose')).toHaveAttribute('aria-label', 'Cerrar configuración');
   await page.locator('#settingsClose').click();
 
   await page.locator('#map').click({ position: { x: 640, y: 400 } });

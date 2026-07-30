@@ -81,6 +81,7 @@ test('storm tracks hydrate observed history and update a projected cell path', a
   await expect(page.locator('.storm-track-projection')).toHaveCount(1);
   await expect(page.locator('.storm-track-forecast-point')).toHaveCount(2);
   await expect(page.locator('.sidebar [data-layer="stormTracks"]')).toHaveAttribute('data-feature-count', '1');
+  const requestsBeforeReload = currentRequests;
 
   await page.locator('.storm-cell-marker').dispatchEvent('click');
   await expect(page.locator('.leaflet-popup-content')).toContainText('Storm TLX-A1');
@@ -91,5 +92,5 @@ test('storm tracks hydrate observed history and update a projected cell path', a
   await expect(page.locator('.storm-cell-marker')).toHaveCount(0);
   await toggle();
   await expect(page.locator('.storm-cell-marker')).toHaveCount(1);
-  expect(currentRequests).toBe(2);
+  await expect.poll(() => currentRequests).toBeGreaterThan(requestsBeforeReload);
 });

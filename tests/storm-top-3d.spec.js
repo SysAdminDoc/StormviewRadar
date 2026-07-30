@@ -79,7 +79,7 @@ test('3D storm-top mode renders measured columns from local Cesium assets and re
   const view = page.locator('#cesiumView');
   await expect(view).toBeVisible({ timeout: 20_000 });
   await expect(view).toHaveAttribute('data-entity-count', '2', { timeout: 20_000 });
-  await expect(page.locator('#storm3dStatus')).toHaveText('2 storm top(s) in the current map view');
+  await expect(page.locator('#storm3dStatus')).toHaveText('2 storm tops in the current map view');
   await expect(page.locator('#cesiumContainer canvas')).toHaveCount(1);
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('body')).toHaveClass(/storm-3d-mode/);

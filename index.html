@@ -2893,6 +2893,7 @@
     <script src="vendor/topojson/topojson-client.min.js"></script>
     <script type="module">
     import { createProviderRegistry, RADAR_CAPABILITIES } from './src/providers/registry.js';
+    import { createMessageFormatter } from './src/i18n.js';
 
     (function() {
         'use strict';
@@ -3172,8 +3173,10 @@
                 alertAudioReady: 'Alert sounds enabled',
                 alertAudioUnavailable: 'Audio is unavailable in this browser',
                 alertAudioActivation: 'Use Test Sound to activate alert audio in this tab',
-                newMatchingAlerts: '{value} new matching alert(s)',
-                alertsInMap: '{value} alert(s) in map',
+                newMatchingAlerts_one: '{count} new matching alert',
+                newMatchingAlerts_other: '{count} new matching alerts',
+                alertsInMap_one: '{count} alert in map',
+                alertsInMap_other: '{count} alerts in map',
                 activeWeatherAlert: 'Active weather alert',
                 viewAlert: 'View',
                 dismissAlert: 'Dismiss alert',
@@ -3184,16 +3187,52 @@
                 alertIssuedJustNow: 'just issued',
                 alertIssuedMinutesAgo: '{value}m since issue',
                 alertIssuedHoursAgo: '{value}h since issue',
-                nonMapAlerts: '{value} active alert(s) cannot be drawn on the map',
-                additionalNonMapAlerts: '{value} additional alert(s)',
+                nonMapAlerts_one: '{count} active alert cannot be drawn on the map',
+                nonMapAlerts_other: '{count} active alerts cannot be drawn on the map',
+                additionalNonMapAlerts_one: '{count} additional alert',
+                additionalNonMapAlerts_other: '{count} additional alerts',
                 stormTopsLoading: 'Loading storm cells…',
-                stormTopsCount: '{value} storm top(s) in the current map view',
+                stormTopsCount_one: '{count} storm top in the current map view',
+                stormTopsCount_other: '{count} storm tops in the current map view',
                 stormTopsScale: 'Display height scale: {value}×.',
                 stormTopsEmpty: 'No current storm tops are available in this map view',
                 stormTopsUnavailable: '3D storm tops are unavailable',
                 stormTopsToggle: 'Toggle 3D storm-top heights',
                 stormTopsViewLabel: 'Three-dimensional storm-top view',
-                stormTopsThreatColors: 'Storm-top threat colors'
+                stormTopsThreatColors: 'Storm-top threat colors',
+                mapAria: 'Interactive weather map. Use arrow keys to pan, plus and minus to zoom, and F for the forecast at map center.',
+                searchPlaceholder: 'Search location…',
+                searchAria: 'Search for a US location',
+                searchClearAria: 'Clear location search',
+                searchResultsAria: 'Location suggestions',
+                layersPanelAria: 'Layers panel',
+                savedLocationsAria: 'Saved locations',
+                toggleThemeAria: 'Toggle theme',
+                refreshDataAria: 'Refresh all data',
+                settingsAria: 'Settings',
+                myLocationAria: 'My location',
+                centerForecastAria: 'Forecast at map center',
+                openLayersAria: 'Open layer controls',
+                closeSettingsAria: 'Close settings',
+                closeLayersAria: 'Close layer controls',
+                radarFrameAria: 'Radar frame',
+                radarProgressAria: 'Radar frame loading progress',
+                geofenceNamePlaceholder: 'Name (for example, Home)',
+                locationUnsupported: 'Location is unavailable in this browser. Search for a place or click the map instead.',
+                locationDenied: 'Location permission is denied. Enable it in browser site settings, then reload StormView.',
+                locationFinding: 'Finding your location…',
+                locationFailed: 'Your location could not be determined. Search for a place or click the map instead.',
+                owmKeyRequired: 'API key required. Open Settings > API Keys to add your OpenWeatherMap key.',
+                owmKeyRejected: 'OpenWeatherMap rejected this API key. Update it in Settings > API Keys.',
+                owmValidationFailed: 'OpenWeatherMap credential validation failed. Retry this layer when the provider is available.',
+                reducedDataEnabled: 'Reduced Data enabled: optional live overlays paused and radar preload limited',
+                apiKeysSaved: 'API keys saved in this browser profile',
+                settingsExported: 'Settings exported without API keys',
+                diagnosticNoRequests: 'No provider requests recorded yet.',
+                diagnosticNone: 'None',
+                diagnosticRetryAvailable: 'Retry available',
+                diagnosticNoRetry: 'No retry pending',
+                diagnosticNoTilePause: 'No tile providers paused'
             },
             es: {
                 loading: 'Cargando...',
@@ -3244,8 +3283,10 @@
                 alertAudioReady: 'Sonidos de alerta activados',
                 alertAudioUnavailable: 'El audio no está disponible en este navegador',
                 alertAudioActivation: 'Usa Probar sonido para activar el audio en esta pestaña',
-                newMatchingAlerts: '{value} alerta(s) nueva(s) coincidente(s)',
-                alertsInMap: '{value} alerta(s) en el mapa',
+                newMatchingAlerts_one: '{count} alerta nueva coincidente',
+                newMatchingAlerts_other: '{count} alertas nuevas coincidentes',
+                alertsInMap_one: '{count} alerta en el mapa',
+                alertsInMap_other: '{count} alertas en el mapa',
                 activeWeatherAlert: 'Alerta meteorológica activa',
                 viewAlert: 'Ver',
                 dismissAlert: 'Descartar alerta',
@@ -3256,19 +3297,55 @@
                 alertIssuedJustNow: 'recién emitida',
                 alertIssuedMinutesAgo: '{value} min desde la emisión',
                 alertIssuedHoursAgo: '{value} h desde la emisión',
-                nonMapAlerts: '{value} alerta(s) activa(s) no se pueden dibujar en el mapa',
-                additionalNonMapAlerts: '{value} alerta(s) adicional(es)',
+                nonMapAlerts_one: '{count} alerta activa no se puede dibujar en el mapa',
+                nonMapAlerts_other: '{count} alertas activas no se pueden dibujar en el mapa',
+                additionalNonMapAlerts_one: '{count} alerta adicional',
+                additionalNonMapAlerts_other: '{count} alertas adicionales',
                 stormTopsLoading: 'Cargando celdas de tormenta…',
-                stormTopsCount: '{value} cima(s) de tormenta en la vista actual',
+                stormTopsCount_one: '{count} cima de tormenta en la vista actual',
+                stormTopsCount_other: '{count} cimas de tormenta en la vista actual',
                 stormTopsScale: 'Escala de altura visual: {value}×.',
                 stormTopsEmpty: 'No hay cimas de tormenta actuales en esta vista',
                 stormTopsUnavailable: 'Las cimas de tormenta 3D no están disponibles',
                 stormTopsToggle: 'Alternar alturas 3D de cimas de tormenta',
                 stormTopsViewLabel: 'Vista tridimensional de cimas de tormenta',
-                stormTopsThreatColors: 'Colores de amenaza de las cimas'
+                stormTopsThreatColors: 'Colores de amenaza de las cimas',
+                mapAria: 'Mapa meteorológico interactivo. Usa las flechas para desplazar, más y menos para acercar, y F para el pronóstico en el centro.',
+                searchPlaceholder: 'Buscar ubicación…',
+                searchAria: 'Buscar una ubicación de Estados Unidos',
+                searchClearAria: 'Borrar búsqueda de ubicación',
+                searchResultsAria: 'Sugerencias de ubicación',
+                layersPanelAria: 'Panel de capas',
+                savedLocationsAria: 'Ubicaciones guardadas',
+                toggleThemeAria: 'Cambiar tema',
+                refreshDataAria: 'Actualizar todos los datos',
+                settingsAria: 'Configuración',
+                myLocationAria: 'Mi ubicación',
+                centerForecastAria: 'Pronóstico en el centro del mapa',
+                openLayersAria: 'Abrir controles de capas',
+                closeSettingsAria: 'Cerrar configuración',
+                closeLayersAria: 'Cerrar controles de capas',
+                radarFrameAria: 'Imagen de radar',
+                radarProgressAria: 'Progreso de carga de imágenes de radar',
+                geofenceNamePlaceholder: 'Nombre (por ejemplo, Casa)',
+                locationUnsupported: 'La ubicación no está disponible en este navegador. Busca un lugar o haz clic en el mapa.',
+                locationDenied: 'El permiso de ubicación está denegado. Actívalo en la configuración del sitio y vuelve a cargar StormView.',
+                locationFinding: 'Buscando tu ubicación…',
+                locationFailed: 'No se pudo determinar tu ubicación. Busca un lugar o haz clic en el mapa.',
+                owmKeyRequired: 'Se requiere una clave. Abre Configuración > Claves API para añadir tu clave de OpenWeatherMap.',
+                owmKeyRejected: 'OpenWeatherMap rechazó esta clave. Actualízala en Configuración > Claves API.',
+                owmValidationFailed: 'Falló la validación de credenciales de OpenWeatherMap. Reintenta esta capa cuando el proveedor esté disponible.',
+                reducedDataEnabled: 'Datos reducidos activados: capas en vivo opcionales pausadas y precarga de radar limitada',
+                apiKeysSaved: 'Claves API guardadas en este perfil del navegador',
+                settingsExported: 'Configuración exportada sin claves API',
+                diagnosticNoRequests: 'Todavía no se registraron solicitudes del proveedor.',
+                diagnosticNone: 'Ninguno',
+                diagnosticRetryAvailable: 'Reintento disponible',
+                diagnosticNoRetry: 'Sin reintento pendiente',
+                diagnosticNoTilePause: 'Ningún proveedor de teselas está pausado'
             }
         };
-        const SPANISH_EXACT_TEXT = {
+        const STATIC_MESSAGE_TRANSLATIONS = {
             'Settings': 'Configuración',
             'Display': 'Pantalla',
             'Status': 'Estado',
@@ -3386,22 +3463,30 @@
             'Hail': 'Granizo',
             'Other': 'Otro'
         };
-        const originalTextNodes = new WeakMap();
+        const STATIC_MESSAGE_CATALOG = Object.freeze(Object.fromEntries(
+            Object.entries(STATIC_MESSAGE_TRANSLATIONS).map(([english, spanish], index) => [
+                `static.${index + 1}`,
+                Object.freeze({ en: english, es: spanish })
+            ])
+        ));
+        const STATIC_MESSAGE_KEY_BY_ENGLISH = new Map(
+            Object.entries(STATIC_MESSAGE_CATALOG).map(([key, messages]) => [messages.en, key])
+        );
+        const staticMessageKeysByNode = new WeakMap();
 
         function languageCode() {
             return settings.language === 'es' ? 'es' : 'en';
         }
 
+        const messageFormatter = createMessageFormatter(MESSAGE_CATALOG, languageCode);
+
         function t(key, variables = {}) {
-            const template = MESSAGE_CATALOG[languageCode()]?.[key] ?? MESSAGE_CATALOG.en[key] ?? key;
-            return Object.entries(variables).reduce(
-                (value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)),
-                template
-            );
+            return messageFormatter.message(key, variables);
         }
 
-        function translatedExact(value) {
-            return languageCode() === 'es' ? (SPANISH_EXACT_TEXT[value] || value) : value;
+        function localizedStaticText(value) {
+            const key = STATIC_MESSAGE_KEY_BY_ENGLISH.get(value);
+            return key ? STATIC_MESSAGE_CATALOG[key][languageCode()] : value;
         }
 
         function localizeTextTree(root = document.body) {
@@ -3409,20 +3494,20 @@
             const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
             let node;
             while ((node = walker.nextNode())) {
-                const original = originalTextNodes.get(node) ?? node.nodeValue;
-                originalTextNodes.set(node, original);
-                const trimmed = original.trim();
-                if (!trimmed) continue;
-                const translated = translatedExact(trimmed);
-                node.nodeValue = original.replace(trimmed, translated);
+                let key = staticMessageKeysByNode.get(node);
+                if (!key) {
+                    key = STATIC_MESSAGE_KEY_BY_ENGLISH.get(node.nodeValue.trim());
+                    if (key) staticMessageKeysByNode.set(node, key);
+                }
+                if (!key) continue;
+                const messages = STATIC_MESSAGE_CATALOG[key];
+                const current = node.nodeValue.trim();
+                node.nodeValue = node.nodeValue.replace(current, messages[languageCode()]);
             }
         }
 
         function formatLocalizedDate(value, options = {}) {
-            const date = value instanceof Date ? value : new Date(value);
-            return Number.isFinite(date.getTime())
-                ? new Intl.DateTimeFormat(languageCode() === 'es' ? 'es-US' : 'en-US', options).format(date)
-                : '';
+            return messageFormatter.date(value, options);
         }
 
         function unitProfile() {
@@ -3435,19 +3520,48 @@
             const value = Number(fahrenheit);
             if (!Number.isFinite(value)) return 'N/A';
             const converted = settings.units === 'metric' ? (value - 32) * 5 / 9 : value;
-            return `${new Intl.NumberFormat(languageCode(), { maximumFractionDigits: 0 }).format(converted)}${unitProfile().temperature}`;
+            return `${messageFormatter.number(converted, { maximumFractionDigits: 0 })}${unitProfile().temperature}`;
         }
 
         function formatRiverStage(feet) {
             const value = Number(feet);
             if (!Number.isFinite(value)) return 'N/A';
             const converted = settings.units === 'metric' ? value * 0.3048 : value;
-            return `${new Intl.NumberFormat(languageCode(), { maximumFractionDigits: 2 }).format(converted)} ${unitProfile().stage}`;
+            return `${messageFormatter.number(converted, { maximumFractionDigits: 2 })} ${unitProfile().stage}`;
         }
 
         function applyLanguage() {
             document.documentElement.lang = languageCode();
             localizeTextTree();
+            const localizedAttributes = {
+                map: ['aria-label', 'mapAria'],
+                searchInput: ['aria-label', 'searchAria'],
+                searchClear: ['aria-label', 'searchClearAria'],
+                searchResults: ['aria-label', 'searchResultsAria'],
+                sidebarToggle: ['title', 'layersPanelAria'],
+                bookmarksBtn: ['title', 'savedLocationsAria'],
+                bookmarksPanel: ['aria-label', 'savedLocationsAria'],
+                themeBtn: ['title', 'toggleThemeAria'],
+                refreshBtn: ['title', 'refreshDataAria'],
+                settingsBtn: ['title', 'settingsAria'],
+                locBtn: ['aria-label', 'myLocationAria'],
+                centerForecastBtn: ['aria-label', 'centerForecastAria'],
+                mobileFab: ['aria-label', 'openLayersAria'],
+                settingsClose: ['aria-label', 'closeSettingsAria'],
+                sheetClose: ['aria-label', 'closeLayersAria'],
+                timeline: ['aria-label', 'radarFrameAria'],
+                loadProgressBar: ['aria-label', 'radarProgressAria']
+            };
+            Object.entries(localizedAttributes).forEach(([id, [attribute, key]]) => {
+                const element = document.getElementById(id);
+                if (!element) return;
+                element.setAttribute(attribute, t(key));
+                if (attribute === 'title' && !element.getAttribute('aria-label')) {
+                    element.setAttribute('aria-label', t(key));
+                }
+            });
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) searchInput.placeholder = t('searchPlaceholder');
             if (alertAgeLegendControl && currentAlertFeatures.length) {
                 const referenceTime = replayMode && frames[currentFrame]
                     ? frames[currentFrame].time * 1000
@@ -3467,11 +3581,7 @@
             if (stormTopView) stormTopView.setAttribute('aria-label', t('stormTopsViewLabel'));
             if (stormTopLegend) stormTopLegend.setAttribute('aria-label', t('stormTopsThreatColors'));
             const geofenceNameInput = document.getElementById('geofenceNameInput');
-            if (geofenceNameInput) {
-                geofenceNameInput.placeholder = languageCode() === 'es'
-                    ? 'Nombre (por ejemplo, Casa)'
-                    : 'Name (for example, Home)';
-            }
+            if (geofenceNameInput) geofenceNameInput.placeholder = t('geofenceNamePlaceholder');
             renderGeofenceList();
             updateTimestamp();
             renderDiagnostics();
@@ -3559,7 +3669,7 @@
             const product = report.radar.product || 'reflectivity';
             document.getElementById('diagVersion').textContent = report.appVersion;
             providerElement.textContent = `${report.radar.provider} / ${product}`;
-            document.getElementById('diagState').textContent = `${translatedExact(report.radar.state)}: ${report.radar.message}`;
+            document.getElementById('diagState').textContent = `${localizedStaticText(report.radar.state)}: ${report.radar.message}`;
             document.getElementById('diagFreshness').textContent = report.radar.validAt
                 ? `${formatLocalizedDate(report.radar.validAt, { dateStyle: 'short', timeStyle: 'medium' })} · ${report.radar.age}`
                 : report.radar.age;
@@ -3571,22 +3681,22 @@
                 .filter(([, value]) => value.state !== 'disabled')
                 .sort(([left], [right]) => left.localeCompare(right));
             document.getElementById('diagOverlays').textContent = overlayStates.length
-                ? overlayStates.map(([name, value]) => `${getLayerName(name)}: ${value.state}`).join(' · ')
-                : 'None';
+                ? overlayStates.map(([name, value]) => `${getLayerName(name)}: ${localizedStaticText(value.state)}`).join(' · ')
+                : t('diagnosticNone');
             document.getElementById('diagRetry').textContent =
-                `${report.radar.retryable ? 'Retry available' : 'No retry pending'} · ${report.radar.retryBackoffMs} ms tile backoff`;
+                `${report.radar.retryable ? t('diagnosticRetryAvailable') : t('diagnosticNoRetry')} · ${report.radar.retryBackoffMs} ms tile backoff`;
             document.getElementById('diagTileBackoff').textContent = report.resources.tileBackoff.length
                 ? report.resources.tileBackoff
                     .map(provider => `${provider.provider} paused until ${formatLocalizedDate(provider.pauseUntil, { timeStyle: 'medium' })}`)
                     .join(' · ')
-                : 'No tile providers paused';
+                : t('diagnosticNoTilePause');
 
             const requestList = document.getElementById('diagRequests');
             requestList.replaceChildren();
             if (!report.requests.length) {
                 const empty = document.createElement('p');
                 empty.className = 'setting-hint';
-                empty.textContent = 'No provider requests recorded yet.';
+                empty.textContent = t('diagnosticNoRequests');
                 requestList.append(empty);
                 return;
             }
@@ -3596,7 +3706,7 @@
                 const endpoint = document.createElement('strong');
                 endpoint.textContent = request.endpoint;
                 const detail = document.createElement('span');
-                detail.textContent = `${translatedExact(request.result)}${request.status ? ` (${request.status})` : ''} · ${request.durationMs} ms · ${formatLocalizedDate(request.startedAt, { timeStyle: 'medium' })}`;
+                detail.textContent = `${localizedStaticText(request.result)}${request.status ? ` (${request.status})` : ''} · ${request.durationMs} ms · ${formatLocalizedDate(request.startedAt, { timeStyle: 'medium' })}`;
                 row.append(endpoint, detail);
                 requestList.append(row);
             });
@@ -4370,16 +4480,16 @@
             const list = document.getElementById('geofenceList');
             if (!list) return;
             if (!geofences.length) {
-                list.innerHTML = `<div class="setting-hint">${escapeHTML(translatedExact('No saved geofences.'))}</div>`;
+                list.innerHTML = `<div class="setting-hint">${escapeHTML(localizedStaticText('No saved geofences.'))}</div>`;
                 return;
             }
             list.innerHTML = geofences.map(geofence => `
                 <div class="geofence-item">
                     <button class="geofence-item-info" type="button" data-geofence-focus="${geofence.id}" style="border:0;background:none;color:inherit;text-align:left;cursor:pointer;">
                         <div class="geofence-item-name">${escapeHTML(geofence.name, 80)}</div>
-                        <div class="geofence-item-meta">${geofence.radiusMiles} mi / ${Math.round(geofence.radiusMiles * 1.609344)} km · ${escapeHTML(translatedExact('local only'))}</div>
+                        <div class="geofence-item-meta">${geofence.radiusMiles} mi / ${Math.round(geofence.radiusMiles * 1.609344)} km · ${escapeHTML(localizedStaticText('local only'))}</div>
                     </button>
-                    <button class="geofence-delete" type="button" data-geofence-delete="${geofence.id}" aria-label="${escapeHTML(translatedExact('Delete'))} ${escapeHTML(geofence.name, 80)}">${escapeHTML(translatedExact('Delete'))}</button>
+                    <button class="geofence-delete" type="button" data-geofence-delete="${geofence.id}" aria-label="${escapeHTML(localizedStaticText('Delete'))} ${escapeHTML(geofence.name, 80)}">${escapeHTML(localizedStaticText('Delete'))}</button>
                 </div>
             `).join('');
             list.querySelectorAll('[data-geofence-focus]').forEach(button => {
@@ -6811,7 +6921,7 @@
                 container.open = false;
                 return;
             }
-            summary.textContent = t('nonMapAlerts', { value: unresolved.length });
+            summary.textContent = t('nonMapAlerts', { count: unresolved.length });
             unresolved.slice(0, 20).forEach(feature => {
                 const item = document.createElement('li');
                 const properties = feature.properties || {};
@@ -6822,7 +6932,7 @@
             });
             if (unresolved.length > 20) {
                 const item = document.createElement('li');
-                item.textContent = t('additionalNonMapAlerts', { value: unresolved.length - 20 });
+                item.textContent = t('additionalNonMapAlerts', { count: unresolved.length - 20 });
                 list.appendChild(item);
             }
         }
@@ -7003,7 +7113,7 @@
             replayWarnings = [];
             clearAllFrameLayers();
             removeLayer('alerts');
-            setReplayControlState(translatedExact('Live mode'));
+            setReplayControlState(localizedStaticText('Live mode'));
             updatePlaybackVisibility();
             loadRadarData();
             if (settings.layers.alerts) loadAlerts();
@@ -7094,7 +7204,7 @@
                 ? 'extreme'
                 : urgencies.includes('severe') ? 'severe' : 'standard';
             await playAlertTone(urgency);
-            showToast(t('newMatchingAlerts', { value: matches.length }), 'warn', 4000);
+            showToast(t('newMatchingAlerts', { count: matches.length }), 'warn', 4000);
         }
 
         function mobileAlertBannerTools() {
@@ -7135,7 +7245,7 @@
                 banner.dataset.severity = ['extreme', 'severe', 'moderate', 'minor'].includes(severity)
                     ? severity : 'unknown';
                 banner.setAttribute('aria-label', t('activeWeatherAlert'));
-                document.getElementById('mobileAlertMeta').textContent = t('alertsInMap', { value: selection.count });
+                document.getElementById('mobileAlertMeta').textContent = t('alertsInMap', { count: selection.count });
                 document.getElementById('mobileAlertTitle').textContent = event;
                 document.getElementById('mobileAlertHeadline').textContent = headline;
                 document.getElementById('mobileAlertView').textContent = t('viewAlert');
@@ -7663,7 +7773,7 @@
             view.dataset.entityCount = String(columns.length);
             view.dataset.heightScale = String(displayScale);
             document.getElementById('storm3dStatus').textContent = columns.length
-                ? t('stormTopsCount', { value: columns.length })
+                ? t('stormTopsCount', { count: columns.length })
                 : t('stormTopsEmpty');
             document.getElementById('storm3dScale').textContent = t('stormTopsScale', { value: displayScale });
             cesiumViewer.scene.requestRender();
@@ -7974,7 +8084,7 @@
 
         async function toggleOWMLayer(name) {
             if (!settings.owmKey && settings.layers[name]) {
-                showToast('API key required. Open Settings > API Keys to add your OpenWeatherMap key.', 'warn', 5000);
+                showToast(t('owmKeyRequired'), 'warn', 5000);
                 settings.layers[name] = false;
                 saveSettings();
                 syncAccessibleControlStates();
@@ -8001,9 +8111,7 @@
                     settings.layers[name] = false;
                     saveSettings();
                     syncAccessibleControlStates();
-                    const message = credentialFailure
-                        ? 'OpenWeatherMap rejected this API key. Update it in Settings > API Keys.'
-                        : 'OpenWeatherMap credential validation failed. Retry this layer when the provider is available.';
+                    const message = credentialFailure ? t('owmKeyRejected') : t('owmValidationFailed');
                     setLayerRequestState(name, 'failed', message, !credentialFailure);
                     showToast(message, credentialFailure ? 'error' : 'warn', 7000);
                     return;
@@ -8151,7 +8259,7 @@
             }
 
             const isForecast = frame.isForecast === true;
-            const frameKinds = { forecast: t('forecast'), analysis: t('analysis'), past: t('past'), latest: t('latest'), replay: translatedExact('Replay') };
+            const frameKinds = { forecast: t('forecast'), analysis: t('analysis'), past: t('past'), latest: t('latest'), replay: localizedStaticText('Replay') };
             const frameKind = frameKinds[frame.kind] || (isForecast ? t('forecast') : t('latest'));
             document.getElementById('timestampText').textContent = `${timeStr} (${frameKind})`;
             const timestampBox = document.getElementById('timestampBox');
@@ -8193,7 +8301,7 @@
             sourceEl.classList.toggle('forecast', isForecast);
             
             if (replayMode) {
-                frameEl.textContent = `${translatedExact('Replay')} • ${currentFrame + 1}/${frames.length}`;
+                frameEl.textContent = `${localizedStaticText('Replay')} • ${currentFrame + 1}/${frames.length}`;
                 frameEl.title = frame.timeSource || '';
             } else if (settings.source === 'hrrr') {
                 const hour = frame.forecastHour || 0;
@@ -8210,7 +8318,7 @@
                     differentialReflectivity: 'ZDR',
                     correlationCoefficient: 'Correlation coefficient'
                 };
-                frameEl.textContent = `${frame.site} ${frame.elevationAngle.toFixed(1)}° • ${translatedExact(productNames[settings.radarProduct])} • ${formatProviderAge(frame)}`;
+                frameEl.textContent = `${frame.site} ${frame.elevationAngle.toFixed(1)}° • ${localizedStaticText(productNames[settings.radarProduct])} • ${formatProviderAge(frame)}`;
                 frameEl.title = `${frame.timeSource || ''}: ${frame.path || ''}`;
             } else if (!RADAR_CAPABILITIES[settings.source]?.animation) {
                 frameEl.textContent = `${frameKind} • ${formatProviderAge(frame)}`;
@@ -8684,7 +8792,7 @@
                 <div class="fc-current-icon">${getWeatherIcon(cur.weather_code, isNight)}</div>
                 <div class="fc-current-temp">${Math.round(cur.temperature_2m)}${units.temperature}</div>
                 <div class="fc-current-details">
-                    <div class="fc-condition">${translatedExact(getWeatherText(cur.weather_code))}</div>
+                    <div class="fc-condition">${localizedStaticText(getWeatherText(cur.weather_code))}</div>
                     <div class="fc-stats">
                         <div><span class="fc-stat-label">${t('feels')} </span>${Math.round(cur.apparent_temperature)}${units.temperature}</div>
                         <div><span class="fc-stat-label">${t('humidity')} </span>${Math.round(finiteNumber(cur.relative_humidity_2m, 0, 100, 0))}%</div>
@@ -9356,7 +9464,7 @@
                     REDUCED_DATA_OPTIONAL_LAYERS.forEach(layer => {
                         if (settings.layers[layer]) handleLayerToggle(layer, false);
                     });
-                    showToast('Reduced Data enabled: optional live overlays paused and radar preload limited', 'info', 5000);
+                    showToast(t('reducedDataEnabled'), 'info', 5000);
                 }
                 saveSettings();
                 loadRadarData();
@@ -9464,7 +9572,7 @@
             document.getElementById('replayEndInput').value = localDateTimeInputValue(replayEndDefault);
             document.getElementById('startReplayBtn').addEventListener('click', startHistoricalReplay);
             document.getElementById('exitReplayBtn').addEventListener('click', exitHistoricalReplay);
-            setReplayControlState(translatedExact('Live mode'));
+            setReplayControlState(localizedStaticText('Live mode'));
 
             // Color schemes
             document.querySelectorAll('[data-scheme]').forEach(el => {
@@ -9530,7 +9638,7 @@
                 const nextKey = document.getElementById('owmKeyInput').value.trim();
                 if (nextKey !== settings.owmKey) validatedOWMKey = '';
                 settings.owmKey = nextKey;
-                if (saveSettings()) showToast('API keys saved in this browser profile', 'success', 2500);
+                if (saveSettings()) showToast(t('apiKeysSaved'), 'success', 2500);
             });
 
             // Import/Export
@@ -9549,7 +9657,7 @@
                 a.download = 'stormview-settings.json';
                 a.click();
                 setTimeout(() => URL.revokeObjectURL(a.href), 0);
-                showToast('Settings exported without API keys', 'success', 2500);
+                showToast(t('settingsExported'), 'success', 2500);
             });
             
             document.getElementById('importBtn').addEventListener('click', () => {
@@ -9835,23 +9943,23 @@
 
         function goToLocation() {
             if (!navigator.geolocation) {
-                const message = 'Location is unavailable in this browser. Search for a place or click the map instead.';
+                const message = t('locationUnsupported');
                 setLocationControlStatus(message, 'unsupported');
                 showToast(message, 'warn', 6000);
                 return;
             }
             if (locationPermissionBlocked) {
-                showToast('Location permission is denied. Enable it in browser site settings, then reload StormView.', 'warn', 6000);
+                showToast(t('locationDenied'), 'warn', 6000);
                 return;
             }
 
-            setLocationControlStatus('Finding your location…', 'loading');
+            setLocationControlStatus(t('locationFinding'), 'loading');
             
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     const {latitude, longitude} = pos.coords;
                     map.flyTo([latitude, longitude], 10);
-                    setLocationControlStatus('My Location', 'ready');
+                    setLocationControlStatus(t('myLocationAria'), 'ready');
 
                     if (locationMarker) locationMarker.setLatLng([latitude, longitude]);
                     else {
@@ -9863,9 +9971,7 @@
                 (error) => {
                     const denied = error?.code === 1;
                     locationPermissionBlocked = denied;
-                    const message = denied
-                        ? 'Location permission is denied. Enable it in browser site settings, then reload StormView.'
-                        : 'Your location could not be determined. Search for a place or click the map instead.';
+                    const message = denied ? t('locationDenied') : t('locationFailed');
                     setLocationControlStatus(message, denied ? 'denied' : 'failed');
                     showToast(message, 'warn', 6000);
                 },

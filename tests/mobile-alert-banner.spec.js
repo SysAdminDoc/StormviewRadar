@@ -79,7 +79,7 @@ test('mobile alert banner prioritizes visible threats, dismisses, and focuses th
   await page.goto('/');
   const banner = page.locator('#mobileAlertBanner');
   await expect(banner).toBeVisible();
-  await expect(page.locator('#mobileAlertMeta')).toHaveText('2 alert(s) in map');
+  await expect(page.locator('#mobileAlertMeta')).toHaveText('2 alerts in map');
   await expect(page.locator('#mobileAlertTitle')).toHaveText('Tornado Warning');
   expect(await banner.evaluate(element => parseFloat(getComputedStyle(element).animationDuration))).toBeLessThan(0.001);
   const accessibility = await new AxeBuilder({ page })
@@ -89,7 +89,7 @@ test('mobile alert banner prioritizes visible threats, dismisses, and focuses th
   expect(accessibility.violations).toEqual([]);
 
   await page.locator('#mobileAlertDismiss').click();
-  await expect(page.locator('#mobileAlertMeta')).toHaveText('1 alert(s) in map');
+  await expect(page.locator('#mobileAlertMeta')).toHaveText('1 alert in map');
   await expect(page.locator('#mobileAlertTitle')).toHaveText('Flood Warning');
 
   await page.locator('#mobileAlertView').click();
