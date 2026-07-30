@@ -2838,7 +2838,9 @@
 
     <script src="vendor/leaflet/leaflet.js"></script>
     <script src="vendor/topojson/topojson-client.min.js"></script>
-    <script>
+    <script type="module">
+    import { createProviderRegistry, RADAR_CAPABILITIES } from './src/providers/registry.js';
+
     (function() {
         'use strict';
 
@@ -4144,44 +4146,6 @@
                 states: true, counties: true, labels: true, highways: false, geofences: false
             }
         };
-
-        const RADAR_CAPABILITIES = Object.freeze({
-            hrrr: {
-                label: 'HRRR',
-                products: ['reflectivity'],
-                note: 'Analysis plus hourly forecast guidance through +18 hours.',
-                animation: true,
-                coverage: { label: 'CONUS', bounds: [-125, 24, -66, 50] }
-            },
-            rainviewer: {
-                label: 'RainViewer',
-                products: ['reflectivity'],
-                note: 'Past radar only: approximately 2 hours, Universal Blue palette, native zoom 7.',
-                animation: true,
-                coverage: { label: 'Global' }
-            },
-            mrms: {
-                label: 'MRMS',
-                products: ['reflectivity', 'velocity', 'echoTops', 'precipAccum'],
-                note: 'Latest US radar products from Iowa Environmental Mesonet.',
-                animation: false,
-                coverage: { label: 'CONUS', bounds: [-125, 24, -66, 50] }
-            },
-            nowcoast: {
-                label: 'NOAA WMS',
-                products: ['reflectivity'],
-                note: 'Latest NOAA nowCOAST CONUS radar mosaic; single frame.',
-                animation: false,
-                coverage: { label: 'CONUS', bounds: [-125, 24, -66, 50] }
-            },
-            level2: {
-                label: 'NEXRAD Level II',
-                products: ['reflectivity', 'velocity', 'differentialReflectivity', 'correlationCoefficient'],
-                note: 'Latest native single-site base data from the NOAA/Unidata AWS archive.',
-                animation: false,
-                coverage: { label: 'selected radar range' }
-            }
-        });
 
         // ==================== INITIALIZATION ====================
         function init() {
@@ -5574,17 +5538,7 @@
                 framesReady = false;
                 setProviderStatus('loading', t('providerLoading', { provider: capability.label }));
                 
-                if (requestedSource === 'rainviewer') {
-                    await loadRainViewerPreloaded(signal, generation);
-                } else if (requestedSource === 'mrms') {
-                    await loadMRMS(signal, generation);
-                } else if (requestedSource === 'hrrr') {
-                    await loadHRRR(signal, generation);
-                } else if (requestedSource === 'nowcoast') {
-                    await loadNowCOAST(signal, generation);
-                } else if (requestedSource === 'level2') {
-                    await loadLevel2(signal, generation);
-                }
+                await providerRegistry.radar(requestedSource).load(signal, generation);
                 ensureCurrentRadarLoad(generation, signal);
                 lastRefreshTime = Date.now();
                 activeRadarSource = requestedSource;
@@ -5608,7 +5562,7 @@
                     saveSettings();
                     try {
                         clearAllFrameLayers();
-                        await loadMRMS(signal, generation);
+                        await providerRegistry.radar('mrms').load(signal, generation);
                         ensureCurrentRadarLoad(generation, signal);
                         lastRefreshTime = Date.now();
                         activeRadarSource = 'mrms';
@@ -6556,143 +6510,100 @@
         }
 
         // ==================== WEATHER LAYERS ====================
+        function disableRadarLayer() {
+            radarAbortController?.abort(new DOMException('Radar layer disabled', 'AbortError'));
+            radarLoadGeneration += 1;
+            clearAllFrameLayers();
+            disposeRadarState(retainedRadarState);
+            retainedRadarState = null;
+        }
+
+        function disposeAlertsLayer() {
+            removeLayer('alerts');
+            currentAlertFeatures = [];
+            renderNonMapAlerts([]);
+            updateAlertCount(0);
+            updateMobileAlertBanner([]);
+        }
+
+        function loadAlertsLayer() {
+            if (replayMode) renderReplayAlerts(frames[currentFrame].time * 1000);
+            else loadAlerts();
+        }
+
+        function simpleOverlayAdapter(id, load, dispose = () => removeLayer(id)) {
+            return {
+                load,
+                cancel: () => layerRequests.get(id)?.abort(new DOMException('Provider cancelled', 'AbortError')),
+                status: () => diagnosticsState.layerStates[id] || { state: settings.layers[id] ? 'idle' : 'disabled' },
+                dispose
+            };
+        }
+
+        const radarProviderAdapter = load => ({
+            load,
+            cancel: () => radarAbortController?.abort(new DOMException('Radar provider cancelled', 'AbortError')),
+            status: () => diagnosticsState.provider,
+            dispose: disableRadarLayer
+        });
+
+        const providerRegistry = createProviderRegistry({
+            radar: {
+                hrrr: radarProviderAdapter(loadHRRR),
+                rainviewer: radarProviderAdapter(loadRainViewerPreloaded),
+                mrms: radarProviderAdapter(loadMRMS),
+                nowcoast: radarProviderAdapter(loadNowCOAST),
+                level2: {
+                    ...radarProviderAdapter(loadLevel2),
+                    cancel: () => disposeLevel2Worker(new DOMException('Level II provider cancelled', 'AbortError'))
+                }
+            },
+            overlays: {
+                radar: simpleOverlayAdapter('radar', loadRadarData, disableRadarLayer),
+                couplets: simpleOverlayAdapter('couplets', renderLevel2Couplets),
+                alerts: simpleOverlayAdapter('alerts', loadAlertsLayer, disposeAlertsLayer),
+                spcOutlook: simpleOverlayAdapter('spcOutlook', loadSPCOutlook),
+                stormReports: simpleOverlayAdapter('stormReports', loadStormReports),
+                stormTracks: simpleOverlayAdapter('stormTracks', loadStormTracks),
+                hailMesh: simpleOverlayAdapter('hailMesh', loadHailMesh),
+                lightning: simpleOverlayAdapter('lightning', () => {
+                    loadLightning();
+                    layerRefs.lightning?.addTo(map);
+                }),
+                satellite: simpleOverlayAdapter('satellite', () => loadSatelliteLayer('visible')),
+                satelliteIR: simpleOverlayAdapter('satelliteIR', () => loadSatelliteLayer('ir')),
+                satelliteWV: simpleOverlayAdapter('satelliteWV', () => loadSatelliteLayer('wv')),
+                satelliteGeoColor: simpleOverlayAdapter('satelliteGeoColor', () => loadSatelliteLayer('geocolor')),
+                satelliteSandwich: simpleOverlayAdapter('satelliteSandwich', () => loadSatelliteLayer('sandwich')),
+                satelliteMesoscale: simpleOverlayAdapter('satelliteMesoscale', () => loadSatelliteLayer('mesoscale')),
+                riverGauges: simpleOverlayAdapter('riverGauges', loadRiverGauges),
+                surfaceObs: simpleOverlayAdapter('surfaceObs', loadSurfaceObs),
+                spcWatches: simpleOverlayAdapter('spcWatches', loadSPCWatches),
+                spcMCD: simpleOverlayAdapter('spcMCD', loadSPCMCD),
+                spcTornado: simpleOverlayAdapter('spcTornado', () => loadSPCProbability('tornado')),
+                spcWind: simpleOverlayAdapter('spcWind', () => loadSPCProbability('wind')),
+                spcHail: simpleOverlayAdapter('spcHail', () => loadSPCProbability('hail')),
+                tropical: simpleOverlayAdapter('tropical', loadTropical),
+                sigmets: simpleOverlayAdapter('sigmets', loadSIGMETs),
+                temp: simpleOverlayAdapter('temp', () => toggleOWMLayer('temp'), () => toggleOWMLayer('temp')),
+                wind: simpleOverlayAdapter('wind', () => toggleOWMLayer('wind'), () => toggleOWMLayer('wind')),
+                clouds: simpleOverlayAdapter('clouds', () => toggleOWMLayer('clouds'), () => toggleOWMLayer('clouds')),
+                pressure: simpleOverlayAdapter('pressure', () => toggleOWMLayer('pressure'), () => toggleOWMLayer('pressure')),
+                states: simpleOverlayAdapter('states', loadStates),
+                counties: simpleOverlayAdapter('counties', loadCounties),
+                labels: simpleOverlayAdapter('labels', () => toggleLabelsLayer(true), () => toggleLabelsLayer(false)),
+                highways: simpleOverlayAdapter('highways', () => toggleHighwaysLayer(true), () => toggleHighwaysLayer(false)),
+                geofences: simpleOverlayAdapter('geofences', loadGeofenceLayer)
+            },
+            cancel: id => layerRequests.get(id)?.abort(new DOMException('Provider cancelled', 'AbortError')),
+            status: id => diagnosticsState.layerStates[id] || diagnosticsState.provider
+        });
+
         function handleLayerToggle(name, on, silent = false) {
             settings.layers[name] = on;
             saveSettings();
             syncAccessibleControlStates();
-
-            switch(name) {
-                case 'radar':
-                    if (on) loadRadarData();
-                    else {
-                        radarAbortController?.abort(new DOMException('Radar layer disabled', 'AbortError'));
-                        radarLoadGeneration += 1;
-                        clearAllFrameLayers();
-                        disposeRadarState(retainedRadarState);
-                        retainedRadarState = null;
-                    }
-                    break;
-                case 'couplets':
-                    on ? renderLevel2Couplets() : removeLayer('couplets');
-                    break;
-                case 'alerts':
-                    if (replayMode) {
-                        if (on) renderReplayAlerts(frames[currentFrame].time * 1000);
-                        else {
-                            removeLayer('alerts');
-                            currentAlertFeatures = [];
-                            renderNonMapAlerts([]);
-                            updateAlertCount(0);
-                            updateMobileAlertBanner([]);
-                        }
-                    } else {
-                        if (on) loadAlerts();
-                        else {
-                            removeLayer('alerts');
-                            currentAlertFeatures = [];
-                            renderNonMapAlerts([]);
-                            updateAlertCount(0);
-                            updateMobileAlertBanner([]);
-                        }
-                    }
-                    break;
-                case 'spcOutlook':
-                    on ? loadSPCOutlook() : removeLayer('spcOutlook');
-                    break;
-                case 'stormReports':
-                    on ? loadStormReports() : removeLayer('stormReports');
-                    break;
-                case 'stormTracks':
-                    on ? loadStormTracks() : removeLayer('stormTracks');
-                    break;
-                case 'hailMesh':
-                    on ? loadHailMesh() : removeLayer('hailMesh');
-                    break;
-                case 'lightning':
-                    if (on) {
-                        loadLightning();
-                        if (layerRefs.lightning) layerRefs.lightning.addTo(map);
-                    } else {
-                        removeLayer('lightning');
-                    }
-                    break;
-                case 'satellite':
-                    on ? loadSatelliteLayer('visible') : removeLayer('satellite');
-                    break;
-                case 'satelliteIR':
-                    on ? loadSatelliteLayer('ir') : removeLayer('satelliteIR');
-                    break;
-                case 'satelliteWV':
-                    on ? loadSatelliteLayer('wv') : removeLayer('satelliteWV');
-                    break;
-                case 'satelliteGeoColor':
-                    on ? loadSatelliteLayer('geocolor') : removeLayer('satelliteGeoColor');
-                    break;
-                case 'satelliteSandwich':
-                    on ? loadSatelliteLayer('sandwich') : removeLayer('satelliteSandwich');
-                    break;
-                case 'satelliteMesoscale':
-                    on ? loadSatelliteLayer('mesoscale') : removeLayer('satelliteMesoscale');
-                    break;
-                case 'riverGauges':
-                    on ? loadRiverGauges() : removeLayer('riverGauges');
-                    break;
-                case 'surfaceObs':
-                    on ? loadSurfaceObs() : removeLayer('surfaceObs');
-                    break;
-                    
-                // Enhanced SPC layers
-                case 'spcWatches':
-                    on ? loadSPCWatches() : removeLayer('spcWatches');
-                    break;
-                case 'spcMCD':
-                    on ? loadSPCMCD() : removeLayer('spcMCD');
-                    break;
-                case 'spcTornado':
-                    on ? loadSPCProbability('tornado') : removeLayer('spcTornado');
-                    break;
-                case 'spcWind':
-                    on ? loadSPCProbability('wind') : removeLayer('spcWind');
-                    break;
-                case 'spcHail':
-                    on ? loadSPCProbability('hail') : removeLayer('spcHail');
-                    break;
-                    
-                // Tropical
-                case 'tropical':
-                    on ? loadTropical() : removeLayer('tropical');
-                    break;
-                    
-                // Aviation
-                case 'sigmets':
-                    on ? loadSIGMETs() : removeLayer('sigmets');
-                    break;
-                    
-                // OWM layers (require API key)
-                case 'temp':
-                case 'wind':
-                case 'clouds':
-                case 'pressure':
-                    toggleOWMLayer(name);
-                    break;
-                    
-                // Map overlays
-                case 'states':
-                    on ? loadStates() : removeLayer('states');
-                    break;
-                case 'counties':
-                    on ? loadCounties() : removeLayer('counties');
-                    break;
-                case 'labels':
-                    toggleLabelsLayer(on);
-                    break;
-                case 'highways':
-                    toggleHighwaysLayer(on);
-                    break;
-                case 'geofences':
-                    on ? loadGeofenceLayer() : removeLayer('geofences');
-                    break;
-            }
+            providerRegistry.setOverlayEnabled(name, on);
         }
 
         function removeLayer(name) {
