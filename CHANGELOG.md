@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Corrected provider/runtime/privacy documentation, documented key modules and coverage limits, and added a clean-tree release command that synchronizes every version surface, runs the release gate, commits, and tags.
 - Upgraded the exact-pinned esbuild toolchain from 0.25.6 to 0.28.1 and rebuilt/revalidated the local Cesium and NEXRAD Level II worker bundles without dynamic evaluation.
 - Made saved-location writes transactional with quota recovery guidance, JSON export, keyboard-labeled removal, and undoable delete/clear actions; location permission failures now explain recovery without repeated prompts, and rejected OpenWeatherMap keys disable only the requested layer with diagnostics.
 - Extracted a capability-aware registry for all radar and overlay providers, replacing UI source/layer branches with uniform load, cancel, status, and disposal lifecycle dispatch.

@@ -127,7 +127,7 @@ API keys are stored unencrypted in the current browser profile and sent directly
 | SPC Outlook | [SPC](https://www.spc.noaa.gov/) | Daily |
 | SPC Mesoscale Discussions | [SPC](https://www.spc.noaa.gov/products/md/) | Provider dependent |
 | SIGMETs and AIRMETs | [NWS API](https://www.weather.gov/documentation/services-web-api) | Real-time |
-| Storm Reports | SPC | As reported |
+| Storm Reports | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/geojson/lsr.php) | As reported |
 | Storm tracks | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/geojson/nexrad_attr.py?help=) | ~1 minute |
 | Lightning | Iowa State Mesonet | ~5 minutes |
 | Satellite | GOES East (IEM) | ~15 minutes |
@@ -173,6 +173,31 @@ after the complete browser suite and advisory check pass for `main`; the deploy
 then verifies the hosted commit, version, social image, lazy modules, worker
 scripts, and representative Cesium runtime asset types.
 
+StormView has no application server, account system, or telemetry endpoint.
+The static browser client requests map/weather data directly from the providers
+listed above. Settings, saved locations, geofences, and optional API keys remain
+in the current browser profile; exports omit API keys and diagnostics redact
+keys and precise coordinates. Provider coverage is not uniform: Level II,
+MRMS, IEM reports, and most severe-weather analysis are US-focused, RainViewer
+supplies global past radar, and a transparent or stale layer can reflect an
+upstream outage rather than an all-clear.
+
+## Release process
+
+Start from a clean `main` checkout after all release changes are committed.
+The release command validates the semver, synchronizes package, page, README,
+CLAUDE, and changelog versions, runs the complete release gate, creates a
+`chore(release)` commit, and adds the matching annotated tag:
+
+```bash
+npm run release -- 0.2.0
+git push origin main --follow-tags
+```
+
+The command refuses a dirty tree, an existing tag, a non-increasing version, or
+a failed test/audit gate, so a release never depends on hand-editing version
+strings.
+
 ## Performance Optimizations
 
 StormView includes several optimizations for smooth performance:
@@ -210,8 +235,8 @@ Access the settings panel (⚙️) to customize:
 StormviewRadar/
 ├── index.html          # Single-file application
 ├── package.json        # Locked test and vendored-runtime dependencies
-├── scripts/            # Static checks and Level II worker build
-├── src/                # Level II worker source and browser shims
+├── scripts/            # Builds, release automation, and static/hosted checks
+├── src/                # Provider registry, analysis modules, workers, and browser shims
 ├── tests/              # Deterministic Playwright browser tests
 ├── vendor/             # Pinned Leaflet, TopoJSON, and NEXRAD runtime assets
 ├── README.md           # Documentation

@@ -5,7 +5,9 @@ const port = Number(process.env.PLAYWRIGHT_PORT || 4173);
 export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
-  workers: process.env.CI ? 4 : 6,
+  // Shared Windows workstations can have several graphics-heavy app suites active.
+  // Serial execution avoids browser startup starvation; CI keeps parallel coverage.
+  workers: process.platform === 'win32' ? 1 : (process.env.CI ? 4 : 6),
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
