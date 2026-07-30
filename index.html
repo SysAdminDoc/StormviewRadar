@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#1e1e2e">
     <meta charset="UTF-8">
     <meta name="application-version" content="0.1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.open-meteo.com https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://stamen-tiles.a.ssl.fastly.net https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.open-meteo.com https://api.openweathermap.org https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://stamen-tiles.a.ssl.fastly.net https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StormView Radar 0.1.0</title>
     
@@ -379,6 +379,24 @@
         }
         .bm-header-title { font-size: 13px; font-weight: 700; }
         .bm-header-count { font-size: 11px; color: var(--text-muted); }
+        .bm-tools {
+            display: flex; gap: 6px;
+            padding: 8px 14px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .bm-tool {
+            min-height: 28px;
+            padding: 4px 9px;
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            background: var(--glass-hover);
+            color: var(--text-dim);
+            font: inherit;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .bm-tool:hover, .bm-tool:focus-visible { color: var(--text); border-color: var(--accent); }
+        .bm-tool:disabled { opacity: 0.45; cursor: default; }
 
         .bm-list {
             max-height: min(320px, calc(100dvh - 132px)); overflow-y: auto;
@@ -1859,6 +1877,18 @@
         .toast .toast-icon.warn { color: var(--warning); }
         .toast .toast-icon.error { color: var(--danger); }
         .toast .toast-msg { flex: 1; line-height: 1.3; }
+        .toast-action {
+            flex-shrink: 0;
+            border: 1px solid currentColor;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--accent);
+            padding: 4px 8px;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .toast-action:hover, .toast-action:focus-visible { background: var(--glass-hover); }
         
         @keyframes toast-in {
             to { opacity: 1; transform: translateX(0); }
@@ -2046,6 +2076,10 @@
         <div class="bm-header">
             <span class="bm-header-title">Saved Locations</span>
             <span class="bm-header-count" id="bmCount"></span>
+        </div>
+        <div class="bm-tools">
+            <button class="bm-tool" id="bmExport" type="button">Export</button>
+            <button class="bm-tool" id="bmClear" type="button">Clear all</button>
         </div>
         <div class="bm-list" id="bmList"></div>
     </div>
@@ -2526,7 +2560,7 @@
     </div>
 
     <!-- Location Button -->
-    <button class="icon-btn loc-btn glass" id="locBtn" title="My Location">
+    <button class="icon-btn loc-btn glass" id="locBtn" type="button" title="My Location" aria-label="My Location" aria-live="polite">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
     </button>
     <button class="icon-btn map-forecast-btn glass" id="centerForecastBtn" type="button" title="Forecast at map center" aria-label="Forecast at map center">
@@ -7868,12 +7902,27 @@
         }
 
         // OWM Layers
-        function toggleOWMLayer(name) {
+        let validatedOWMKey = '';
+
+        async function validateOWMKey(key, signal) {
+            if (validatedOWMKey === key) return;
+            const center = map.getCenter();
+            const params = new URLSearchParams({
+                lat: center.lat.toFixed(4),
+                lon: center.lng.toFixed(4),
+                appid: key
+            });
+            await fetchWithTimeout(`https://api.openweathermap.org/data/2.5/weather?${params}`, { signal });
+            validatedOWMKey = key;
+        }
+
+        async function toggleOWMLayer(name) {
             if (!settings.owmKey && settings.layers[name]) {
                 showToast('API key required. Open Settings > API Keys to add your OpenWeatherMap key.', 'warn', 5000);
-                document.querySelector(`[data-layer="${name}"]`)?.classList.remove('active');
                 settings.layers[name] = false;
                 saveSettings();
+                syncAccessibleControlStates();
+                setLayerRequestState(name, 'failed', 'OpenWeatherMap API key required');
                 return;
             }
 
@@ -7884,10 +7933,29 @@
                 pressure: 'pressure_new'
             };
             
-            const url = `https://tile.openweathermap.org/map/${layerTypes[name]}/{z}/{x}/{y}.png?appid=${settings.owmKey}`;
-            
             removeLayer(name);
             if (settings.layers[name]) {
+                const controller = beginLayerRequest(name, true);
+                const requestedKey = settings.owmKey;
+                try {
+                    await validateOWMKey(requestedKey, controller.signal);
+                } catch (error) {
+                    if (error?.name === 'AbortError') return;
+                    const credentialFailure = /\bHTTP (?:401|403)\b/.test(error?.message || '');
+                    settings.layers[name] = false;
+                    saveSettings();
+                    syncAccessibleControlStates();
+                    const message = credentialFailure
+                        ? 'OpenWeatherMap rejected this API key. Update it in Settings > API Keys.'
+                        : 'OpenWeatherMap credential validation failed. Retry this layer when the provider is available.';
+                    setLayerRequestState(name, 'failed', message, !credentialFailure);
+                    showToast(message, credentialFailure ? 'error' : 'warn', 7000);
+                    return;
+                } finally {
+                    finishLayerRequest(name, controller);
+                }
+                if (!settings.layers[name] || settings.owmKey !== requestedKey) return;
+                const url = `https://tile.openweathermap.org/map/${layerTypes[name]}/{z}/{x}/{y}.png?appid=${requestedKey}`;
                 layerRefs[name] = L.tileLayer.cached(url, {
                     opacity: 0.5, 
                     zIndex: 45,
@@ -7897,6 +7965,7 @@
                     errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
                 });
                 layerRefs[name].addTo(map);
+                setLayerRequestState(name, 'current', `${getLayerName(name)} loaded from OpenWeatherMap`);
             }
         }
 
@@ -8239,7 +8308,7 @@
         }
         
         // ==================== TOAST NOTIFICATIONS ====================
-        function showToast(message, type = 'info', duration = 3500) {
+        function showToast(message, type = 'info', duration = 3500, action = null) {
             const container = document.getElementById('toastContainer');
             if (!container) return;
             
@@ -8260,6 +8329,17 @@
             text.className = 'toast-msg';
             text.textContent = safeText(message, 500);
             toast.append(icon, text);
+            if (action && typeof action.handler === 'function') {
+                const button = document.createElement('button');
+                button.className = 'toast-action';
+                button.type = 'button';
+                button.textContent = safeText(action.label || 'Undo', 40);
+                button.addEventListener('click', () => {
+                    action.handler();
+                    toast.remove();
+                }, { once: true });
+                toast.appendChild(button);
+            }
             container.appendChild(toast);
             
             // Limit visible toasts
@@ -8616,8 +8696,35 @@
             } catch { savedLocations = []; }
         }
 
-        function saveBookmarks() {
-            localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(savedLocations));
+        function persistBookmarks(nextLocations) {
+            try {
+                localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(nextLocations));
+                savedLocations = nextLocations;
+                return true;
+            } catch (error) {
+                console.error('Saved location storage error:', error);
+                showToast(
+                    'Saved locations could not be stored. Export your current list, then remove entries or clear browser storage before retrying.',
+                    'error',
+                    8000
+                );
+                return false;
+            }
+        }
+
+        function exportBookmarks() {
+            const payload = {
+                schemaVersion: 1,
+                exportedAt: new Date().toISOString(),
+                locations: savedLocations
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const anchor = document.createElement('a');
+            anchor.href = URL.createObjectURL(blob);
+            anchor.download = 'stormview-saved-locations.json';
+            anchor.click();
+            setTimeout(() => URL.revokeObjectURL(anchor.href), 0);
+            showToast('Saved locations exported', 'success', 2500);
         }
 
         function addBookmark(name, lat, lng) {
@@ -8640,18 +8747,50 @@
                 showToast('Location already saved', 'warn');
                 return false;
             }
-            savedLocations.push({ name, lat, lng, id: Date.now() });
-            saveBookmarks();
+            const nextLocations = [...savedLocations, { name, lat, lng, id: Date.now() }];
+            if (!persistBookmarks(nextLocations)) return false;
             renderBookmarks();
             showToast(`Saved: ${name}`, 'success');
             return true;
         }
 
         function removeBookmark(id) {
-            savedLocations = savedLocations.filter(b => b.id !== id);
-            saveBookmarks();
+            const index = savedLocations.findIndex(bookmark => bookmark.id === id);
+            if (index < 0) return false;
+            const removed = savedLocations[index];
+            const nextLocations = savedLocations.filter(bookmark => bookmark.id !== id);
+            if (!persistBookmarks(nextLocations)) return false;
             renderBookmarks();
             updateForecastSaveState();
+            showToast(`Removed: ${removed.name}`, 'info', 7000, {
+                label: 'Undo',
+                handler: () => {
+                    const restored = [...savedLocations];
+                    restored.splice(Math.min(index, restored.length), 0, removed);
+                    if (!persistBookmarks(restored)) return;
+                    renderBookmarks();
+                    updateForecastSaveState();
+                    showToast(`Restored: ${removed.name}`, 'success', 2500);
+                }
+            });
+            return true;
+        }
+
+        function clearBookmarks() {
+            if (!savedLocations.length) return;
+            const removed = [...savedLocations];
+            if (!persistBookmarks([])) return;
+            renderBookmarks();
+            updateForecastSaveState();
+            showToast('Cleared saved locations', 'info', 7000, {
+                label: 'Undo',
+                handler: () => {
+                    if (!persistBookmarks(removed)) return;
+                    renderBookmarks();
+                    updateForecastSaveState();
+                    showToast('Saved locations restored', 'success', 2500);
+                }
+            });
         }
 
         function renderBookmarks() {
@@ -8660,6 +8799,8 @@
             if (!list) return;
 
             count.textContent = savedLocations.length > 0 ? `${savedLocations.length} saved` : '';
+            document.getElementById('bmExport').disabled = savedLocations.length === 0;
+            document.getElementById('bmClear').disabled = savedLocations.length === 0;
 
             if (savedLocations.length === 0) {
                 list.innerHTML = `<div class="bm-empty">
@@ -8677,11 +8818,11 @@
                         <div class="bm-item-coords">${b.lat.toFixed(4)}, ${b.lng.toFixed(4)}</div>
                     </div>
                     <div class="bm-item-actions">
-                        <button class="bm-action forecast" title="Open forecast" data-action="forecast">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>
+                        <button class="bm-action forecast" type="button" title="Open forecast" aria-label="Open forecast for ${escapeHTML(b.name, 120)}" data-action="forecast">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>
                         </button>
-                        <button class="bm-action delete" title="Remove" data-action="delete">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        <button class="bm-action delete" type="button" title="Remove" aria-label="Remove ${escapeHTML(b.name, 120)}" data-action="delete">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                         </button>
                     </div>
                 </div>
@@ -8709,7 +8850,6 @@
                 // Delete button
                 item.querySelector('[data-action="delete"]')?.addEventListener('click', () => {
                     removeBookmark(id);
-                    showToast(`Removed: ${bm.name}`, 'info');
                 });
             });
         }
@@ -8769,7 +8909,6 @@
                 );
                 if (existing) {
                     removeBookmark(existing.id);
-                    showToast(`Removed: ${name}`, 'info');
                 } else {
                     addBookmark(name, lat, lng);
                 }
@@ -9038,6 +9177,8 @@
             });
 
             document.getElementById('locBtn').addEventListener('click', goToLocation);
+            document.getElementById('bmExport').addEventListener('click', exportBookmarks);
+            document.getElementById('bmClear').addEventListener('click', clearBookmarks);
             
             document.getElementById('timestampTz').addEventListener('click', () => {
                 settings.useLocalTime = !settings.useLocalTime;
@@ -9282,7 +9423,9 @@
             document.getElementById('owmKeyInput').value = settings.owmKey;
             
             document.getElementById('saveKeysBtn').addEventListener('click', () => {
-                settings.owmKey = document.getElementById('owmKeyInput').value.trim();
+                const nextKey = document.getElementById('owmKeyInput').value.trim();
+                if (nextKey !== settings.owmKey) validatedOWMKey = '';
+                settings.owmKey = nextKey;
                 if (saveSettings()) showToast('API keys saved in this browser profile', 'success', 2500);
             });
 
@@ -9577,13 +9720,34 @@
             document.getElementById('sheetClose').addEventListener('click', closeSheet);
         }
 
+        let locationPermissionBlocked = false;
+
+        function setLocationControlStatus(message, state = 'idle') {
+            const button = document.getElementById('locBtn');
+            button.dataset.locationState = state;
+            button.title = message;
+            button.setAttribute('aria-label', message);
+        }
+
         function goToLocation() {
-            if (!navigator.geolocation) return;
+            if (!navigator.geolocation) {
+                const message = 'Location is unavailable in this browser. Search for a place or click the map instead.';
+                setLocationControlStatus(message, 'unsupported');
+                showToast(message, 'warn', 6000);
+                return;
+            }
+            if (locationPermissionBlocked) {
+                showToast('Location permission is denied. Enable it in browser site settings, then reload StormView.', 'warn', 6000);
+                return;
+            }
+
+            setLocationControlStatus('Finding your location…', 'loading');
             
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     const {latitude, longitude} = pos.coords;
                     map.flyTo([latitude, longitude], 10);
+                    setLocationControlStatus('My Location', 'ready');
 
                     if (locationMarker) locationMarker.setLatLng([latitude, longitude]);
                     else {
@@ -9592,7 +9756,15 @@
                         }).addTo(map);
                     }
                 },
-                () => console.warn('Could not get location'),
+                (error) => {
+                    const denied = error?.code === 1;
+                    locationPermissionBlocked = denied;
+                    const message = denied
+                        ? 'Location permission is denied. Enable it in browser site settings, then reload StormView.'
+                        : 'Your location could not be determined. Search for a place or click the map instead.';
+                    setLocationControlStatus(message, denied ? 'denied' : 'failed');
+                    showToast(message, 'warn', 6000);
+                },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
         }

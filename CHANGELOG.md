@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Made saved-location writes transactional with quota recovery guidance, JSON export, keyboard-labeled removal, and undoable delete/clear actions; location permission failures now explain recovery without repeated prompts, and rejected OpenWeatherMap keys disable only the requested layer with diagnostics.
 - Extracted a capability-aware registry for all radar and overlay providers, replacing UI source/layer branches with uniform load, cancel, status, and disposal lifecycle dispatch.
 - Completed modal isolation, focus return, visible layer-sheet closure, ARIA tab/tabpanel semantics with arrow navigation, WCAG 2.2 control targets, a named keyboard-accessible map-center forecast, and theme-independent 3D status contrast.
 - Kept saved locations and header controls within 320px/390px viewports, exposed bookmark actions on touch and keyboard focus, and centralized duplicate layer, source, product, basemap, and ARIA state across desktop, quick, and mobile controls.

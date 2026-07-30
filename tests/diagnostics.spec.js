@@ -112,6 +112,10 @@ test('tile backoff pauses only the failing provider origin', async ({ page }) =>
     contentType: 'text/plain',
     body: 'forced tile failure'
   }));
+  await page.route('https://api.openweathermap.org/data/2.5/weather**', route => route.fulfill({
+    status: 200,
+    json: { weather: [] }
+  }));
   await page.route('https://api.rainviewer.com/public/weather-maps.json', route => route.fulfill({
     json: {
       host: 'https://tilecache.rainviewer.com',
