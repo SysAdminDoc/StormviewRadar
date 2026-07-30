@@ -90,3 +90,41 @@ test('runtime assets are local and CSP blocks an unapproved connection origin', 
   });
   expect(unapprovedRequestSucceeded).toBe(false);
 });
+
+test('official SPC discussions render without a false PIREP product', async ({ page }) => {
+  await page.route('https://www.spc.noaa.gov/products/spcmdrss.xml', route => route.fulfill({
+    contentType: 'application/rss+xml',
+    body: `<?xml version="1.0"?><rss><channel><item>
+      <title>Mesoscale Discussion 1799</title>
+      <link>https://www.spc.noaa.gov/products/md/md1799.html</link>
+      <description>Severe-weather discussion</description>
+      <pubDate>Wed, 29 Jul 2026 20:40:00 +0000</pubDate>
+    </item></channel></rss>`
+  }));
+  await page.route('https://www.spc.noaa.gov/products/md/md1799.html', route => route.fulfill({
+    contentType: 'text/html',
+    body: `<pre>
+      Mesoscale Discussion 1799
+      Areas affected...Southern Georgia into northern Florida
+      Concerning...Severe Thunderstorm Watch 532...
+      Valid 292040Z - 292245Z
+      SUMMARY...Damaging wind and isolated large hail remain possible.
+      DISCUSSION...Additional technical detail.
+      LAT...LON 30128117 29888235 30248425 31378709 30128117
+    </pre>`
+  }));
+
+  await page.goto('/');
+  await expect(page.locator('[data-layer="pireps"]')).toHaveCount(0);
+  await expect(page.getByText('PIREPs', { exact: true })).toHaveCount(0);
+
+  const control = page.locator('.sidebar [data-layer="spcMCD"]');
+  await control.evaluate(element => element.click());
+  await expect(control).toHaveAttribute('data-feature-count', '1');
+  const discussion = page.locator('.spc-mcd-layer');
+  await expect(discussion).toHaveCount(1);
+  await discussion.click();
+  await expect(page.locator('.leaflet-popup-content')).toContainText('Mesoscale Discussion 1799');
+  await expect(page.locator('.leaflet-popup-content')).toContainText('Southern Georgia into northern Florida');
+  await expect(page.locator('.leaflet-popup-content')).toContainText('Damaging wind');
+});

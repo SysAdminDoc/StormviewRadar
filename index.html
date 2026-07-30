@@ -2160,13 +2160,9 @@
             </div>
             <div class="panel-content">
                 <div class="layer-grid">
-                    <div class="layer-chip" data-layer="pireps">
-                        <span class="dot" style="background: #ff9900"></span>
-                        <span class="layer-name">PIREPs</span>
-                    </div>
-                    <div class="layer-chip" data-layer="sigmets">
+                    <div class="layer-chip full-width" data-layer="sigmets">
                         <span class="dot" style="background: #ff0066"></span>
-                        <span class="layer-name">SIGMETs</span>
+                        <span class="layer-name">SIGMETs / AIRMETs</span>
                     </div>
                 </div>
             </div>
@@ -2773,9 +2769,9 @@
             spcSigWind: 'https://www.spc.noaa.gov/products/outlook/day1otlk_sigwind.nolyr.geojson',
             spcSigHail: 'https://www.spc.noaa.gov/products/outlook/day1otlk_sighail.nolyr.geojson',
             
-            // SPC Watches & MCDs - use NWS API (CORS-friendly)
+            // SPC watches and official Mesoscale Discussion feed
             spcWatches: 'https://api.weather.gov/alerts/active?event=Tornado%20Watch,Severe%20Thunderstorm%20Watch',
-            spcMCD: 'https://api.weather.gov/alerts/active?event=Special%20Weather%20Statement',
+            spcMCD: 'https://www.spc.noaa.gov/products/spcmdrss.xml',
             
             // Storm Reports
             iemLSR: 'https://mesonet.agron.iastate.edu/geojson/lsr.geojson?recent=86400',
@@ -2794,8 +2790,7 @@
             nowcoastCapabilities: 'https://nowcoast.noaa.gov/geoserver/observations/weather_radar/ows?service=WMS&version=1.3.0&request=GetCapabilities',
             nexradSites: 'https://mesonet.agron.iastate.edu/geojson/network/NEXRAD.geojson',
             
-            // Aviation - use NWS API (CORS-friendly) instead of aviationweather.gov
-            pireps: 'https://api.weather.gov/alerts/active?event=SIGMET,Convective%20SIGMET',
+            // Browser-safe aviation hazards. AviationWeather PIREPs forbid CORS.
             sigmets: 'https://api.weather.gov/alerts/active?event=SIGMET,Convective%20SIGMET,AIRMET',
             
             // Tropical - NHC
@@ -2892,6 +2887,7 @@
         let geofences = [];
         const seenAlertIds = new Set();
         let historicalReplayToolsPromise = null;
+        let spcMcdToolsPromise = null;
         let replayAbortController = null;
         let replayMode = false;
         let replayWarnings = [];
@@ -3796,7 +3792,7 @@
             spcTornado: null, spcWind: null, spcHail: null,
             tropical: null, tropicalCone: null, tropicalTrack: null,
             velocity: null, echoTops: null, precipAccum: null,
-            pireps: null, sigmets: null,
+            sigmets: null,
             satelliteIR: null, satelliteWV: null,
             
             // Map overlays
@@ -3855,7 +3851,7 @@
                 velocity: false, echoTops: false, precipAccum: false,
                 
                 // Aviation
-                pireps: false, sigmets: false,
+                sigmets: false,
                 
                 // Satellite channels
                 satelliteIR: false, satelliteWV: false, satelliteGeoColor: false,
@@ -5681,21 +5677,36 @@
         }
         
         async function loadSPCMCD() {
-            if (layerRefs.spcMCD) {
-                map.removeLayer(layerRefs.spcMCD);
-            }
-            
+            const controller = beginLayerRequest('spcMCD');
             try {
-                const resp = await fetchWithTimeout(DATA_URLS.spcMCD);
-                const data = await resp.json();
-                const features = featureList(data);
-                
+                if (!spcMcdToolsPromise) spcMcdToolsPromise = import('./src/spc-mcd.js');
+                const [tools, resp] = await Promise.all([
+                    spcMcdToolsPromise,
+                    fetchWithTimeout(DATA_URLS.spcMCD, { signal: controller.signal })
+                ]);
+                const feedItems = tools.parseSpcMcdFeed(await resp.text());
+                const results = await Promise.allSettled(feedItems.map(async item => {
+                    const detailResponse = await fetchWithTimeout(item.url, { signal: controller.signal });
+                    return tools.parseSpcMcdDetail(await detailResponse.text(), item);
+                }));
+                controller.signal.throwIfAborted();
+                if (layerRequests.get('spcMCD') !== controller || !settings.layers.spcMCD) return;
+                const features = results
+                    .filter(result => result.status === 'fulfilled')
+                    .map(result => result.value);
+                if (layerRefs.spcMCD) {
+                    map.removeLayer(layerRefs.spcMCD);
+                    layerRefs.spcMCD.clearLayers?.();
+                    layerRefs.spcMCD = null;
+                }
                 if (features.length === 0) {
                     showDataStatus('No active MCDs');
+                    setLayerFeatureCount('spcMCD', 0);
                     return;
                 }
-                
                 layerRefs.spcMCD = L.geoJSON(features, {
+                    className: 'spc-mcd-layer',
+                    renderer: L.svg({ pane: 'alertPane' }),
                     style: {
                         color: '#00ffff',
                         weight: 2,
@@ -5704,19 +5715,29 @@
                         dashArray: '5,5'
                     },
                     onEachFeature: (feature, layer) => {
+                        layer.options.className = 'spc-mcd-layer';
                         const p = feature.properties || {};
                         layer.bindPopup(`
                             <div class="popup-content">
-                                <h4>${escapeHTML(p.event || 'Special Weather Statement', 120)}</h4>
-                                <p>${escapeHTML(p.headline || '', 200)}</p>
+                                <h4>${escapeHTML(p.event || 'Mesoscale Discussion', 120)}</h4>
+                                <p><strong>Areas:</strong> ${escapeHTML(p.areasAffected || 'See official discussion', 240)}</p>
+                                ${p.concerning ? `<p><strong>Concerning:</strong> ${escapeHTML(p.concerning, 240)}</p>` : ''}
+                                <p>${escapeHTML(p.summary || '', 600)}</p>
+                                ${p.validText ? `<p class="meta">Valid: ${escapeHTML(p.validText, 80)}</p>` : ''}
                             </div>
                         `);
                     },
                     pane: 'alertPane'
                 }).addTo(map);
-                
+                setLayerFeatureCount('spcMCD', features.length);
+                showDataStatus(`${features.length} active MCD(s)`);
             } catch(e) {
-                console.error('SPC MCD load error:', e);
+                if (e.name !== 'AbortError') {
+                    console.error('SPC MCD load error:', e);
+                    showDataStatus('SPC MCDs unavailable');
+                }
+            } finally {
+                finishLayerRequest('spcMCD', controller);
             }
         }
         
@@ -5845,54 +5866,6 @@
         }
         
         // ==================== AVIATION WEATHER ====================
-        async function loadPIREPs() {
-            if (layerRefs.pireps) {
-                map.removeLayer(layerRefs.pireps);
-            }
-            
-            try {
-                // Use NWS API for aviation hazard alerts (CORS-friendly)
-                const resp = await fetchWithTimeout(DATA_URLS.pireps);
-                const data = await resp.json();
-                const features = featureList(data);
-                
-                if (features.length === 0) {
-                    showDataStatus('No active SIGMETs/aviation hazards');
-                    return;
-                }
-                
-                layerRefs.pireps = L.geoJSON(features, {
-                    style: (feature) => {
-                        const evt = safeText(feature.properties?.event, 120).toLowerCase();
-                        let color = '#ff9900';
-                        if (evt.includes('convective')) color = '#ff0000';
-                        return {
-                            color: color,
-                            weight: 2,
-                            fillColor: color,
-                            fillOpacity: 0.15,
-                            dashArray: '8,4'
-                        };
-                    },
-                    onEachFeature: (feature, layer) => {
-                        const p = feature.properties || {};
-                        layer.bindPopup(`
-                            <div class="popup-content">
-                                <h4>${escapeHTML(p.event || 'Aviation Hazard', 120)}</h4>
-                                <p>${escapeHTML(p.headline || '', 200)}</p>
-                                <p class="meta">${p.expires ? `Expires: ${escapeHTML(formatExternalDate(p.expires))}` : ''}</p>
-                            </div>
-                        `);
-                    },
-                    pane: 'alertPane'
-                }).addTo(map);
-                
-                showDataStatus(`${features.length} aviation alert(s)`);
-            } catch(e) {
-                console.error('Aviation alerts load error:', e);
-            }
-        }
-        
         async function loadSIGMETs() {
             if (layerRefs.sigmets) {
                 map.removeLayer(layerRefs.sigmets);
@@ -6236,9 +6209,6 @@
                     break;
                     
                 // Aviation
-                case 'pireps':
-                    on ? loadPIREPs() : removeLayer('pireps');
-                    break;
                 case 'sigmets':
                     on ? loadSIGMETs() : removeLayer('sigmets');
                     break;
@@ -6328,7 +6298,7 @@
                 temp: 'Temperature', wind: 'Wind', clouds: 'Clouds', pressure: 'Pressure',
                 spcWatches: 'SPC Watches', spcMCD: 'Mesoscale Discussions',
                 spcTornado: 'Tornado Prob', spcWind: 'Wind Prob', spcHail: 'Hail Prob',
-                tropical: 'Tropical Systems', pireps: 'PIREPs', sigmets: 'SIGMETs',
+                tropical: 'Tropical Systems', sigmets: 'SIGMETs / AIRMETs',
                 states: 'State Borders', counties: 'County Borders', labels: 'City Labels', highways: 'Highways',
                 geofences: 'Local Geofences'
             };
@@ -8637,7 +8607,6 @@
                 if (settings.layers.spcWatches) loadSPCWatches();
                 if (settings.layers.spcMCD) loadSPCMCD();
                 if (settings.layers.tropical) loadTropical();
-                if (settings.layers.pireps) loadPIREPs();
                 if (settings.layers.sigmets) loadSIGMETs();
             });
 

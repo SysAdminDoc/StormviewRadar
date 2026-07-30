@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Replaced mislabeled Special Weather Statements with official SPC Mesoscale Discussion polygons and removed the duplicate false-PIREP control while retaining honest SIGMET/AIRMET coverage.
 - Made clean-checkout builds license-complete by tracking the exact Cesium license and retaining dependency notices in the deployed engine bundle.
 - Fixed RainViewer integration to use its supported past-radar frames, Universal Blue palette, and native zoom limit.
 - Added source capability guidance and disabled unsupported radar products.

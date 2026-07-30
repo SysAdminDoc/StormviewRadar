@@ -38,6 +38,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Alert Sounds** — Opt in to synthesized tones for newly issued alerts, filtered by NWS severity, event type, and distance from the map center
 - **Private Geofences** — Save up to 20 named local alert radii at the map center, display them as optional overlays, and match alert sounds against their polygon intersections
 - **SPC Outlooks** — Storm Prediction Center convective outlooks
+- **SPC Mesoscale Discussions** — Active official SPC discussions with their valid polygons, affected areas, and summaries
 - **Storm Reports** — Cluster the latest IEM tornado, hail, wind, and flood reports at overview zooms, then expand to individual report pins at zoom 9+
 - **Storm Tracks** — Plot current NEXRAD storm cells with an hour of observed positions, 30/60-minute motion projections, and TVS, mesocyclone, hail, VIL, and echo-top details
 - **3D Storm Tops** — Toggle a Cesium globe that extrudes current IEM NEXRAD echo-top estimates, prioritizes threat cells, labels measured heights, and discloses its zoom-dependent display scale
@@ -45,6 +46,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Satellite** — GOES satellite imagery overlay
 - **River Gauges** — USGS water level monitoring stations
 - **Surface Observations** — METAR station data display
+- **Aviation Hazards** — Browser-safe NWS SIGMET and AIRMET alert polygons; pilot reports are intentionally omitted because the official PIREP API disallows direct browser access
 
 ### Additional Overlays (API Required)
 - **Temperature** — OpenWeatherMap temperature layer
@@ -121,6 +123,8 @@ API keys are stored unencrypted in the current browser profile and sent directly
 | Historical radar and warnings | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/GIS/rasters.php?rid=2) | 5-minute frames |
 | Alerts | [NWS API](https://www.weather.gov/documentation/services-web-api) | Real-time |
 | SPC Outlook | [SPC](https://www.spc.noaa.gov/) | Daily |
+| SPC Mesoscale Discussions | [SPC](https://www.spc.noaa.gov/products/md/) | Provider dependent |
+| SIGMETs and AIRMETs | [NWS API](https://www.weather.gov/documentation/services-web-api) | Real-time |
 | Storm Reports | SPC | As reported |
 | Storm tracks | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/geojson/nexrad_attr.py?help=) | ~1 minute |
 | Lightning | Iowa State Mesonet | ~5 minutes |
