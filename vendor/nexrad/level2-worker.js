@@ -5,11 +5,20 @@
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __getProtoOf = Object.getPrototypeOf;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __esm = (fn, res) => function __init() {
-    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  var __esm = (fn, res, err) => function __init() {
+    if (err) throw err[0];
+    try {
+      return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+    } catch (e) {
+      throw err = [e], e;
+    }
   };
   var __commonJS = (cb, mod) => function __require() {
-    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+    try {
+      return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+    } catch (e) {
+      throw mod = 0, e;
+    }
   };
   var __export = (target, all) => {
     for (var name in all)
@@ -1789,7 +1798,7 @@
       function numberIsNaN(obj) {
         return obj !== obj;
       }
-      var hexSliceLookupTable = function() {
+      var hexSliceLookupTable = (function() {
         const alphabet = "0123456789abcdef";
         const table = new Array(256);
         for (let i = 0; i < 16; ++i) {
@@ -1799,7 +1808,7 @@
           }
         }
         return table;
-      }();
+      })();
       function defineBigIntMethod(fn) {
         return typeof BigInt === "undefined" ? BufferBigIntNotDefined : fn;
       }
@@ -2619,7 +2628,7 @@
   // node_modules/seek-bzip/lib/crc32.js
   var require_crc32 = __commonJS({
     "node_modules/seek-bzip/lib/crc32.js"(exports, module) {
-      module.exports = function() {
+      module.exports = (function() {
         var crc32Lookup = new Uint32Array([
           0,
           79764919,
@@ -2893,7 +2902,7 @@
           };
         };
         return CRC32;
-      }();
+      })();
     }
   });
 
@@ -3667,7 +3676,7 @@
             if (this?.data?.[this.elevation]?.[scan]?.record === void 0) throw new Error(`getHeader no data for elevation: ${this.elevation}, scan: ${scan}`);
             return this.data[this.elevation][scan].record;
           }
-          return this.data[this.elevation].map((i) => i.record);
+          return this.data[this.elevation].map(((i) => i.record));
         }
         /**
          * Returns an Object of radar reflectivity data for the current elevation and scan (or all scans if not provided)
