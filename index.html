@@ -2703,6 +2703,7 @@
                         <div class="diagnostic-row"><dt>Resources</dt><dd id="diagResources">Loading…</dd></div>
                         <div class="diagnostic-row"><dt>Overlay loads</dt><dd id="diagOverlays">None</dd></div>
                         <div class="diagnostic-row"><dt>Retry / backoff</dt><dd id="diagRetry">Loading…</dd></div>
+                        <div class="diagnostic-row"><dt>Tile providers</dt><dd id="diagTileBackoff">Loading…</dd></div>
                     </dl>
                 </div>
                 <div class="settings-section">
@@ -3374,7 +3375,7 @@
                         loaded: framesLoaded || frameLayers.filter(Boolean).length
                     },
                     retryable: diagnosticsState.provider.retryable,
-                    retryBackoffMs: rateLimiter.backoffMs
+                    retryBackoffMs: rateLimiter.getBackoffMs(frameLayers[currentFrame]?._stormviewBackoffKey)
                 },
                 resources: {
                     activeRequests: activeRequests.size,
@@ -3383,7 +3384,8 @@
                     overlayStates: Object.fromEntries(Object.entries(diagnosticsState.layerStates).map(([name, value]) => [
                         name,
                         { ...value }
-                    ]))
+                    ])),
+                    tileBackoff: rateLimiter.snapshot()
                 },
                 requests: diagnosticsState.requests.map(request => ({ ...request }))
             };
@@ -3412,6 +3414,11 @@
                 : 'None';
             document.getElementById('diagRetry').textContent =
                 `${report.radar.retryable ? 'Retry available' : 'No retry pending'} · ${report.radar.retryBackoffMs} ms tile backoff`;
+            document.getElementById('diagTileBackoff').textContent = report.resources.tileBackoff.length
+                ? report.resources.tileBackoff
+                    .map(provider => `${provider.provider} paused until ${formatLocalizedDate(provider.pauseUntil, { timeStyle: 'medium' })}`)
+                    .join(' · ')
+                : 'No tile providers paused';
 
             const requestList = document.getElementById('diagRequests');
             requestList.replaceChildren();
@@ -4285,7 +4292,7 @@
             
             const selectedId = BASEMAPS[id] ? id : 'dark';
             const basemap = BASEMAPS[selectedId];
-            baseLayer = L.tileLayer(basemap.url, {
+            baseLayer = L.tileLayer.cached(basemap.url, {
                 attribution: basemap.attribution,
                 subdomains: basemap.subdomains || [],
                 maxZoom: 19,
@@ -4302,75 +4309,152 @@
         }
 
         // ==================== RATE LIMIT HANDLING ====================
-        const rateLimiter = {
-            isPaused: false,
-            pauseUntil: 0,
-            backoffMs: 3000,
-            maxBackoff: 30000,
-            errorCount: 0,
-            errorWindow: [],
-            windowMs: 2000, // Track errors within 2 second window
-            threshold: 4,   // 4+ errors in window = rate limited
-            
-            recordError() {
-                const now = Date.now();
-                this.errorWindow.push(now);
-                
-                // Clean old errors outside window
-                this.errorWindow = this.errorWindow.filter(t => now - t < this.windowMs);
-                
-                // Check if we hit threshold
-                if (this.errorWindow.length >= this.threshold && !this.isPaused) {
-                    this.pause();
-                }
-            },
-            
-            pause() {
-                this.isPaused = true;
-                this.pauseUntil = Date.now() + this.backoffMs;
-                
-                console.log(`[RateLimiter] Paused for ${this.backoffMs}ms after ${this.errorWindow.length} errors`);
-                
-                setTimeout(() => {
-                    this.resume();
-                }, this.backoffMs);
-                
-                // Increase backoff for next time
-                this.backoffMs = Math.min(this.backoffMs * 1.5, this.maxBackoff);
-            },
-            
-            resume() {
-                this.isPaused = false;
-                this.errorWindow = [];
-                console.log('[RateLimiter] Resuming...');
-                
-                // Trigger redraw of current frame
-                if (frameLayers[currentFrame] && map.hasLayer(frameLayers[currentFrame])) {
-                    setTimeout(() => {
-                        frameLayers[currentFrame].redraw();
-                    }, 100);
-                }
-            },
-            
-            recordSuccess() {
-                // Gradually reduce backoff on sustained success
-                if (this.backoffMs > 3000) {
-                    this.backoffMs = Math.max(3000, this.backoffMs * 0.9);
-                }
-            },
-            
-            reset() {
-                this.backoffMs = 3000;
-                this.errorWindow = [];
-                this.isPaused = false;
+        function tileProviderKey(url) {
+            const value = String(url || '');
+            const templateHost = value.match(/^https?:\/\/([^/]+)/i)?.[1]
+                ?.replace(/^\{s\}\./i, '')
+                ?.replace(/\{[^}]+\}/g, 'template');
+            if (templateHost) return templateHost.toLowerCase();
+            try {
+                return new URL(value, window.location.href).hostname.toLowerCase() || 'local';
+            } catch {
+                return 'unknown';
             }
-        };
+        }
+
+        const cachedTileLayers = new Set();
+        const rateLimiter = (() => {
+            const states = new Map();
+            const baseBackoffMs = 3000;
+            const maxBackoffMs = 30000;
+            const windowMs = 2000;
+            const threshold = 4;
+
+            function stateFor(provider) {
+                const key = provider || 'unknown';
+                if (!states.has(key)) {
+                    states.set(key, {
+                        provider: key,
+                        isPaused: false,
+                        pauseUntil: 0,
+                        backoffMs: baseBackoffMs,
+                        errorWindow: [],
+                        generation: 0
+                    });
+                }
+                return states.get(key);
+            }
+
+            function notify() {
+                if (typeof renderDiagnostics === 'function') renderDiagnostics();
+            }
+
+            function redrawProvider(provider) {
+                setTimeout(() => {
+                    cachedTileLayers.forEach(layer => {
+                        if (layer._stormviewBackoffKey === provider && layer._map?.hasLayer(layer)) {
+                            layer.redraw();
+                        }
+                    });
+                }, 100);
+            }
+
+            function resume(provider, expectedGeneration) {
+                const state = states.get(provider);
+                if (!state || (expectedGeneration !== undefined && state.generation !== expectedGeneration)) return;
+                state.isPaused = false;
+                state.pauseUntil = 0;
+                state.errorWindow = [];
+                console.log(`[RateLimiter] Resuming ${provider}`);
+                notify();
+                redrawProvider(provider);
+            }
+
+            function isPaused(provider) {
+                const state = states.get(provider || 'unknown');
+                if (!state?.isPaused) return false;
+                if (Date.now() >= state.pauseUntil) {
+                    resume(state.provider, state.generation);
+                    return false;
+                }
+                return true;
+            }
+
+            function recordError(provider) {
+                const state = stateFor(provider);
+                const now = Date.now();
+                state.errorWindow.push(now);
+                state.errorWindow = state.errorWindow.filter(time => now - time < windowMs);
+                if (state.errorWindow.length < threshold || state.isPaused) return;
+
+                const delay = state.backoffMs;
+                state.isPaused = true;
+                state.pauseUntil = now + delay;
+                state.generation += 1;
+                const generation = state.generation;
+                console.log(`[RateLimiter] Paused ${state.provider} for ${delay}ms after ${state.errorWindow.length} errors`);
+                setTimeout(() => resume(state.provider, generation), delay);
+                state.backoffMs = Math.min(Math.round(delay * 1.5), maxBackoffMs);
+                notify();
+            }
+
+            function recordSuccess(provider) {
+                const state = stateFor(provider);
+                if (state.backoffMs > baseBackoffMs) {
+                    state.backoffMs = Math.max(baseBackoffMs, Math.round(state.backoffMs * 0.9));
+                }
+            }
+
+            function reset(provider) {
+                if (provider) {
+                    const state = states.get(provider);
+                    if (state) state.generation += 1;
+                    states.delete(provider);
+                } else {
+                    states.forEach(state => { state.generation += 1; });
+                    states.clear();
+                }
+                notify();
+            }
+
+            function snapshot() {
+                return [...states.values()]
+                    .filter(state => isPaused(state.provider))
+                    .map(state => ({
+                        provider: state.provider,
+                        pauseUntil: new Date(state.pauseUntil).toISOString(),
+                        retryInMs: Math.max(0, state.pauseUntil - Date.now())
+                    }))
+                    .sort((left, right) => left.provider.localeCompare(right.provider));
+            }
+
+            function getBackoffMs(provider) {
+                return states.get(provider || 'unknown')?.backoffMs || baseBackoffMs;
+            }
+
+            return { getBackoffMs, isPaused, recordError, recordSuccess, reset, snapshot };
+        })();
 
         // Custom TileLayer - optimized for memory with zoom stability
         L.TileLayer.Cached = L.TileLayer.extend({
             options: {
                 errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
                 keepBuffer: 4  // Reduced from 25 for memory savings
+            },
+
+            initialize: function(url, options) {
+                L.TileLayer.prototype.initialize.call(this, url, options);
+                this._stormviewBackoffKey = options?.backoffKey || tileProviderKey(url);
+            },
+
+            onAdd: function(mapInstance) {
+                cachedTileLayers.add(this);
+                L.TileLayer.prototype.onAdd.call(this, mapInstance);
+            },
+
+            onRemove: function(mapInstance) {
+                cachedTileLayers.delete(this);
+                L.TileLayer.prototype.onRemove.call(this, mapInstance);
             },
             
             // Prevent pruning during zoom for visual stability
@@ -4381,7 +4465,7 @@
             
             // Skip tile requests when rate limited
             _update: function(center) {
-                if (rateLimiter.isPaused) return;
+                if (rateLimiter.isPaused(this._stormviewBackoffKey)) return;
                 L.TileLayer.prototype._update.call(this, center);
             },
             
@@ -4395,7 +4479,7 @@
                 tile.style.transition = 'opacity 0.2s';
                 tile.style.color = 'transparent';
                 
-                if (rateLimiter.isPaused) {
+                if (rateLimiter.isPaused(this._stormviewBackoffKey)) {
                     tile.src = this.options.errorTileUrl;
                     done(null, tile);
                     return tile;
@@ -4407,7 +4491,7 @@
                 tile.onload = function() {
                     if (loaded) return;
                     loaded = true;
-                    rateLimiter.recordSuccess();
+                    rateLimiter.recordSuccess(self._stormviewBackoffKey);
                     tile.style.opacity = '1';
                     done(null, tile);
                 };
@@ -4415,7 +4499,7 @@
                 tile.onerror = function() {
                     if (loaded) return;
                     loaded = true;
-                    rateLimiter.recordError();
+                    rateLimiter.recordError(self._stormviewBackoffKey);
                     tile.src = self.options.errorTileUrl;
                     tile.style.opacity = '0';
                     done(null, tile);
@@ -4486,9 +4570,8 @@
                 // Delayed tile update - only if needed and not rate limited
                 clearTimeout(zoomTimeout);
                 zoomTimeout = setTimeout(() => {
-                    if (isZooming || rateLimiter.isPaused) return;
-                    
                     const layer = frameLayers[currentFrame];
+                    if (isZooming || rateLimiter.isPaused(layer?._stormviewBackoffKey)) return;
                     if (!layer || !map.hasLayer(layer)) return;
                     
                     // Set correct opacity
@@ -4497,10 +4580,10 @@
                     
                     // Only request new tiles if we zoomed IN significantly
                     // Zooming out should just use cached/upscaled tiles
-                    if (zoomDelta > 0 && zoom > 6 && !rateLimiter.isPaused) {
+                    if (zoomDelta > 0 && zoom > 6 && !rateLimiter.isPaused(layer._stormviewBackoffKey)) {
                         // Gentle refresh for new tiles - doesn't clear existing
                         requestAnimationFrame(() => {
-                            if (!isZooming && !rateLimiter.isPaused) {
+                            if (!isZooming && !rateLimiter.isPaused(layer._stormviewBackoffKey)) {
                                 layer._update();
                             }
                         });
@@ -4724,7 +4807,7 @@
         
         // Gentle refresh of MRMS layer - only if not rate limited
         function refreshMRMSLayer() {
-            if (rateLimiter.isPaused) return;
+            if (rateLimiter.isPaused(radarSystem.mrmsBase?._stormviewBackoffKey)) return;
             if (radarSystem.mrmsBase && map.hasLayer(radarSystem.mrmsBase)) {
                 // Use _update instead of redraw - less aggressive
                 radarSystem.mrmsBase._update();
@@ -5370,7 +5453,6 @@
         async function loadRainViewerPreloaded(signal, generation) {
             showLoadProgress();
             loadAborted = false;
-            rateLimiter.reset();
             
             const resp = await fetchWithTimeout('https://api.rainviewer.com/public/weather-maps.json', { signal });
             rainviewerData = await resp.json();
@@ -5386,6 +5468,8 @@
             if (!frames.length || typeof rainviewerData.host !== 'string') {
                 throw new Error('RainViewer returned no supported past radar frames');
             }
+            const rainViewerBackoffKey = tileProviderKey(rainviewerData.host);
+            rateLimiter.reset(rainViewerBackoffKey);
             lastPastFrame = frames.length - 1;
 
             framesTotal = frames.length;
@@ -5414,7 +5498,7 @@
             for (let batchStart = 0; batchStart < frames.length; batchStart += BATCH_SIZE) {
                 ensureCurrentRadarLoad(generation, signal);
                 
-                while (rateLimiter.isPaused) {
+                while (rateLimiter.isPaused(rainViewerBackoffKey)) {
                     await abortableDelay(500, signal);
                     ensureCurrentRadarLoad(generation, signal);
                 }
@@ -7678,7 +7762,7 @@
             
             removeLayer(name);
             if (settings.layers[name]) {
-                layerRefs[name] = L.tileLayer(url, { 
+                layerRefs[name] = L.tileLayer.cached(url, {
                     opacity: 0.5, 
                     zIndex: 45,
                     maxNativeZoom: 12,

@@ -72,3 +72,73 @@ test('diagnostics expose freshness and failures without secrets or coordinates',
   expect(reportText).not.toContain('-96.5678');
   expect(report.requests.every(request => !request.endpoint.includes('?'))).toBeTruthy();
 });
+
+test('tile backoff pauses only the failing provider origin', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('stormview_pro_v3', JSON.stringify({
+      source: 'hrrr',
+      basemap: 'dark',
+      owmKey: 'forced-failure-key',
+      autoRefresh: false,
+      layers: {
+        radar: true,
+        temp: true,
+        alerts: false,
+        spcOutlook: false,
+        states: false,
+        counties: false,
+        labels: false
+      }
+    }));
+    localStorage.setItem('stormview_welcomed_v5', '1');
+  });
+
+  let iemTiles = 0;
+  let basemapTiles = 0;
+  let rainViewerTiles = 0;
+  await page.route('https://mesonet.agron.iastate.edu/data/gis/images/4326/hrrr/refd_1080.json', route => route.fulfill({
+    json: { model_init_utc: '2026-07-25T12:00:00Z' }
+  }));
+  await page.route('https://mesonet.agron.iastate.edu/cache/tile.py/**', route => {
+    iemTiles += 1;
+    return route.fulfill({ status: 200, contentType: 'image/png', body: transparentPng });
+  });
+  await page.route('https://*.basemaps.cartocdn.com/**', route => {
+    basemapTiles += 1;
+    return route.fulfill({ status: 200, contentType: 'image/png', body: transparentPng });
+  });
+  await page.route('https://tile.openweathermap.org/**', route => route.fulfill({
+    status: 503,
+    contentType: 'text/plain',
+    body: 'forced tile failure'
+  }));
+  await page.route('https://api.rainviewer.com/public/weather-maps.json', route => route.fulfill({
+    json: {
+      host: 'https://tilecache.rainviewer.com',
+      radar: { past: [{ time: 1785012000, path: '/v2/radar/1785012000' }] }
+    }
+  }));
+  await page.route('https://tilecache.rainviewer.com/**', route => {
+    rainViewerTiles += 1;
+    return route.fulfill({ status: 200, contentType: 'image/png', body: transparentPng });
+  });
+
+  await page.goto('/');
+  await expect(page.locator('#dataStatusText')).toHaveText('HRRR: current');
+  await page.locator('#settingsBtn').click();
+  await page.locator('.settings-tab[data-tab="diagnostics"]').click();
+  await expect(page.locator('#diagTileBackoff')).toContainText('tile.openweathermap.org paused until', { timeout: 2000 });
+  await expect(page.locator('#diagTileBackoff')).not.toContainText('mesonet.agron.iastate.edu');
+  await expect(page.locator('#diagTileBackoff')).not.toContainText('basemaps.cartocdn.com');
+
+  const iemBeforeZoom = iemTiles;
+  const basemapBeforeZoom = basemapTiles;
+  await page.locator('#settingsClose').click();
+  await page.locator('.leaflet-control-zoom-in').evaluate(element => element.click());
+  await expect.poll(() => iemTiles).toBeGreaterThan(iemBeforeZoom);
+  await expect.poll(() => basemapTiles).toBeGreaterThan(basemapBeforeZoom);
+
+  await page.locator('.sidebar [data-source="rainviewer"]').evaluate(element => element.click());
+  await expect(page.locator('#dataStatusText')).toHaveText('RainViewer: current');
+  await expect.poll(() => rainViewerTiles).toBeGreaterThan(0);
+});
