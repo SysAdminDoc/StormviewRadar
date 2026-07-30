@@ -61,7 +61,7 @@ test('diagnostics expose freshness and failures without secrets or coordinates',
   await expect(page.locator('#diagRequests')).not.toContainText('?');
 
   await page.locator('#copyDiagnosticsBtn').click();
-  await expect(page.locator('.toast-msg')).toHaveText('Redacted diagnostics copied');
+  await expect(page.getByText('Redacted diagnostics copied', { exact: true })).toBeVisible();
   const reportText = await page.evaluate(() => navigator.clipboard.readText());
   const report = JSON.parse(reportText);
   expect(report.radar.state).toBe('fallback');

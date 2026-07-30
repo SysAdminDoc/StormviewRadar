@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 function stormFeature(id, longitude, latitude, properties = {}) {
@@ -22,6 +23,20 @@ function stormFeature(id, longitude, latitude, properties = {}) {
     },
     geometry: { type: 'Point', coordinates: [longitude, latitude] }
   };
+}
+
+function relativeLuminance([red, green, blue]) {
+  const channel = value => {
+    const normalized = value / 255;
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue);
+}
+
+function contrastRatio(foreground, background) {
+  const lighter = Math.max(relativeLuminance(foreground), relativeLuminance(background));
+  const darker = Math.min(relativeLuminance(foreground), relativeLuminance(background));
+  return (lighter + 0.05) / (darker + 0.05);
 }
 
 test('3D storm-top mode renders measured columns from local Cesium assets and releases WebGL state', async ({ page }) => {
@@ -68,6 +83,31 @@ test('3D storm-top mode renders measured columns from local Cesium assets and re
   await expect(page.locator('#cesiumContainer canvas')).toHaveCount(1);
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('body')).toHaveClass(/storm-3d-mode/);
+
+  const assertStormInfoContrast = async () => {
+    const colors = await page.locator('.storm-3d-info').evaluate(panel => {
+      const parse = value => (value.match(/\d+(?:\.\d+)?/g) || []).slice(0, 3).map(Number);
+      const background = parse(getComputedStyle(panel).backgroundColor);
+      return [...panel.querySelectorAll('strong, .storm-3d-info-status, .storm-3d-info-note, .storm-3d-legend')].map(element => ({
+        label: element.className || element.tagName,
+        foreground: parse(getComputedStyle(element).color),
+        background
+      }));
+    });
+    for (const color of colors) {
+      expect(contrastRatio(color.foreground, color.background), color.label).toBeGreaterThanOrEqual(4.5);
+    }
+    const results = await new AxeBuilder({ page })
+      .include('#cesiumView')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
+      .analyze();
+    expect(results.violations).toEqual([]);
+  };
+
+  await assertStormInfoContrast();
+  await page.locator('#themeBtn').click();
+  await expect(page.locator('body')).toHaveClass(/light-theme/);
+  await assertStormInfoContrast();
 
   await page.keyboard.press('Escape');
   await expect(view).toBeHidden();

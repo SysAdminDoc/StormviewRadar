@@ -60,6 +60,8 @@ test('custom switches and dialogs support keyboard state and focus return', asyn
   const panel = page.locator('#settingsPanel');
   await expect(panel).toHaveAttribute('aria-hidden', 'false');
   await expect(panel.locator(':focus')).toHaveCount(1);
+  await expect(page.locator('#map')).toHaveAttribute('inert', '');
+  await expect(page.locator('.header')).toHaveAttribute('inert', '');
 
   const themeSwitch = page.locator('#themeToggle');
   await themeSwitch.focus();
@@ -67,9 +69,19 @@ test('custom switches and dialogs support keyboard state and focus return', asyn
   await themeSwitch.press('Space');
   await expect(themeSwitch).not.toHaveAttribute('aria-checked', initialState);
 
+  const displayTab = page.locator('#settingsTabDisplay');
+  await displayTab.focus();
+  await displayTab.press('ArrowRight');
+  await expect(page.locator('#settingsTabRadar')).toBeFocused();
+  await expect(page.locator('#settingsTabRadar')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#settingsPanelRadar')).not.toHaveAttribute('hidden', '');
+  await expect(page.locator('#settingsPanelDisplay')).toHaveAttribute('hidden', '');
+
   await page.keyboard.press('Escape');
   await expect(panel).toHaveAttribute('aria-hidden', 'true');
   await expect(opener).toBeFocused();
+  await expect(page.locator('#map')).not.toHaveAttribute('inert', '');
+  await expect(page.locator('.header')).not.toHaveAttribute('inert', '');
 });
 
 test('search combobox supports arrow selection and Enter', async ({ page }) => {
@@ -92,6 +104,61 @@ test('search combobox supports arrow selection and Enter', async ({ page }) => {
   await expect(search).toHaveAttribute('aria-expanded', 'false');
 });
 
+test('the named map opens a point forecast from its keyboard shortcut', async ({ page }) => {
+  await page.route('https://api.open-meteo.com/v1/forecast**', route => route.fulfill({
+    json: {
+      timezone: 'UTC',
+      current: {
+        temperature_2m: 70,
+        apparent_temperature: 70,
+        relative_humidity_2m: 50,
+        weather_code: 0,
+        wind_speed_10m: 5,
+        wind_direction_10m: 180,
+        wind_gusts_10m: 8,
+        surface_pressure: 1012,
+        precipitation: 0,
+        is_day: 1
+      },
+      hourly: {
+        time: ['2026-07-25T21:00'],
+        temperature_2m: [70],
+        weather_code: [0],
+        precipitation_probability: [0],
+        is_day: [1]
+      },
+      daily: {
+        time: ['2026-07-25'],
+        weather_code: [0],
+        temperature_2m_max: [75],
+        temperature_2m_min: [60],
+        precipitation_probability_max: [0],
+        wind_speed_10m_max: [8]
+      }
+    }
+  }));
+  await page.route('https://api.weather.gov/points/**', route => route.fulfill({
+    json: { properties: { relativeLocation: { properties: { city: 'Map Center', state: 'TS' } } } }
+  }));
+  await page.route('https://api.weather.gov/alerts/active?point=**', route => route.fulfill({
+    json: { type: 'FeatureCollection', features: [] }
+  }));
+  await page.goto('/');
+
+  const map = page.getByRole('region', { name: /Interactive weather map/ });
+  await expect(map).toHaveAttribute('aria-keyshortcuts', 'F');
+  await map.focus();
+  await map.press('f');
+  await expect(page.locator('#fcPanel')).toHaveAttribute('aria-hidden', 'false');
+  await expect(page.locator('#fcLocation')).toHaveText('Map Center, TS');
+  await expect(map).toHaveAttribute('inert', '');
+
+  await page.locator('#fcClose').click();
+  await expect(page.locator('#fcPanel')).toHaveAttribute('aria-hidden', 'true');
+  await expect(map).toBeFocused();
+  await expect(map).not.toHaveAttribute('inert', '');
+});
+
 test('mobile sheet traps focus, closes with Escape, and honors contrast preferences', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
@@ -106,8 +173,39 @@ test('mobile sheet traps focus, closes with Escape, and honors contrast preferen
   const sheet = page.locator('#bottomSheet');
   await expect(sheet).toHaveAttribute('aria-hidden', 'false');
   await expect(sheet.locator(':focus')).toHaveCount(1);
+  await expect(page.locator('#sheetClose')).toBeVisible();
+  await expect(page.locator('#map')).toHaveAttribute('inert', '');
   await expect(page.locator('#mobileFab')).toHaveCSS('border-style', 'solid');
 
+  const layersTab = page.locator('#sheetTabLayers');
+  await layersTab.focus();
+  await layersTab.press('ArrowRight');
+  await expect(page.locator('#sheetTabSources')).toBeFocused();
+  await expect(page.locator('#sheetTabSources')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#mobileSourcesTab')).not.toHaveAttribute('hidden', '');
+  await expect(page.locator('#mobileLayersTab')).toHaveAttribute('hidden', '');
+
+  const targetSizes = await page.locator(
+    'button:visible, [role="button"]:visible, [role="switch"]:visible, [role="checkbox"]:visible, [role="radio"]:visible, [role="tab"]:visible'
+  ).evaluateAll(elements => elements.map(element => {
+    const bounds = element.getBoundingClientRect();
+    return { label: element.getAttribute('aria-label') || element.textContent.trim(), width: bounds.width, height: bounds.height };
+  }));
+  expect(targetSizes.filter(target => target.width < 24 || target.height < 24)).toEqual([]);
+  const primaryMobileTargets = await page.locator(
+    '#bookmarksBtn, #themeBtn, #settingsBtn, #mobileFab, #locBtn, #centerForecastBtn, .ctrl-btn, .play-btn, #speedBtn, #sheetClose, .sheet-tab'
+  ).evaluateAll(elements => elements.filter(element => element.getClientRects().length).map(element => {
+    const bounds = element.getBoundingClientRect();
+    return { id: element.id || element.textContent.trim(), width: bounds.width, height: bounds.height };
+  }));
+  expect(primaryMobileTargets.filter(target => target.width < 44 || target.height < 44)).toEqual([]);
+
+  await page.locator('#sheetClose').click();
+  await expect(sheet).toHaveAttribute('aria-hidden', 'true');
+  await expect(opener).toBeFocused();
+  await expect(page.locator('#map')).not.toHaveAttribute('inert', '');
+
+  await opener.click();
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveAttribute('aria-hidden', 'true');
   await expect(opener).toBeFocused();
@@ -187,7 +285,7 @@ test('narrow layouts keep saved locations onscreen and synchronize duplicate con
   await assertLayerState('radar', false);
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('#sheetOverlay').click();
+  await page.locator('#sheetClose').click();
   await page.locator('#bookmarksBtn').click();
   await assertNoHorizontalOverflow(390);
 });

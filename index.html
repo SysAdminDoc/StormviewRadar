@@ -56,6 +56,23 @@
         }
 
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        button,
+        input:not([type="range"]),
+        select,
+        summary,
+        [role="button"],
+        [role="switch"],
+        [role="checkbox"],
+        [role="radio"],
+        [role="tab"] {
+            min-width: 24px;
+            min-height: 24px;
+        }
+        :focus-visible {
+            outline: 3px solid var(--accent);
+            outline-offset: 2px;
+        }
         
         html, body {
             height: 100%;
@@ -82,19 +99,25 @@
             z-index: 10;
             width: min(330px, calc(100vw - 24px));
             padding: 12px 14px;
-            color: var(--text);
+            color: #f8fafc;
             pointer-events: none;
         }
+        .storm-3d-info.glass {
+            background: #0b1220;
+            border-color: #64748b;
+        }
         .storm-3d-info strong { display: block; margin-bottom: 3px; font-size: 13px; }
-        .storm-3d-info-status { color: var(--accent); font-size: 11px; font-weight: 700; }
-        .storm-3d-info-note { margin-top: 5px; color: var(--text-dim); font-size: 10px; line-height: 1.4; }
-        .storm-3d-legend { display: flex; flex-wrap: wrap; gap: 5px 10px; margin-top: 7px; font-size: 9px; color: var(--text-dim); }
+        .storm-3d-info-status { color: #7dd3fc; font-size: 11px; font-weight: 700; }
+        .storm-3d-info-note { margin-top: 5px; color: #cbd5e1; font-size: 10px; line-height: 1.4; }
+        .storm-3d-legend { display: flex; flex-wrap: wrap; gap: 5px 10px; margin-top: 7px; font-size: 9px; color: #e2e8f0; }
         .storm-3d-legend span { display: inline-flex; align-items: center; gap: 4px; }
         .storm-3d-legend i { width: 7px; height: 7px; border-radius: 50%; }
         body.storm-3d-mode #map { visibility: hidden; }
         body.storm-3d-mode .playback,
         body.storm-3d-mode .legend,
         body.storm-3d-mode .loc-btn,
+        body.storm-3d-mode .map-forecast-btn,
+        body.storm-3d-mode .mobile-fab,
         body.storm-3d-mode .status-bar { display: none !important; }
 
         /* Aggressively hide ALL broken image icons */
@@ -1006,10 +1029,36 @@
         }
         .bottom-sheet.open { transform: translateY(0); }
         .sheet-handle { width: 40px; height: 4px; background: var(--text-muted); border-radius: 2px; margin: 12px auto; }
+        .sheet-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 4px 16px 10px;
+        }
+        .sheet-title { font-size: 16px; font-weight: 700; }
+        .sheet-close {
+            width: 44px;
+            height: 44px;
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            background: var(--glass-hover);
+            color: var(--text);
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+        }
+        .sheet-close svg { width: 20px; height: 20px; }
         .sheet-content { flex: 1; overflow-y: auto; padding: 0 16px 24px; }
 
         .mobile-fab { display: none; position: fixed; bottom: 120px; left: 12px; z-index: 1000; }
         .loc-btn { position: absolute; bottom: 120px; right: 12px; z-index: 900; }
+        .map-forecast-btn {
+            position: absolute;
+            right: 12px;
+            bottom: 168px;
+            z-index: 900;
+        }
 
         /* Status indicators */
         .status-bar {
@@ -1634,6 +1683,21 @@
                 color: #fff;
             }
             .loc-btn { bottom: 110px; }
+            .map-forecast-btn { bottom: 158px; }
+            .header .icon-btn,
+            .mobile-fab,
+            .loc-btn,
+            .map-forecast-btn,
+            .ctrl-btn,
+            .play-btn,
+            .speed-pill,
+            .fc-save,
+            .fc-close,
+            .settings-close,
+            .sheet-tab {
+                min-width: 44px;
+                min-height: 44px;
+            }
             .mobile-alert-banner:not([hidden]) {
                 position: fixed;
                 top: 110px;
@@ -1892,7 +1956,7 @@
         <div class="loading-text">Initializing radar systems...</div>
     </div>
 
-    <div id="map"></div>
+    <div id="map" role="region" aria-label="Interactive weather map. Use arrow keys to pan, plus and minus to zoom, and F for the forecast at map center." aria-keyshortcuts="F"></div>
     <section class="storm-3d-view" id="cesiumView" aria-label="Three-dimensional storm-top view" aria-hidden="true" hidden>
         <div id="cesiumContainer"></div>
         <div class="storm-3d-info glass">
@@ -2465,6 +2529,9 @@
     <button class="icon-btn loc-btn glass" id="locBtn" title="My Location">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
     </button>
+    <button class="icon-btn map-forecast-btn glass" id="centerForecastBtn" type="button" title="Forecast at map center" aria-label="Forecast at map center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M3 12h6M15 12h6M12 3v6M12 15v6"/></svg>
+    </button>
 
     <!-- Mobile FAB -->
     <button class="icon-btn mobile-fab glass" id="mobileFab" type="button" aria-label="Open layer controls" aria-expanded="false" aria-controls="bottomSheet">
@@ -2480,16 +2547,16 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
             </button>
         </div>
-        <div class="settings-tabs">
-            <button class="settings-tab active" data-tab="display">Display</button>
-            <button class="settings-tab" data-tab="radar">Radar</button>
-            <button class="settings-tab" data-tab="alerts">Alerts</button>
-            <button class="settings-tab" data-tab="api">APIs</button>
-            <button class="settings-tab" data-tab="diagnostics">Status</button>
+        <div class="settings-tabs" id="settingsTabs" role="tablist" aria-label="Settings sections">
+            <button class="settings-tab active" id="settingsTabDisplay" data-tab="display" role="tab" aria-selected="true" aria-controls="settingsPanelDisplay">Display</button>
+            <button class="settings-tab" id="settingsTabRadar" data-tab="radar" role="tab" aria-selected="false" aria-controls="settingsPanelRadar" tabindex="-1">Radar</button>
+            <button class="settings-tab" id="settingsTabAlerts" data-tab="alerts" role="tab" aria-selected="false" aria-controls="settingsPanelAlerts" tabindex="-1">Alerts</button>
+            <button class="settings-tab" id="settingsTabApi" data-tab="api" role="tab" aria-selected="false" aria-controls="settingsPanelApi" tabindex="-1">APIs</button>
+            <button class="settings-tab" id="settingsTabDiagnostics" data-tab="diagnostics" role="tab" aria-selected="false" aria-controls="settingsPanelDiagnostics" tabindex="-1">Status</button>
         </div>
         <div class="settings-content">
             <!-- Display Tab -->
-            <div class="settings-tab-content" data-tab-content="display">
+            <div class="settings-tab-content" id="settingsPanelDisplay" data-tab-content="display" role="tabpanel" aria-labelledby="settingsTabDisplay">
                 <div class="settings-section">
                     <div class="settings-section-title">Appearance</div>
                     <div class="setting-row">
@@ -2555,7 +2622,7 @@
                 </div>
             </div>
             <!-- Radar Tab -->
-            <div class="settings-tab-content" data-tab-content="radar" style="display:none;">
+            <div class="settings-tab-content" id="settingsPanelRadar" data-tab-content="radar" role="tabpanel" aria-labelledby="settingsTabRadar" hidden>
                 <div class="settings-section">
                     <div class="settings-section-title">Radar Display</div>
                     <div class="setting-row">
@@ -2622,7 +2689,7 @@
                 </div>
             </div>
             <!-- Alerts Tab -->
-            <div class="settings-tab-content" data-tab-content="alerts" style="display:none;">
+            <div class="settings-tab-content" id="settingsPanelAlerts" data-tab-content="alerts" role="tabpanel" aria-labelledby="settingsTabAlerts" hidden>
                 <div class="settings-section">
                     <div class="settings-section-title">Audio Notifications</div>
                     <div class="setting-row">
@@ -2689,7 +2756,7 @@
                 </div>
             </div>
             <!-- API Tab -->
-            <div class="settings-tab-content" data-tab-content="api" style="display:none;">
+            <div class="settings-tab-content" id="settingsPanelApi" data-tab-content="api" role="tabpanel" aria-labelledby="settingsTabApi" hidden>
                 <div class="settings-section">
                     <div class="settings-section-title">OpenWeatherMap</div>
                     <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Required for Temperature, Wind, Clouds, and Pressure layers</p>
@@ -2706,7 +2773,7 @@
                 </button>
             </div>
             <!-- Diagnostics Tab -->
-            <div class="settings-tab-content" data-tab-content="diagnostics" style="display:none;">
+            <div class="settings-tab-content" id="settingsPanelDiagnostics" data-tab-content="diagnostics" role="tabpanel" aria-labelledby="settingsTabDiagnostics" hidden>
                 <div class="settings-section">
                     <div class="settings-section-title">Radar &amp; Freshness</div>
                     <dl class="diagnostics-grid">
@@ -2736,17 +2803,23 @@
 
     <!-- Mobile Bottom Sheet -->
     <div class="sheet-overlay" id="sheetOverlay" aria-hidden="true"></div>
-    <div class="bottom-sheet" id="bottomSheet" role="dialog" aria-modal="true" aria-label="Layer controls" aria-hidden="true" inert>
+    <div class="bottom-sheet" id="bottomSheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" aria-hidden="true" inert>
         <div class="sheet-handle"></div>
-        <div class="sheet-tabs">
-            <button class="sheet-tab active" data-sheet-tab="layers">Layers</button>
-            <button class="sheet-tab" data-sheet-tab="sources">Sources</button>
-            <button class="sheet-tab" data-sheet-tab="map">Map</button>
+        <div class="sheet-header">
+            <h2 class="sheet-title" id="sheetTitle">Layer controls</h2>
+            <button class="sheet-close" id="sheetClose" type="button" aria-label="Close layer controls">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="sheet-tabs" id="sheetTabs" role="tablist" aria-label="Layer control sections">
+            <button class="sheet-tab active" id="sheetTabLayers" data-sheet-tab="layers" role="tab" aria-selected="true" aria-controls="mobileLayersTab">Layers</button>
+            <button class="sheet-tab" id="sheetTabSources" data-sheet-tab="sources" role="tab" aria-selected="false" aria-controls="mobileSourcesTab" tabindex="-1">Sources</button>
+            <button class="sheet-tab" id="sheetTabMap" data-sheet-tab="map" role="tab" aria-selected="false" aria-controls="mobileMapTab" tabindex="-1">Map</button>
         </div>
         <div class="sheet-content" id="mobileContent">
-            <div class="sheet-tab-content active" data-sheet-content="layers" id="mobileLayersTab"></div>
-            <div class="sheet-tab-content" data-sheet-content="sources" id="mobileSourcesTab"></div>
-            <div class="sheet-tab-content" data-sheet-content="map" id="mobileMapTab"></div>
+            <div class="sheet-tab-content active" data-sheet-content="layers" id="mobileLayersTab" role="tabpanel" aria-labelledby="sheetTabLayers"></div>
+            <div class="sheet-tab-content" data-sheet-content="sources" id="mobileSourcesTab" role="tabpanel" aria-labelledby="sheetTabSources" hidden></div>
+            <div class="sheet-tab-content" data-sheet-content="map" id="mobileMapTab" role="tabpanel" aria-labelledby="sheetTabMap" hidden></div>
         </div>
     </div>
 
@@ -3466,21 +3539,66 @@
         }
 
         function setAccessibleDialog(panel, overlay, open, opener, closeHandler) {
+            if (open && activeDialog && activeDialog !== panel) activeDialog._closeDialog?.();
             panel.toggleAttribute('inert', !open);
             panel.setAttribute('aria-hidden', String(!open));
             overlay?.setAttribute('aria-hidden', String(!open));
             if (open) {
-                panel._returnFocus = opener || document.activeElement;
+                if (activeDialog !== panel) {
+                    panel._returnFocus = opener || document.activeElement;
+                    panel._modalSiblings = [...document.body.children]
+                        .filter(element => element !== panel && element !== overlay && element.tagName !== 'SCRIPT')
+                        .map(element => ({ element, wasInert: element.hasAttribute('inert') }));
+                    panel._modalSiblings.forEach(({ element }) => element.setAttribute('inert', ''));
+                }
                 panel._closeDialog = closeHandler;
                 activeDialog = panel;
                 requestAnimationFrame(() => focusableElements(panel)[0]?.focus());
             } else {
                 if (activeDialog === panel) activeDialog = null;
+                panel._modalSiblings?.forEach(({ element, wasInert }) => {
+                    if (element.isConnected) element.toggleAttribute('inert', wasInert);
+                });
+                panel._modalSiblings = null;
                 const returnFocus = panel._returnFocus;
                 panel._returnFocus = null;
                 panel._closeDialog = null;
                 if (returnFocus?.isConnected) returnFocus.focus();
             }
+        }
+
+        function initializeTabList(tabList, tabs, panelForTab, onActivate) {
+            const activate = (selected, moveFocus = false) => {
+                tabs.forEach(tab => {
+                    const active = tab === selected;
+                    tab.classList.toggle('active', active);
+                    tab.setAttribute('aria-selected', String(active));
+                    tab.tabIndex = active ? 0 : -1;
+                    const panel = panelForTab(tab);
+                    if (panel) {
+                        panel.hidden = !active;
+                        panel.classList.toggle('active', active);
+                    }
+                });
+                onActivate?.(selected);
+                if (moveFocus) selected.focus();
+            };
+
+            tabList.setAttribute('aria-orientation', 'horizontal');
+            tabs.forEach((tab, index) => {
+                tab.addEventListener('click', () => activate(tab));
+                tab.addEventListener('keydown', event => {
+                    let nextIndex = null;
+                    if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+                    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+                    if (event.key === 'Home') nextIndex = 0;
+                    if (event.key === 'End') nextIndex = tabs.length - 1;
+                    if (nextIndex === null) return;
+                    event.preventDefault();
+                    activate(tabs[nextIndex], true);
+                });
+            });
+            activate(tabs.find(tab => tab.classList.contains('active')) || tabs[0]);
         }
 
         function accessibleControlLabel(element) {
@@ -8350,6 +8468,20 @@
             closeBtn.addEventListener('click', closePanel);
             overlay.addEventListener('click', closePanel);
 
+            const openCenterForecast = () => {
+                const center = map.getCenter();
+                openForecast(center.lat, center.lng);
+            };
+            document.getElementById('centerForecastBtn').addEventListener('click', openCenterForecast);
+            const mapContainer = map.getContainer();
+            if (!mapContainer.hasAttribute('tabindex')) mapContainer.tabIndex = 0;
+            mapContainer.addEventListener('keydown', event => {
+                if (event.target !== mapContainer || event.altKey || event.ctrlKey || event.metaKey) return;
+                if (event.key.toLowerCase() !== 'f') return;
+                event.preventDefault();
+                openCenterForecast();
+            });
+
             // Map click handler
             map.on('click', (e) => {
                 // Don't trigger if clicking on a popup, marker, or UI element
@@ -9032,16 +9164,15 @@
             overlay.addEventListener('click', closeSettings);
             document.getElementById('settingsClose').addEventListener('click', closeSettings);
 
-            // Tabs
-            document.querySelectorAll('.settings-tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
-                    document.querySelectorAll('.settings-tab-content').forEach(c => c.style.display = 'none');
-                    tab.classList.add('active');
-                    document.querySelector(`[data-tab-content="${tab.dataset.tab}"]`).style.display = 'block';
+            const settingsTabs = [...document.querySelectorAll('#settingsTabs .settings-tab')];
+            initializeTabList(
+                document.getElementById('settingsTabs'),
+                settingsTabs,
+                tab => document.getElementById(tab.getAttribute('aria-controls')),
+                tab => {
                     if (tab.dataset.tab === 'diagnostics') renderDiagnostics();
-                });
-            });
+                }
+            );
 
             document.getElementById('copyDiagnosticsBtn').addEventListener('click', async () => {
                 try {
@@ -9476,15 +9607,12 @@
             });
             syncLevel2SiteControls();
 
-            // Tab switching
-            document.querySelectorAll('.sheet-tab[data-sheet-tab]').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    document.querySelectorAll('.sheet-tab').forEach(t => t.classList.remove('active'));
-                    document.querySelectorAll('.sheet-tab-content').forEach(c => c.classList.remove('active'));
-                    tab.classList.add('active');
-                    document.querySelector(`[data-sheet-content="${tab.dataset.sheetTab}"]`)?.classList.add('active');
-                });
-            });
+            const sheetTabs = [...document.querySelectorAll('#sheetTabs .sheet-tab')];
+            initializeTabList(
+                document.getElementById('sheetTabs'),
+                sheetTabs,
+                tab => document.getElementById(tab.getAttribute('aria-controls'))
+            );
 
             // Wire up all interactive elements in the sheet
             const content = document.getElementById('mobileContent');
@@ -9535,6 +9663,7 @@
                 setAccessibleDialog(sheet, overlay, false);
             };
             overlay.addEventListener('click', closeSheet);
+            document.getElementById('sheetClose').addEventListener('click', closeSheet);
         }
 
         function goToLocation() {

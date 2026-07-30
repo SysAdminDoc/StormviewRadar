@@ -97,6 +97,8 @@ python -m http.server 8000
 | `←` | Previous frame |
 | `→` | Next frame |
 | `R` | Refresh radar data |
+| `F` (while the map is focused) | Open the forecast at map center |
+| `←` / `→` (on a settings or layer tab) | Move between tabs |
 
 ## API Keys (Optional)
 
