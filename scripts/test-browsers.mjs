@@ -1,8 +1,7 @@
 import { spawnSync } from 'node:child_process';
 
 function run(args) {
-  const command = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  const result = spawnSync(command, ['playwright', 'test', ...args], {
+  const result = spawnSync(process.execPath, ['node_modules/@playwright/test/cli.js', 'test', ...args], {
     cwd: process.cwd(),
     stdio: 'inherit'
   });

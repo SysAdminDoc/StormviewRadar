@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Kept startup loading visible until radar reaches ready/fallback/error, added semantic progress and retry states, exposed first-frame/loop/render/drop/byte diagnostics, and added Reduced Data mode with bounded frame preload and paused data-heavy overlays.
 - Corrected provider/runtime/privacy documentation, documented key modules and coverage limits, and added a clean-tree release command that synchronizes every version surface, runs the release gate, commits, and tags.
 - Upgraded the exact-pinned esbuild toolchain from 0.25.6 to 0.28.1 and rebuilt/revalidated the local Cesium and NEXRAD Level II worker bundles without dynamic evaluation.
 - Made saved-location writes transactional with quota recovery guidance, JSON export, keyboard-labeled removal, and undoable delete/clear actions; location permission failures now explain recovery without repeated prompts, and rejected OpenWeatherMap keys disable only the requested layer with diagnostics.

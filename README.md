@@ -69,6 +69,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Versioned Settings** — Validated preferences migrate forward in browser storage
 - **Import/Export** — Backup and restore configuration without exporting API keys
 - **Redacted Diagnostics** — Inspect provider freshness, fallback, coverage, resource counts, retry state, and request results without copying secrets or precise coordinates
+- **Reduced Data Mode** — Limit radar frames and pause data-heavy optional overlays on constrained connections
 - **Language & Units** — Persist English or Spanish UI plus US customary or metric weather units, with locale-aware dates and safe English fallback
 - **Quiet-by-Default Audio** — The first alert load is silent; a user gesture unlocks audio and only unseen matching alerts can sound
 - **Local-Only Alert Areas** — Geofences remain in the current browser profile and are not sent to StormView or included in settings exports

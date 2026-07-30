@@ -1180,6 +1180,16 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         .loading-text { margin-top: 16px; color: var(--text-dim); }
+        .loading-retry {
+            margin-top: 14px;
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--accent);
+            padding: 8px 14px;
+            cursor: pointer;
+        }
+        .loading-retry[hidden] { display: none; }
 
         .data-credit {
             position: absolute; top: 116px; right: 12px;
@@ -1976,14 +1986,15 @@
             </filter>
         </defs>
     </svg>
-    <div class="loading-overlay" id="loading">
+    <div class="loading-overlay" id="loading" role="status" aria-live="polite">
         <div class="loading-logo">
             <img src="logo/StormView-192x192.png" alt="StormView">
         </div>
         <div class="loading-title">StormView Radar</div>
         <div class="loading-sub">v0.1.0</div>
         <div class="loading-spinner"></div>
-        <div class="loading-text">Initializing radar systems...</div>
+        <div class="loading-text" id="startupStatus">Initializing radar systems...</div>
+        <button class="loading-retry" id="startupRetry" type="button" hidden>Retry radar</button>
     </div>
 
     <div id="map" role="region" aria-label="Interactive weather map. Use arrow keys to pan, plus and minus to zoom, and F for the forecast at map center." aria-keyshortcuts="F"></div>
@@ -2545,11 +2556,12 @@
     </div>
 
     <!-- Load Progress -->
-    <div class="load-progress" id="loadProgress">
+    <div class="load-progress" id="loadProgress" role="status" aria-live="polite">
         <span id="loadProgressText">0%</span>
-        <div class="load-progress-bar">
+        <div class="load-progress-bar" id="loadProgressBar" role="progressbar" aria-label="Radar frame loading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <div class="load-progress-fill" id="loadProgressFill"></div>
         </div>
+        <button class="load-progress-retry" id="loadProgressRetry" type="button" hidden>Retry</button>
     </div>
 
     <!-- Status Bar -->
@@ -2600,6 +2612,13 @@
                     <div class="setting-row">
                         <div><div class="setting-label">Show Legend</div></div>
                         <div class="toggle on" id="legendToggle"></div>
+                    </div>
+                    <div class="setting-row">
+                        <div>
+                            <div class="setting-label">Reduced Data</div>
+                            <div class="setting-hint">Load fewer frames and pause data-heavy optional overlays</div>
+                        </div>
+                        <div class="toggle" id="reducedDataToggle"></div>
                     </div>
                     <div class="setting-row">
                         <label class="setting-label" for="languageSelect">Language</label>
@@ -3088,8 +3107,21 @@
             provider: { state: 'loading', message: 'Starting radar provider', updatedAt: null, retryable: false },
             requests: [],
             layerCounts: {},
-            layerStates: {}
+            layerStates: {},
+            performance: {
+                startupStartedAt: performance.now(),
+                firstUsableFrameMs: null,
+                loopCompletedAt: null,
+                renderedFrames: 0,
+                droppedFrames: 0,
+                transferredBytes: 0
+            }
         };
+        const REDUCED_DATA_OPTIONAL_LAYERS = new Set([
+            'stormReports', 'stormTracks', 'hailMesh', 'lightning', 'satellite', 'satelliteIR',
+            'satelliteWV', 'satelliteGeoColor', 'satelliteSandwich', 'satelliteMesoscale',
+            'riverGauges', 'surfaceObs', 'tropical', 'sigmets'
+        ]);
         const MESSAGE_CATALOG = {
             en: {
                 loading: 'Loading...',
@@ -3507,6 +3539,8 @@
                 resources: {
                     activeRequests: activeRequests.size,
                     activeLayerRequests: layerRequests.size,
+                    performance: { ...diagnosticsState.performance },
+                    frameLayerCount: frameLayers.filter(Boolean).length,
                     featureCounts: { ...diagnosticsState.layerCounts },
                     overlayStates: Object.fromEntries(Object.entries(diagnosticsState.layerStates).map(([name, value]) => [
                         name,
@@ -3532,7 +3566,7 @@
             document.getElementById('diagCoverage').textContent = report.radar.coverage;
             const featureTotal = Object.values(report.resources.featureCounts).reduce((sum, value) => sum + value, 0);
             document.getElementById('diagResources').textContent =
-                `${report.radar.frames.loaded}/${report.radar.frames.total} frames · ${featureTotal} features · ${report.resources.activeRequests} requests`;
+                `${report.radar.frames.loaded}/${report.radar.frames.total} frames · ${report.resources.frameLayerCount} layers · ${featureTotal} features · ${report.resources.activeRequests} requests · first frame ${report.resources.performance.firstUsableFrameMs ?? 'pending'} ms · ${report.resources.performance.droppedFrames} dropped · ${report.resources.performance.transferredBytes} bytes`;
             const overlayStates = Object.entries(report.resources.overlayStates)
                 .filter(([, value]) => value.state !== 'disabled')
                 .sort(([left], [right]) => left.localeCompare(right));
@@ -3921,7 +3955,7 @@
                 if (typeof candidate[key] === 'string' && allowed.includes(candidate[key])) result[key] = candidate[key];
             });
 
-            ['loop', 'autoRefresh', 'showLegend', 'highResMode', 'useLocalTime', 'alertAudioEnabled'].forEach(key => {
+            ['loop', 'autoRefresh', 'showLegend', 'highResMode', 'useLocalTime', 'alertAudioEnabled', 'reducedData'].forEach(key => {
                 if (typeof candidate[key] === 'boolean') result[key] = candidate[key];
             });
             ['smooth', 'snowColor'].forEach(key => {
@@ -4011,6 +4045,10 @@
             try {
                 const response = await window.fetch(input, { ...init, signal: controller.signal });
                 diagnosticStatus = response.status;
+                const contentLength = Number(response.headers.get('content-length'));
+                if (Number.isFinite(contentLength) && contentLength > 0) {
+                    diagnosticsState.performance.transferredBytes += contentLength;
+                }
                 if (!response.ok) {
                     diagnosticResult = 'HTTP error';
                     throw new Error(`HTTP ${response.status} ${response.statusText || 'request failed'}`);
@@ -4141,6 +4179,7 @@
             autoRefresh: true,
             showLegend: true,
             highResMode: true,
+            reducedData: false,
             alertAudioEnabled: false,
             alertAudioSeverity: 'severe',
             alertAudioType: 'warnings',
@@ -4182,7 +4221,7 @@
         };
 
         // ==================== INITIALIZATION ====================
-        function init() {
+        async function init() {
             loadSettings();
             applyTheme();
             initMap();
@@ -4197,10 +4236,14 @@
             initBookmarks();
             initAccessibility();
             updatePlaybackVisibility();
-            loadRadarData();
+            await loadRadarData();
             
             Object.keys(settings.layers).forEach(layer => {
                 if (settings.layers[layer] && layer !== 'radar') {
+                    if (settings.reducedData && REDUCED_DATA_OPTIONAL_LAYERS.has(layer)) {
+                        handleLayerToggle(layer, false, true);
+                        return;
+                    }
                     handleLayerToggle(layer, true, true);
                 }
             });
@@ -5471,6 +5514,9 @@
             framesLoaded = 1;
             framesTotal = 1;
             framesReady = true;
+            if (diagnosticsState.performance.firstUsableFrameMs === null) {
+                diagnosticsState.performance.firstUsableFrameMs = Math.round(performance.now() - diagnosticsState.performance.startupStartedAt);
+            }
             lastRefreshTime = Date.now();
             updateLoadProgress(100);
             updateTimestamp();
@@ -5640,7 +5686,10 @@
                     );
                 }
             } finally {
-                if (generation === radarLoadGeneration) hideLoadProgress();
+                if (generation === radarLoadGeneration) {
+                    if (diagnosticsState.provider.state === 'error') showLoadFailure();
+                    else hideLoadProgress();
+                }
             }
         }
 
@@ -5659,6 +5708,7 @@
                     timeSource: 'RainViewer weather maps metadata'
                 }))
                 : [];
+            if (settings.reducedData) frames = frames.slice(-6);
             if (!frames.length || typeof rainviewerData.host !== 'string') {
                 throw new Error('RainViewer returned no supported past radar frames');
             }
@@ -5705,10 +5755,7 @@
                     
                     const layer = L.tileLayer.cached(url, tileOptions);
                     
-                    layer.on('load', () => {
-                        framesLoaded++;
-                        updateLoadProgress(framesLoaded / framesTotal * 100);
-                    });
+                    layer.on('load', markRadarFrameLoaded);
                     
                     frameLayers[i] = layer;
                     
@@ -5778,6 +5825,9 @@
                 updateWhenIdle: true,
                 attribution: IEM_ATTRIBUTION
             });
+            framesTotal = 1;
+            framesLoaded = 0;
+            layer.once('load', markRadarFrameLoaded);
             layer.addTo(map);
             frameLayers.push(layer);
             ensureCurrentRadarLoad(generation, signal);
@@ -5828,6 +5878,9 @@
                 updateWhenIdle: true,
                 attribution: '<a href="https://nowcoast.noaa.gov/">NOAA nowCOAST</a>'
             });
+            framesTotal = 1;
+            framesLoaded = 0;
+            layer.once('load', markRadarFrameLoaded);
             layer.addTo(map);
             frameLayers.push(layer);
             ensureCurrentRadarLoad(generation, signal);
@@ -5865,7 +5918,8 @@
                     String(d.getUTCHours()).padStart(2, '0') +
                     String(d.getUTCMinutes()).padStart(2, '0');
                 
-                const maxForecastMinute = Math.min(1080, Math.max(0, Number(meta.forecast_minute) || 1080));
+                const forecastLimit = settings.reducedData ? 360 : 1080;
+                const maxForecastMinute = Math.min(forecastLimit, Math.max(0, Number(meta.forecast_minute) || forecastLimit));
                 frames = [];
                 hrrrFrames = [];
                 
@@ -5917,10 +5971,7 @@
                         
                         const layer = L.tileLayer.cached(url, tileOptions);
                         
-                        layer.on('load', () => {
-                            framesLoaded++;
-                            updateLoadProgress(framesLoaded / framesTotal * 100);
-                        });
+                        layer.on('load', markRadarFrameLoaded);
                         
                         frameLayers[i] = layer;
                         hrrrFrames[i] = layer;
@@ -6350,6 +6401,7 @@
             
             const prevFrame = currentFrame;
             currentFrame = idx;
+            diagnosticsState.performance.renderedFrames += 1;
             
             // Determine target opacity
             const zoom = map.getZoom();
@@ -6465,7 +6517,7 @@
             document.getElementById('playIcon').innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
             lastFrameTime = performance.now();
             // Preload next several frames for smooth cross-fade animation
-            preloadNearbyFrames(currentFrame, 5);
+            preloadNearbyFrames(currentFrame, settings.reducedData ? 2 : 5);
             animationLoop();
         }
 
@@ -6495,12 +6547,16 @@
             const frameDelay = settings.delay / speedMult;
             
             if (elapsed >= frameDelay) {
+                if (elapsed > frameDelay * 1.5) {
+                    diagnosticsState.performance.droppedFrames += Math.max(1, Math.floor(elapsed / frameDelay) - 1);
+                }
                 lastFrameTime = now;
                 
                 let next = currentFrame + 1;
                 if (next >= frames.length) {
                     if (settings.loop) {
                         next = 0;
+                        diagnosticsState.performance.loopCompletedAt = new Date().toISOString();
                     } else {
                         pause();
                         return;
@@ -6508,7 +6564,7 @@
                 }
                 showPreloadedFrame(next);
                 // Preload frames well ahead for smooth cross-fading
-                preloadNearbyFrames(next, 5);
+                preloadNearbyFrames(next, settings.reducedData ? 2 : 5);
             }
             
             animationId = requestAnimationFrame(animationLoop);
@@ -8260,7 +8316,10 @@
         }
 
         function showLoadProgress() {
-            document.getElementById('loadProgress').classList.add('show');
+            const progress = document.getElementById('loadProgress');
+            progress.classList.add('show');
+            progress.dataset.state = 'loading';
+            document.getElementById('loadProgressRetry').hidden = true;
             document.getElementById('playBtn').classList.add('loading');
         }
 
@@ -8270,8 +8329,28 @@
         }
 
         function updateLoadProgress(pct) {
-            document.getElementById('loadProgressFill').style.width = pct + '%';
-            document.getElementById('loadProgressText').textContent = Math.round(pct) + '%';
+            const value = Math.max(0, Math.min(100, Math.round(pct)));
+            document.getElementById('loadProgressFill').style.width = value + '%';
+            document.getElementById('loadProgressText').textContent = value + '%';
+            document.getElementById('loadProgressBar').setAttribute('aria-valuenow', String(value));
+        }
+
+        function markRadarFrameLoaded() {
+            framesLoaded = Math.min(framesTotal, framesLoaded + 1);
+            if (diagnosticsState.performance.firstUsableFrameMs === null) {
+                diagnosticsState.performance.firstUsableFrameMs = Math.round(performance.now() - diagnosticsState.performance.startupStartedAt);
+            }
+            updateLoadProgress(framesTotal ? framesLoaded / framesTotal * 100 : 100);
+            renderDiagnostics();
+        }
+
+        function showLoadFailure() {
+            const progress = document.getElementById('loadProgress');
+            progress.classList.add('show');
+            progress.dataset.state = 'error';
+            document.getElementById('loadProgressText').textContent = 'Radar unavailable';
+            document.getElementById('loadProgressRetry').hidden = false;
+            document.getElementById('playBtn').classList.remove('loading');
         }
 
         function setProviderStatus(state, message, retry = null) {
@@ -8286,6 +8365,11 @@
             };
             dot.className = `dot ${colors[state] || 'blue'}`;
             document.getElementById('dataStatusText').textContent = message;
+            const startupStatus = document.getElementById('startupStatus');
+            if (startupStatus && !document.getElementById('loading').classList.contains('hidden')) {
+                startupStatus.textContent = message;
+                document.getElementById('startupRetry').hidden = state !== 'error';
+            }
             el.dataset.state = state;
             el.classList.add('show');
             el.classList.toggle('retryable', typeof retry === 'function');
@@ -9179,6 +9263,12 @@
             document.getElementById('locBtn').addEventListener('click', goToLocation);
             document.getElementById('bmExport').addEventListener('click', exportBookmarks);
             document.getElementById('bmClear').addEventListener('click', clearBookmarks);
+            const retryRadarLoad = async () => {
+                showLoadProgress();
+                await loadRadarData();
+            };
+            document.getElementById('loadProgressRetry').addEventListener('click', retryRadarLoad);
+            document.getElementById('startupRetry').addEventListener('click', retryRadarLoad);
             
             document.getElementById('timestampTz').addEventListener('click', () => {
                 settings.useLocalTime = !settings.useLocalTime;
@@ -9256,6 +9346,20 @@
                 settings.showLegend = legendToggle.classList.toggle('on');
                 document.getElementById('legend').style.display = settings.showLegend ? 'block' : 'none';
                 saveSettings();
+            });
+
+            const reducedDataToggle = document.getElementById('reducedDataToggle');
+            reducedDataToggle.classList.toggle('on', settings.reducedData);
+            reducedDataToggle.addEventListener('click', () => {
+                settings.reducedData = reducedDataToggle.classList.toggle('on');
+                if (settings.reducedData) {
+                    REDUCED_DATA_OPTIONAL_LAYERS.forEach(layer => {
+                        if (settings.layers[layer]) handleLayerToggle(layer, false);
+                    });
+                    showToast('Reduced Data enabled: optional live overlays paused and radar preload limited', 'info', 5000);
+                }
+                saveSettings();
+                loadRadarData();
             });
             document.getElementById('legend').style.display = settings.showLegend ? 'block' : 'none';
 

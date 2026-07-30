@@ -10,8 +10,10 @@ function fail(message) {
 }
 
 function run(command, args, options = {}) {
-  const executable = process.platform === 'win32' && command === 'npm' ? 'npm.cmd' : command;
-  const result = spawnSync(executable, args, {
+  const npmCli = process.env.npm_execpath;
+  const executable = command === 'npm' && npmCli ? process.execPath : command;
+  const executableArgs = command === 'npm' && npmCli ? [npmCli, ...args] : args;
+  const result = spawnSync(executable, executableArgs, {
     cwd: process.cwd(),
     encoding: 'utf8',
     stdio: options.capture ? 'pipe' : 'inherit'
