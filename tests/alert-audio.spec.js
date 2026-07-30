@@ -25,7 +25,7 @@ function alertFeature(id, geometry) {
       description: 'Take shelter now.',
       areaDesc: 'Test County',
       sent: '2026-07-25T22:00:00Z',
-      expires: '2026-07-25T23:00:00Z'
+      expires: new Date(Date.now() + 60 * 60 * 1000).toISOString()
     },
     geometry
   };

@@ -42,7 +42,7 @@ test.beforeEach(async ({ page }) => {
           event: hostile,
           headline: hostile,
           description: hostile,
-          expires: '2026-07-26T00:00:00Z'
+          expires: new Date(Date.now() + 60 * 60 * 1000).toISOString()
         },
         geometry: {
           type: 'Polygon',

@@ -55,4 +55,5 @@ test('alert identity and urgency are stable with incomplete provider data', () =
     alertIdentifier({ properties: { sent: '2026-07-25T22:00:00Z', event: 'Flood Watch', areaDesc: 'A' } }),
     '2026-07-25T22:00:00Z:Flood Watch:A'
   );
+  assert.equal(alertIdentifier(alert({ _stormviewSeriesId: 'cap-series' })), 'cap-series');
 });

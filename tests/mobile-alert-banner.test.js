@@ -47,3 +47,9 @@ test('mobile alert banner prioritizes severe threats and advances after dismissa
     assert.equal(dismissed.count, 1);
     assert.equal(dismissed.id, 'flood');
 });
+
+test('mobile alert identity follows a normalized CAP series', () => {
+    const feature = alertFeature('update-id', 'Flood Warning', 'Moderate', -98, 34, -96, 36);
+    feature.properties._stormviewSeriesId = 'original-id';
+    assert.equal(alertBannerIdentifier(feature), 'original-id');
+});

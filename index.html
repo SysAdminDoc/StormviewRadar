@@ -1414,6 +1414,36 @@
         .mobile-alert-banner {
             display: none;
         }
+        .non-map-alerts {
+            position: fixed;
+            right: 18px;
+            bottom: 138px;
+            z-index: 800;
+            width: min(340px, calc(100vw - 36px));
+            max-height: 230px;
+            overflow: auto;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            background: var(--glass-heavy);
+            color: var(--text);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(14px);
+            font-size: 11px;
+        }
+        .non-map-alerts[hidden] { display: none; }
+        .non-map-alerts summary {
+            min-height: 40px;
+            padding: 11px 13px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        .non-map-alerts ul {
+            display: grid;
+            gap: 6px;
+            margin: 0;
+            padding: 0 13px 12px 28px;
+            color: var(--text-muted);
+        }
         .mobile-alert-banner-indicator {
             width: 5px;
             align-self: stretch;
@@ -1615,6 +1645,11 @@
                 backdrop-filter: blur(16px);
                 -webkit-backdrop-filter: blur(16px);
                 animation: mobile-alert-in 0.22s ease-out;
+            }
+            .non-map-alerts {
+                right: 10px;
+                bottom: 132px;
+                width: min(340px, calc(100vw - 20px));
             }
             .storm-3d-info {
                 right: 10px;
@@ -2330,6 +2365,11 @@
         </div>
     </section>
 
+    <details class="non-map-alerts" id="nonMapAlerts" hidden>
+        <summary id="nonMapAlertsSummary">Alerts without map geometry</summary>
+        <ul id="nonMapAlertsList"></ul>
+    </details>
+
     <!-- Forecast Panel -->
     <div class="forecast-overlay" id="fcOverlay" aria-hidden="true"></div>
     <div class="forecast-panel" id="fcPanel" role="dialog" aria-modal="true" aria-labelledby="fcLocation" aria-hidden="true" inert>
@@ -2874,6 +2914,7 @@
         let cesiumViewer = null;
         let stormTop3dMode = false;
         let alertAudioToolsPromise = null;
+        let alertSeriesToolsPromise = null;
         let alertAudioContext = null;
         let alertAudioUnlocked = false;
         let alertAudioPrimed = false;
@@ -2886,6 +2927,7 @@
         const dismissedMobileAlertIds = new Set();
         let geofences = [];
         const seenAlertIds = new Set();
+        const alertZoneGeometryCache = new Map();
         let historicalReplayToolsPromise = null;
         let spcMcdToolsPromise = null;
         let replayAbortController = null;
@@ -2979,6 +3021,8 @@
                 alertIssuedJustNow: 'just issued',
                 alertIssuedMinutesAgo: '{value}m since issue',
                 alertIssuedHoursAgo: '{value}h since issue',
+                nonMapAlerts: '{value} active alert(s) cannot be drawn on the map',
+                additionalNonMapAlerts: '{value} additional alert(s)',
                 stormTopsLoading: 'Loading storm cells…',
                 stormTopsCount: '{value} storm top(s) in the current map view',
                 stormTopsScale: 'Display height scale: {value}×.',
@@ -3049,6 +3093,8 @@
                 alertIssuedJustNow: 'recién emitida',
                 alertIssuedMinutesAgo: '{value} min desde la emisión',
                 alertIssuedHoursAgo: '{value} h desde la emisión',
+                nonMapAlerts: '{value} alerta(s) activa(s) no se pueden dibujar en el mapa',
+                additionalNonMapAlerts: '{value} alerta(s) adicional(es)',
                 stormTopsLoading: 'Cargando celdas de tormenta…',
                 stormTopsCount: '{value} cima(s) de tormenta en la vista actual',
                 stormTopsScale: 'Escala de altura visual: {value}×.',
@@ -3247,6 +3293,7 @@
                     .then(tools => showAlertAgeLegend(currentAlertFeatures, tools, referenceTime))
                     .catch(error => console.warn('Alert age legend unavailable:', error));
             }
+            renderNonMapAlerts(currentAlertFeatures);
             const stormTopButton = document.getElementById('stormTop3dBtn');
             const stormTopView = document.getElementById('cesiumView');
             const stormTopLegend = document.querySelector('.storm-3d-legend');
@@ -6131,12 +6178,18 @@
                         if (on) renderReplayAlerts(frames[currentFrame].time * 1000);
                         else {
                             removeLayer('alerts');
+                            currentAlertFeatures = [];
+                            renderNonMapAlerts([]);
+                            updateAlertCount(0);
                             updateMobileAlertBanner([]);
                         }
                     } else {
                         if (on) loadAlerts();
                         else {
                             removeLayer('alerts');
+                            currentAlertFeatures = [];
+                            renderNonMapAlerts([]);
+                            updateAlertCount(0);
                             updateMobileAlertBanner([]);
                         }
                     }
@@ -6335,6 +6388,40 @@
             return alertFillToolsPromise;
         }
 
+        function alertSeriesTools() {
+            if (!alertSeriesToolsPromise) alertSeriesToolsPromise = import('./src/alert-series.js');
+            return alertSeriesToolsPromise;
+        }
+
+        function renderNonMapAlerts(features) {
+            const container = document.getElementById('nonMapAlerts');
+            const summary = document.getElementById('nonMapAlertsSummary');
+            const list = document.getElementById('nonMapAlertsList');
+            if (!container || !summary || !list) return;
+            const unresolved = (Array.isArray(features) ? features : [])
+                .filter(feature => !['Polygon', 'MultiPolygon'].includes(feature?.geometry?.type));
+            list.replaceChildren();
+            container.hidden = unresolved.length === 0;
+            if (!unresolved.length) {
+                container.open = false;
+                return;
+            }
+            summary.textContent = t('nonMapAlerts', { value: unresolved.length });
+            unresolved.slice(0, 20).forEach(feature => {
+                const item = document.createElement('li');
+                const properties = feature.properties || {};
+                const event = safeText(properties.event || 'Weather Alert', 120);
+                const area = safeText(properties.areaDesc || 'Area unavailable', 180);
+                item.textContent = `${event} — ${area}`;
+                list.appendChild(item);
+            });
+            if (unresolved.length > 20) {
+                const item = document.createElement('li');
+                item.textContent = t('additionalNonMapAlerts', { value: unresolved.length - 20 });
+                list.appendChild(item);
+            }
+        }
+
         function formatAlertIssueAge(ageMinutes) {
             if (!Number.isFinite(ageMinutes) || ageMinutes < 0) return '';
             if (ageMinutes < 1) return t('alertIssuedJustNow');
@@ -6405,6 +6492,7 @@
                 .filter(feature => tools.warningActiveAt(feature, timestamp))
                 .slice(0, MAX_ALERT_FEATURES);
             currentAlertFeatures = activeWarnings;
+            renderNonMapAlerts(activeWarnings);
             updateMobileAlertBanner(settings.layers.alerts ? activeWarnings : []);
             if (!settings.layers.alerts) return;
             layerRefs.alerts = L.geoJSON({ type: 'FeatureCollection', features: activeWarnings }, {
@@ -6685,17 +6773,35 @@
         async function loadAlerts() {
             removeLayer('alerts');
             currentAlertFeatures = [];
+            renderNonMapAlerts([]);
             updateMobileAlertBanner([]);
             const controller = beginLayerRequest('alerts');
             try {
-                const [resp, tools] = await Promise.all([
+                const [resp, tools, seriesTools] = await Promise.all([
                     fetchWithTimeout(DATA_URLS.nwsAlerts, { signal: controller.signal }),
-                    alertFillTools()
+                    alertFillTools(),
+                    alertSeriesTools()
                 ]);
                 const data = await resp.json();
                 if (controller.signal.aborted || !settings.layers.alerts) return;
-                const features = featureList(data, MAX_ALERT_FEATURES);
                 const referenceTime = Date.now();
+                const normalized = seriesTools.normalizeAlertSeries(
+                    featureList(data, MAX_ALERT_FEATURES),
+                    { now: referenceTime }
+                );
+                const resolved = await seriesTools.resolveAlertZoneGeometries(normalized, {
+                    cache: alertZoneGeometryCache,
+                    now: referenceTime,
+                    fetchZone: async url => {
+                        const zoneResponse = await fetchWithTimeout(url, {
+                            signal: controller.signal,
+                            headers: { Accept: 'application/geo+json' }
+                        });
+                        return zoneResponse.json();
+                    }
+                });
+                if (controller.signal.aborted || layerRequests.get('alerts') !== controller || !settings.layers.alerts) return;
+                const features = resolved.features;
 
                 layerRefs.alerts = L.geoJSON(features, {
                     pane: 'alertPane',
@@ -6729,13 +6835,8 @@
                 if (settings.layers.alerts) layerRefs.alerts.addTo(map);
                 showAlertAgeLegend(features, tools, referenceTime);
                 setLayerFeatureCount('alerts', features.length);
-                
-                // Update alert count badges
-                const warningCount = features.filter(f => {
-                    const evt = safeText(f.properties?.event, 120).toLowerCase();
-                    return evt.includes('warning') || evt.includes('tornado') || evt.includes('severe');
-                }).length;
-                updateAlertCount(warningCount || features.length);
+                updateAlertCount(features.length);
+                renderNonMapAlerts(features);
                 updateMobileAlertBanner(features);
                 await processAlertAudio(features);
             } catch(e) {

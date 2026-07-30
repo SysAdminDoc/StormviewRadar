@@ -17,7 +17,7 @@ function alertFeature(id, event, severity, coordinates, sent) {
       sent,
       headline: `${event} for the test area`,
       description: 'Take shelter and monitor official guidance.',
-      expires: '2026-07-25T21:00:00Z'
+      expires: new Date(Date.now() + 60 * 60 * 1000).toISOString()
     },
     geometry: {
       type: 'Polygon',

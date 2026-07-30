@@ -7,7 +7,7 @@
     "build:cesium": "node scripts/build-cesium-engine.mjs",
     "build:level2": "node scripts/build-level2-worker.mjs",
     "test": "npm run test:static && npm run test:unit && playwright test",
-    "test:static": "npm run build:cesium && npm run build:level2 && node --check src/alert-audio.js && node --check src/alert-fill.js && node --check src/cesium-engine-entry.js && node --check src/historical-replay.js && node --check src/mesh-analysis.js && node --check src/mesh-worker.js && node --check src/mobile-alert-banner.js && node --check src/spc-mcd.js && node --check src/storm-report-clusters.js && node --check src/storm-top-3d.js && node --check src/storm-tracks.js && node scripts/check-version.mjs && node scripts/check-vendor.mjs && node scripts/check-static.mjs",
+    "test:static": "npm run build:cesium && npm run build:level2 && node --check src/alert-audio.js && node --check src/alert-fill.js && node --check src/alert-series.js && node --check src/cesium-engine-entry.js && node --check src/historical-replay.js && node --check src/mesh-analysis.js && node --check src/mesh-worker.js && node --check src/mobile-alert-banner.js && node --check src/spc-mcd.js && node --check src/storm-report-clusters.js && node --check src/storm-top-3d.js && node --check src/storm-tracks.js && node scripts/check-version.mjs && node scripts/check-vendor.mjs && node scripts/check-static.mjs",
     "test:unit": "node --test tests/*.test.js",
     "release:check": "npm test && npm audit --audit-level=high"
   },

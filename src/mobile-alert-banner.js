@@ -28,7 +28,7 @@ export function featureBounds(feature) {
 
 export function alertBannerIdentifier(feature) {
     const properties = feature?.properties || {};
-    return String(feature?.id || properties.id
+    return String(properties._stormviewSeriesId || feature?.id || properties.id
         || `${properties.sent || ''}:${properties.event || ''}:${properties.areaDesc || ''}`).slice(0, 500);
 }
 
