@@ -5,6 +5,22 @@ const transparentPng = Buffer.from(
   'base64'
 );
 
+const overlayFeatureCollection = {
+  type: 'FeatureCollection',
+  features: [{
+    type: 'Feature',
+    properties: {
+      event: 'Tornado Watch',
+      headline: 'Test overlay',
+      LABEL: '15'
+    },
+    geometry: {
+      type: 'Polygon',
+      coordinates: [[[-100, 35], [-95, 35], [-95, 40], [-100, 40], [-100, 35]]]
+    }
+  }]
+};
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('stormview_pro_v3', JSON.stringify({
@@ -83,4 +99,144 @@ test('river gauges use the visible bbox and enforce the marker budget', async ({
 
   await toggle.evaluate(element => element.click());
   await expect(toggle).toHaveAttribute('data-feature-count', '0');
+});
+
+const delayedOverlayScenarios = [
+  {
+    layer: 'spcWatches',
+    url: 'https://api.weather.gov/alerts/active?event=Tornado%20Watch,Severe%20Thunderstorm%20Watch',
+    response: { json: overlayFeatureCollection }
+  },
+  {
+    layer: 'spcMCD',
+    url: 'https://www.spc.noaa.gov/products/spcmdrss.xml',
+    response: {
+      contentType: 'application/rss+xml',
+      body: '<?xml version="1.0"?><rss><channel><item><link>https://www.spc.noaa.gov/products/md/md1799.html</link></item></channel></rss>'
+    }
+  },
+  {
+    layer: 'spcTornado',
+    url: 'https://www.spc.noaa.gov/products/outlook/day1otlk_torn.nolyr.geojson',
+    response: { json: overlayFeatureCollection }
+  },
+  {
+    layer: 'spcWind',
+    url: 'https://www.spc.noaa.gov/products/outlook/day1otlk_wind.nolyr.geojson',
+    response: { json: overlayFeatureCollection }
+  },
+  {
+    layer: 'spcHail',
+    url: 'https://www.spc.noaa.gov/products/outlook/day1otlk_hail.nolyr.geojson',
+    response: { json: overlayFeatureCollection }
+  },
+  {
+    layer: 'sigmets',
+    url: 'https://api.weather.gov/alerts/active?event=SIGMET,Convective%20SIGMET,AIRMET',
+    response: { json: overlayFeatureCollection }
+  }
+];
+
+for (const scenario of delayedOverlayScenarios) {
+  test(`${scenario.layer} cannot resurrect after a delayed response`, async ({ page }) => {
+    let releaseResponse;
+    let markStarted;
+    const responseGate = new Promise(resolve => { releaseResponse = resolve; });
+    const requestStarted = new Promise(resolve => { markStarted = resolve; });
+    await page.route(scenario.url, async route => {
+      markStarted();
+      await responseGate;
+      try {
+        await route.fulfill(scenario.response);
+      } catch {
+        // The expected abort may finish the route before the delayed fixture is released.
+      }
+    });
+
+    await page.goto('/');
+    const control = page.locator(`.sidebar [data-layer="${scenario.layer}"]`);
+    await control.evaluate(element => element.click());
+    await requestStarted;
+    await expect(control).toHaveAttribute('data-load-state', 'loading');
+    await control.evaluate(element => element.click());
+    releaseResponse();
+    await page.waitForTimeout(100);
+
+    await expect(control).not.toHaveClass(/active/);
+    await expect(control).toHaveAttribute('data-feature-count', '0');
+    await expect(control).toHaveAttribute('data-load-state', 'disabled');
+  });
+}
+
+test('overlay diagnostics distinguish stale data and retrying requests', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('stormview_pro_v3', JSON.stringify({
+      source: 'hrrr',
+      autoRefresh: false,
+      layers: {
+        radar: true,
+        alerts: false,
+        spcOutlook: false,
+        spcWatches: true,
+        states: false,
+        counties: false,
+        labels: false
+      }
+    }));
+  });
+
+  let watchRequests = 0;
+  let releaseRetry;
+  const retryGate = new Promise(resolve => { releaseRetry = resolve; });
+  await page.route(
+    'https://api.weather.gov/alerts/active?event=Tornado%20Watch,Severe%20Thunderstorm%20Watch',
+    async route => {
+      watchRequests += 1;
+      if (watchRequests === 2) {
+        await route.fulfill({ status: 503, json: { error: 'temporary failure' } });
+        return;
+      }
+      if (watchRequests === 3) await retryGate;
+      await route.fulfill({ json: overlayFeatureCollection });
+    }
+  );
+
+  await page.goto('/');
+  const control = page.locator('.sidebar [data-layer="spcWatches"]');
+  await expect(control).toHaveAttribute('data-load-state', 'current');
+  await expect(control).toHaveAttribute('data-feature-count', '1');
+
+  await page.locator('#refreshBtn').click();
+  await expect(control).toHaveAttribute('data-load-state', 'stale');
+  await expect(control).toHaveAttribute('data-feature-count', '1');
+
+  await page.locator('#refreshBtn').click();
+  await expect(control).toHaveAttribute('data-load-state', 'retrying');
+  releaseRetry();
+  await expect(control).toHaveAttribute('data-load-state', 'current');
+
+  await page.locator('#settingsBtn').click();
+  await page.locator('.settings-tab[data-tab="diagnostics"]').click();
+  await expect(page.locator('#diagOverlays')).toContainText('SPC Watches: current');
+});
+
+test('overlay diagnostics distinguish empty and initial failure states', async ({ page }) => {
+  await page.route(
+    'https://www.spc.noaa.gov/products/outlook/day1otlk_torn.nolyr.geojson',
+    route => route.fulfill({ json: { type: 'FeatureCollection', features: [] } })
+  );
+  await page.route(
+    'https://api.weather.gov/alerts/active?event=SIGMET,Convective%20SIGMET,AIRMET',
+    route => route.fulfill({ status: 503, json: { error: 'temporary failure' } })
+  );
+
+  await page.goto('/');
+  const tornado = page.locator('.sidebar [data-layer="spcTornado"]');
+  const sigmets = page.locator('.sidebar [data-layer="sigmets"]');
+  await tornado.evaluate(element => element.click());
+  await sigmets.evaluate(element => element.click());
+  await expect(tornado).toHaveAttribute('data-load-state', 'empty');
+  await expect(sigmets).toHaveAttribute('data-load-state', 'failed');
+  await expect(tornado).toHaveAttribute('data-feature-count', '0');
+  await expect(sigmets).toHaveAttribute('data-feature-count', '0');
 });

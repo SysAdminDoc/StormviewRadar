@@ -2701,6 +2701,7 @@
                         <div class="diagnostic-row"><dt>Valid time / age</dt><dd id="diagFreshness">Loading…</dd></div>
                         <div class="diagnostic-row"><dt>Coverage</dt><dd id="diagCoverage">Loading…</dd></div>
                         <div class="diagnostic-row"><dt>Resources</dt><dd id="diagResources">Loading…</dd></div>
+                        <div class="diagnostic-row"><dt>Overlay loads</dt><dd id="diagOverlays">None</dd></div>
                         <div class="diagnostic-row"><dt>Retry / backoff</dt><dd id="diagRetry">Loading…</dd></div>
                     </dl>
                 </div>
@@ -2945,6 +2946,7 @@
         const MAX_RIVER_GAUGES = 250;
         const activeRequests = new Map();
         const layerRequests = new Map();
+        const layerRequestGenerations = new Map();
         const MAX_SETTINGS_BYTES = 32768;
         const SETTINGS_SCHEMA_VERSION = 4;
         const SETTINGS_STORAGE_KEY = 'stormview_settings';
@@ -2957,7 +2959,8 @@
         const diagnosticsState = {
             provider: { state: 'loading', message: 'Starting radar provider', updatedAt: null, retryable: false },
             requests: [],
-            layerCounts: {}
+            layerCounts: {},
+            layerStates: {}
         };
         const MESSAGE_CATALOG = {
             en: {
@@ -3376,7 +3379,11 @@
                 resources: {
                     activeRequests: activeRequests.size,
                     activeLayerRequests: layerRequests.size,
-                    featureCounts: { ...diagnosticsState.layerCounts }
+                    featureCounts: { ...diagnosticsState.layerCounts },
+                    overlayStates: Object.fromEntries(Object.entries(diagnosticsState.layerStates).map(([name, value]) => [
+                        name,
+                        { ...value }
+                    ]))
                 },
                 requests: diagnosticsState.requests.map(request => ({ ...request }))
             };
@@ -3397,6 +3404,12 @@
             const featureTotal = Object.values(report.resources.featureCounts).reduce((sum, value) => sum + value, 0);
             document.getElementById('diagResources').textContent =
                 `${report.radar.frames.loaded}/${report.radar.frames.total} frames · ${featureTotal} features · ${report.resources.activeRequests} requests`;
+            const overlayStates = Object.entries(report.resources.overlayStates)
+                .filter(([, value]) => value.state !== 'disabled')
+                .sort(([left], [right]) => left.localeCompare(right));
+            document.getElementById('diagOverlays').textContent = overlayStates.length
+                ? overlayStates.map(([name, value]) => `${getLayerName(name)}: ${value.state}`).join(' · ')
+                : 'None';
             document.getElementById('diagRetry').textContent =
                 `${report.radar.retryable ? 'Retry available' : 'No retry pending'} · ${report.radar.retryBackoffMs} ms tile backoff`;
 
@@ -3603,15 +3616,80 @@
             }).slice(0, maxItems);
         }
 
-        function beginLayerRequest(name) {
+        function setLayerRequestState(name, state, message = '', retryable = false) {
+            diagnosticsState.layerStates[name] = {
+                state,
+                message: safeText(message, 160),
+                retryable: Boolean(retryable),
+                updatedAt: new Date().toISOString()
+            };
+            document.querySelectorAll(`[data-layer="${name}"]`).forEach(element => {
+                element.dataset.loadState = state;
+                element.toggleAttribute('aria-busy', state === 'loading' || state === 'retrying');
+            });
+            renderDiagnostics();
+        }
+
+        function beginLayerRequest(name, trackState = false) {
             layerRequests.get(name)?.abort(new DOMException('Layer request superseded', 'AbortError'));
             const controller = new AbortController();
+            const generation = (layerRequestGenerations.get(name) || 0) + 1;
+            layerRequestGenerations.set(name, generation);
+            controller._stormviewGeneration = generation;
+            controller._stormviewTrackState = trackState;
             layerRequests.set(name, controller);
+            if (trackState) {
+                const priorState = diagnosticsState.layerStates[name]?.state;
+                const state = ['failed', 'stale'].includes(priorState) ? 'retrying' : 'loading';
+                setLayerRequestState(name, state, `${getLayerName(name)} request generation ${generation}`);
+            }
             return controller;
+        }
+
+        function isLayerRequestCurrent(name, controller) {
+            return layerRequests.get(name) === controller
+                && !controller.signal.aborted
+                && Boolean(settings.layers[name]);
         }
 
         function finishLayerRequest(name, controller) {
             if (layerRequests.get(name) === controller) layerRequests.delete(name);
+        }
+
+        function disposeOverlayLayer(layer) {
+            if (!layer) return;
+            if (map.hasLayer(layer)) map.removeLayer(layer);
+            layer.off?.();
+            layer.clearLayers?.();
+        }
+
+        function commitOverlayLayer(name, controller, nextLayer, featureCount, message) {
+            if (!isLayerRequestCurrent(name, controller)) {
+                disposeOverlayLayer(nextLayer);
+                return false;
+            }
+            disposeOverlayLayer(layerRefs[name]);
+            layerRefs[name] = nextLayer.addTo(map);
+            setLayerFeatureCount(name, featureCount);
+            setLayerRequestState(name, 'current', message);
+            return true;
+        }
+
+        function clearOverlayLayer(name) {
+            disposeOverlayLayer(layerRefs[name]);
+            layerRefs[name] = null;
+            setLayerFeatureCount(name, 0);
+        }
+
+        function failOverlayRequest(name, error) {
+            const stale = Boolean(layerRefs[name]);
+            if (!stale) setLayerFeatureCount(name, 0);
+            setLayerRequestState(
+                name,
+                stale ? 'stale' : 'failed',
+                `${getLayerName(name)} ${stale ? 'refresh failed; showing prior data' : 'load failed'}: ${safeText(error?.message || 'request failed', 100)}`,
+                true
+            );
         }
 
         function conusViewportBbox() {
@@ -5679,21 +5757,19 @@
         
         // ==================== ENHANCED SPC PRODUCTS ====================
         async function loadSPCWatches() {
-            if (layerRefs.spcWatches) {
-                map.removeLayer(layerRefs.spcWatches);
-            }
-            
+            const controller = beginLayerRequest('spcWatches', true);
             try {
-                const resp = await fetchWithTimeout(DATA_URLS.spcWatches);
+                const resp = await fetchWithTimeout(DATA_URLS.spcWatches, { signal: controller.signal });
                 const data = await resp.json();
                 const features = featureList(data);
-                
+                if (!isLayerRequestCurrent('spcWatches', controller)) return;
                 if (features.length === 0) {
+                    clearOverlayLayer('spcWatches');
+                    setLayerRequestState('spcWatches', 'empty', 'No active SPC watches');
                     showToast('No active watches right now', 'info', 2500);
                     return;
                 }
-                
-                layerRefs.spcWatches = L.geoJSON(features, {
+                const nextLayer = L.geoJSON(features, {
                     style: (feature) => {
                         const evt = safeText(feature.properties?.event, 120).toLowerCase();
                         const isTornado = evt.includes('tornado');
@@ -5715,16 +5791,26 @@
                         `);
                     },
                     pane: 'alertPane'
-                }).addTo(map);
-                
-                showDataStatus(`${features.length} active watch(es)`);
+                });
+                if (commitOverlayLayer(
+                    'spcWatches',
+                    controller,
+                    nextLayer,
+                    features.length,
+                    `${features.length} active watch(es)`
+                )) showDataStatus(`${features.length} active watch(es)`);
             } catch(e) {
-                console.error('SPC Watches load error:', e);
+                if (e?.name !== 'AbortError' && layerRequests.get('spcWatches') === controller) {
+                    console.error('SPC Watches load error:', e);
+                    failOverlayRequest('spcWatches', e);
+                }
+            } finally {
+                finishLayerRequest('spcWatches', controller);
             }
         }
         
         async function loadSPCMCD() {
-            const controller = beginLayerRequest('spcMCD');
+            const controller = beginLayerRequest('spcMCD', true);
             try {
                 if (!spcMcdToolsPromise) spcMcdToolsPromise = import('./src/spc-mcd.js');
                 const [tools, resp] = await Promise.all([
@@ -5737,21 +5823,18 @@
                     return tools.parseSpcMcdDetail(await detailResponse.text(), item);
                 }));
                 controller.signal.throwIfAborted();
-                if (layerRequests.get('spcMCD') !== controller || !settings.layers.spcMCD) return;
+                if (!isLayerRequestCurrent('spcMCD', controller)) return;
                 const features = results
                     .filter(result => result.status === 'fulfilled')
                     .map(result => result.value);
-                if (layerRefs.spcMCD) {
-                    map.removeLayer(layerRefs.spcMCD);
-                    layerRefs.spcMCD.clearLayers?.();
-                    layerRefs.spcMCD = null;
-                }
+                if (feedItems.length && !features.length) throw new Error('SPC MCD details could not be parsed');
                 if (features.length === 0) {
+                    clearOverlayLayer('spcMCD');
                     showDataStatus('No active MCDs');
-                    setLayerFeatureCount('spcMCD', 0);
+                    setLayerRequestState('spcMCD', 'empty', 'No active Mesoscale Discussions');
                     return;
                 }
-                layerRefs.spcMCD = L.geoJSON(features, {
+                const nextLayer = L.geoJSON(features, {
                     className: 'spc-mcd-layer',
                     renderer: L.svg({ pane: 'alertPane' }),
                     style: {
@@ -5775,12 +5858,18 @@
                         `);
                     },
                     pane: 'alertPane'
-                }).addTo(map);
-                setLayerFeatureCount('spcMCD', features.length);
-                showDataStatus(`${features.length} active MCD(s)`);
+                });
+                if (commitOverlayLayer(
+                    'spcMCD',
+                    controller,
+                    nextLayer,
+                    features.length,
+                    `${features.length} active MCD(s)`
+                )) showDataStatus(`${features.length} active MCD(s)`);
             } catch(e) {
-                if (e.name !== 'AbortError') {
+                if (e.name !== 'AbortError' && layerRequests.get('spcMCD') === controller) {
                     console.error('SPC MCD load error:', e);
+                    failOverlayRequest('spcMCD', e);
                     showDataStatus('SPC MCDs unavailable');
                 }
             } finally {
@@ -5802,13 +5891,9 @@
             };
             
             const layerKey = `spc${type.charAt(0).toUpperCase() + type.slice(1)}`;
-            
-            if (layerRefs[layerKey]) {
-                map.removeLayer(layerRefs[layerKey]);
-            }
-            
+            const controller = beginLayerRequest(layerKey, true);
             try {
-                const resp = await fetchWithTimeout(urls[type]);
+                const resp = await fetchWithTimeout(urls[type], { signal: controller.signal });
                 const data = await resp.json();
                 
                 // Filter out features with empty geometries
@@ -5817,13 +5902,14 @@
                     if (geom.type === 'GeometryCollection') return (geom.geometries || []).length > 0;
                     return geom.coordinates && geom.coordinates.length > 0;
                 });
-                
+                if (!isLayerRequestCurrent(layerKey, controller)) return;
                 if (validFeatures.length === 0) {
+                    clearOverlayLayer(layerKey);
+                    setLayerRequestState(layerKey, 'empty', `No ${type} outlook areas`);
                     showDataStatus(`No ${type} outlook areas`);
                     return;
                 }
-                
-                layerRefs[layerKey] = L.geoJSON({ type: 'FeatureCollection', features: validFeatures }, {
+                const nextLayer = L.geoJSON({ type: 'FeatureCollection', features: validFeatures }, {
                     style: (feature) => {
                         const label = feature.properties?.LABEL || '';
                         let color = colors[type][0];
@@ -5839,10 +5925,21 @@
                         };
                     },
                     pane: 'alertPane'
-                }).addTo(map);
-                
+                });
+                commitOverlayLayer(
+                    layerKey,
+                    controller,
+                    nextLayer,
+                    validFeatures.length,
+                    `${validFeatures.length} ${type} outlook area(s)`
+                );
             } catch(e) {
-                console.error(`SPC ${type} probability load error:`, e);
+                if (e?.name !== 'AbortError' && layerRequests.get(layerKey) === controller) {
+                    console.error(`SPC ${type} probability load error:`, e);
+                    failOverlayRequest(layerKey, e);
+                }
+            } finally {
+                finishLayerRequest(layerKey, controller);
             }
         }
         
@@ -5914,21 +6011,19 @@
         
         // ==================== AVIATION WEATHER ====================
         async function loadSIGMETs() {
-            if (layerRefs.sigmets) {
-                map.removeLayer(layerRefs.sigmets);
-            }
-            
+            const controller = beginLayerRequest('sigmets', true);
             try {
-                const resp = await fetchWithTimeout(DATA_URLS.sigmets);
+                const resp = await fetchWithTimeout(DATA_URLS.sigmets, { signal: controller.signal });
                 const data = await resp.json();
                 const features = featureList(data);
-                
+                if (!isLayerRequestCurrent('sigmets', controller)) return;
                 if (features.length === 0) {
+                    clearOverlayLayer('sigmets');
+                    setLayerRequestState('sigmets', 'empty', 'No active SIGMETs or AIRMETs');
                     showDataStatus('No active SIGMETs/AIRMETs');
                     return;
                 }
-                
-                layerRefs.sigmets = L.geoJSON(features, {
+                const nextLayer = L.geoJSON(features, {
                     style: (feature) => {
                         const evt = safeText(feature.properties?.event, 120).toLowerCase();
                         let color = '#ff9900';
@@ -5954,11 +6049,21 @@
                         `);
                     },
                     pane: 'alertPane'
-                }).addTo(map);
-                
-                showDataStatus(`${features.length} SIGMET/AIRMET(s)`);
+                });
+                if (commitOverlayLayer(
+                    'sigmets',
+                    controller,
+                    nextLayer,
+                    features.length,
+                    `${features.length} SIGMET/AIRMET(s)`
+                )) showDataStatus(`${features.length} SIGMET/AIRMET(s)`);
             } catch(e) {
-                console.error('SIGMETs load error:', e);
+                if (e?.name !== 'AbortError' && layerRequests.get('sigmets') === controller) {
+                    console.error('SIGMETs load error:', e);
+                    failOverlayRequest('sigmets', e);
+                }
+            } finally {
+                finishLayerRequest('sigmets', controller);
             }
         }
 
@@ -6295,6 +6400,7 @@
 
         function removeLayer(name) {
             const request = layerRequests.get(name);
+            const trackedRequestState = Boolean(request || diagnosticsState.layerStates[name]);
             if (request) {
                 request.abort(new DOMException('Layer disabled', 'AbortError'));
                 layerRequests.delete(name);
@@ -6324,6 +6430,7 @@
                 });
             }
             setLayerFeatureCount(name, 0);
+            if (trackedRequestState) setLayerRequestState(name, 'disabled', `${getLayerName(name)} disabled`);
         }
 
         function setLayerFeatureCount(name, count) {

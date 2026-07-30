@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Made SPC watch, MCD, probabilistic outlook, and SIGMET/AIRMET loads generation-safe, preserving stale overlays on refresh failure and reporting distinct lifecycle states in diagnostics.
 - Consolidated NWS CAP updates and cancellations into stable alert series, resolved zone-only alerts through a bounded NWS geometry cache, and exposed any still-unmapped alerts in an explicit list.
 - Replaced mislabeled Special Weather Statements with official SPC Mesoscale Discussion polygons and removed the duplicate false-PIREP control while retaining honest SIGMET/AIRMET coverage.
 - Made clean-checkout builds license-complete by tracking the exact Cesium license and retaining dependency notices in the deployed engine bundle.
