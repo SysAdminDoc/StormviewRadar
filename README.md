@@ -139,8 +139,8 @@ Location searches use the public [Nominatim](https://nominatim.openstreetmap.org
 - Current stable Safari on macOS and iOS
 - Current stable Chrome on Android
 
-Automated release coverage runs in current Chromium at desktop and 390px mobile
-viewports. Firefox and Safari remain supported manual-test targets.
+Automated release coverage runs the full suite in current Chromium plus a
+startup, radar, keyboard, and ARIA smoke in current Firefox and WebKit.
 
 ## Technology Stack
 
@@ -157,18 +157,19 @@ dependencies are vendored or bundled from exact npm package versions. The
 Cesium engine is tree-shaken into a lazy, CSP-safe bundle and uses its local
 Natural Earth imagery. Level II bzip decoding and polar image rendering run off
 the main thread. A Content Security Policy blocks unapproved executable, style,
-and network origins. To verify a change locally:
+and network origins. Development and release checks require Node.js 22 or newer:
 
 ```bash
 npm ci
-npx playwright install chromium
+npx playwright install chromium firefox webkit
 npm run release:check
 ```
 
 The static checks compare vendored files with the lockfile-installed packages.
 Dependabot checks npm dependencies weekly. GitHub Pages deployment runs only
 after the complete browser suite and advisory check pass for `main`; the deploy
-then verifies the hosted commit, version, social image, and runtime asset types.
+then verifies the hosted commit, version, social image, lazy modules, worker
+scripts, and representative Cesium runtime asset types.
 
 ## Performance Optimizations
 

@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build:cesium": "node scripts/build-cesium-engine.mjs",
     "build:level2": "node scripts/build-level2-worker.mjs",
