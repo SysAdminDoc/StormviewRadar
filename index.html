@@ -2896,6 +2896,9 @@
         let lastRefreshTime = null;
         let radarLoadGeneration = 0;
         let radarAbortController = null;
+        let activeRadarSource = null;
+        let activeRadarProduct = null;
+        let retainedRadarState = null;
         let level2Worker = null;
         let level2WorkerSequence = 0;
         let level2LoadedKey = null;
@@ -4815,17 +4818,28 @@
         }
 
         // ==================== RADAR ====================
+        function rejectWorkerRequests(requests, reason) {
+            requests.forEach(request => {
+                clearTimeout(request.timeoutId);
+                request.signal?.removeEventListener('abort', request.abort);
+                request.reject(reason);
+            });
+            requests.clear();
+        }
+
         function disposeMeshWorker(reason = new DOMException('MESH worker stopped', 'AbortError')) {
-            meshWorker?.terminate();
+            const worker = meshWorker;
             meshWorker = null;
-            meshWorkerRequests.forEach(request => request.reject(reason));
-            meshWorkerRequests.clear();
+            worker?.terminate();
+            rejectWorkerRequests(meshWorkerRequests, reason);
         }
 
         function getMeshWorker() {
             if (meshWorker) return meshWorker;
-            meshWorker = new Worker('src/mesh-worker.js', { type: 'module' });
-            meshWorker.addEventListener('message', event => {
+            const worker = new Worker('src/mesh-worker.js', { type: 'module' });
+            meshWorker = worker;
+            worker.addEventListener('message', event => {
+                if (meshWorker !== worker) return;
                 const request = meshWorkerRequests.get(event.data?.id);
                 if (!request) return;
                 clearTimeout(request.timeoutId);
@@ -4834,10 +4848,11 @@
                 if (event.data.type === 'error') request.reject(new Error(event.data.message));
                 else request.resolve(event.data);
             });
-            meshWorker.addEventListener('error', event => {
+            worker.addEventListener('error', event => {
+                if (meshWorker !== worker) return;
                 disposeMeshWorker(new Error(event.message || 'MESH worker failed'));
             });
-            return meshWorker;
+            return worker;
         }
 
         function requestMeshRender(buffer, signal) {
@@ -4847,15 +4862,10 @@
                 const abort = () => {
                     const request = meshWorkerRequests.get(id);
                     if (!request) return;
-                    clearTimeout(request.timeoutId);
-                    meshWorkerRequests.delete(id);
-                    reject(signal.reason || new DOMException('MESH request cancelled', 'AbortError'));
-                    disposeMeshWorker();
+                    disposeMeshWorker(signal.reason || new DOMException('MESH request cancelled', 'AbortError'));
                 };
                 const timeoutId = setTimeout(() => {
-                    meshWorkerRequests.delete(id);
-                    reject(new DOMException('MESH processing timed out after 45 seconds', 'TimeoutError'));
-                    disposeMeshWorker();
+                    disposeMeshWorker(new DOMException('MESH processing timed out after 45 seconds', 'TimeoutError'));
                 }, 45000);
                 meshWorkerRequests.set(id, { resolve, reject, timeoutId, signal, abort });
                 signal?.addEventListener('abort', abort, { once: true });
@@ -4988,17 +4998,19 @@
         ]);
 
         function disposeLevel2Worker(reason = new DOMException('Level II worker stopped', 'AbortError')) {
-            level2Worker?.terminate();
+            const worker = level2Worker;
             level2Worker = null;
             level2LoadedKey = null;
-            level2WorkerRequests.forEach(request => request.reject(reason));
-            level2WorkerRequests.clear();
+            worker?.terminate();
+            rejectWorkerRequests(level2WorkerRequests, reason);
         }
 
         function getLevel2Worker() {
             if (level2Worker) return level2Worker;
-            level2Worker = new Worker('vendor/nexrad/level2-worker.js');
-            level2Worker.addEventListener('message', event => {
+            const worker = new Worker('vendor/nexrad/level2-worker.js');
+            level2Worker = worker;
+            worker.addEventListener('message', event => {
+                if (level2Worker !== worker) return;
                 const request = level2WorkerRequests.get(event.data?.id);
                 if (!request) return;
                 clearTimeout(request.timeoutId);
@@ -5007,11 +5019,12 @@
                 if (event.data.type === 'error') request.reject(new Error(event.data.message));
                 else request.resolve(event.data);
             });
-            level2Worker.addEventListener('error', event => {
+            worker.addEventListener('error', event => {
+                if (level2Worker !== worker) return;
                 const error = new Error(event.message || 'Level II worker failed');
                 disposeLevel2Worker(error);
             });
-            return level2Worker;
+            return worker;
         }
 
         function requestLevel2Worker(type, payload, transfer, signal) {
@@ -5021,14 +5034,10 @@
                 const abort = () => {
                     const request = level2WorkerRequests.get(id);
                     if (!request) return;
-                    clearTimeout(request.timeoutId);
-                    level2WorkerRequests.delete(id);
-                    reject(signal.reason || new DOMException('Level II request cancelled', 'AbortError'));
+                    disposeLevel2Worker(signal.reason || new DOMException('Level II request cancelled', 'AbortError'));
                 };
                 const timeoutId = setTimeout(() => {
-                    level2WorkerRequests.delete(id);
-                    reject(new DOMException('Level II processing timed out after 45 seconds', 'TimeoutError'));
-                    disposeLevel2Worker();
+                    disposeLevel2Worker(new DOMException('Level II processing timed out after 45 seconds', 'TimeoutError'));
                 }, 45000);
                 level2WorkerRequests.set(id, { resolve, reject, timeoutId, signal, abort });
                 signal?.addEventListener('abort', abort, { once: true });
@@ -5267,24 +5276,36 @@
             const rendered = await requestLevel2Worker('render', { product: settings.radarProduct }, [], signal);
             ensureCurrentRadarLoad(generation, signal);
             const imageUrl = await imageBitmapToUrl(rendered.bitmap);
-            ensureCurrentRadarLoad(generation, signal);
+            let layer;
+            let bounds;
+            try {
+                ensureCurrentRadarLoad(generation, signal);
 
-            const latitudeDelta = rendered.maxRangeKm / 110.574;
-            const longitudeDelta = rendered.maxRangeKm / (111.320 * Math.cos(rendered.latitude * Math.PI / 180));
-            const bounds = L.latLngBounds(
-                [rendered.latitude - latitudeDelta, rendered.longitude - longitudeDelta],
-                [rendered.latitude + latitudeDelta, rendered.longitude + longitudeDelta]
-            );
-            const layer = L.imageOverlay(imageUrl, bounds, {
-                opacity: settings.opacity,
-                pane: 'radarPane',
-                className: 'radar-layer level2-radar',
-                alt: `${rendered.site} ${settings.radarProduct} Level II radar`
-            });
-            layer.getAttribution = () => 'NEXRAD Level II: NOAA / NSF Unidata';
-            layer._stormviewObjectUrl = imageUrl;
-            layer.addTo(map);
-            frameLayers = [layer];
+                const latitudeDelta = rendered.maxRangeKm / 110.574;
+                const longitudeDelta = rendered.maxRangeKm / (111.320 * Math.cos(rendered.latitude * Math.PI / 180));
+                bounds = L.latLngBounds(
+                    [rendered.latitude - latitudeDelta, rendered.longitude - longitudeDelta],
+                    [rendered.latitude + latitudeDelta, rendered.longitude + longitudeDelta]
+                );
+                layer = L.imageOverlay(imageUrl, bounds, {
+                    opacity: settings.opacity,
+                    pane: 'radarPane',
+                    className: 'radar-layer level2-radar',
+                    alt: `${rendered.site} ${settings.radarProduct} Level II radar`
+                });
+                layer.getAttribution = () => 'NEXRAD Level II: NOAA / NSF Unidata';
+                layer._stormviewObjectUrl = imageUrl;
+                layer.addTo(map);
+                frameLayers = [layer];
+            } catch (error) {
+                if (layer) {
+                    if (map.hasLayer(layer)) map.removeLayer(layer);
+                    revokeLayerObjectUrl(layer);
+                } else {
+                    URL.revokeObjectURL(imageUrl);
+                }
+                throw error;
+            }
             level2Couplets = Array.isArray(rendered.couplets) ? rendered.couplets : [];
             renderLevel2Couplets();
             frames = [{
@@ -5319,7 +5340,8 @@
         function captureRadarState() {
             if (!frameLayers.length || !frames.length) return null;
             return {
-                source: settings.source,
+                source: activeRadarSource || settings.source,
+                radarProduct: activeRadarProduct || settings.radarProduct,
                 frameLayers: [...frameLayers],
                 frames: frames.map(frame => ({ ...frame })),
                 currentFrame,
@@ -5334,10 +5356,25 @@
             };
         }
 
+        function revokeLayerObjectUrl(layer) {
+            const objectUrl = layer?._stormviewObjectUrl;
+            if (!objectUrl) return;
+            URL.revokeObjectURL(objectUrl);
+            layer._stormviewObjectUrl = null;
+        }
+
+        function disposeRadarState(snapshot) {
+            snapshot?.frameLayers?.forEach(layer => {
+                if (map.hasLayer(layer)) map.removeLayer(layer);
+                revokeLayerObjectUrl(layer);
+            });
+        }
+
         function restoreRadarState(snapshot) {
             if (!snapshot) return false;
             clearAllFrameLayers();
             settings.source = snapshot.source;
+            settings.radarProduct = snapshot.radarProduct;
             frameLayers = snapshot.frameLayers;
             frames = snapshot.frames;
             currentFrame = Math.min(snapshot.currentFrame, frameLayers.length - 1);
@@ -5349,6 +5386,8 @@
             rainviewerData = snapshot.rainviewerData;
             hrrrInitTime = snapshot.hrrrInitTime;
             hrrrFrames = snapshot.hrrrFrames;
+            activeRadarSource = snapshot.source;
+            saveSettings();
 
             const layer = frameLayers[currentFrame];
             if (layer && !map.hasLayer(layer)) layer.addTo(map);
@@ -5376,12 +5415,13 @@
             const { signal } = radarAbortController;
             const requestedSource = settings.source;
             if (requestedSource !== 'level2') disposeLevel2Worker();
-            const previousState = captureRadarState();
+            const previousState = retainedRadarState || captureRadarState();
             const capability = RADAR_CAPABILITIES[requestedSource] || RADAR_CAPABILITIES.mrms;
 
             try {
                 pause();
-                clearAllFrameLayers();
+                clearAllFrameLayers({ dispose: Boolean(retainedRadarState) });
+                retainedRadarState = previousState;
                 framesReady = false;
                 setProviderStatus('loading', t('providerLoading', { provider: capability.label }));
                 
@@ -5398,6 +5438,12 @@
                 }
                 ensureCurrentRadarLoad(generation, signal);
                 lastRefreshTime = Date.now();
+                activeRadarSource = requestedSource;
+                activeRadarProduct = settings.radarProduct;
+                if (retainedRadarState === previousState) {
+                    disposeRadarState(previousState);
+                    retainedRadarState = null;
+                }
                 setProviderStatus('current', t('providerCurrent', { provider: capability.label }));
             } catch(e) {
                 if (signal.aborted || generation !== radarLoadGeneration || e?.name === 'AbortError') return;
@@ -5405,6 +5451,9 @@
 
                 if (requestedSource !== 'mrms') {
                     showToast(`${capability.label} unavailable; using MRMS fallback`, 'warn');
+                    if (requestedSource === 'level2') {
+                        disposeLevel2Worker(new DOMException('Level II fallback started', 'AbortError'));
+                    }
                     settings.source = 'mrms';
                     syncRadarCapabilities();
                     saveSettings();
@@ -5413,6 +5462,12 @@
                         await loadMRMS(signal, generation);
                         ensureCurrentRadarLoad(generation, signal);
                         lastRefreshTime = Date.now();
+                        activeRadarSource = 'mrms';
+                        activeRadarProduct = settings.radarProduct;
+                        if (retainedRadarState === previousState) {
+                            disposeRadarState(previousState);
+                            retainedRadarState = null;
+                        }
                         setProviderStatus(
                             'fallback',
                             t('providerFallback', { provider: capability.label }),
@@ -5427,6 +5482,7 @@
                         if (signal.aborted || generation !== radarLoadGeneration || e2?.name === 'AbortError') return;
                         console.error('MRMS fallback error:', e2);
                         const restored = restoreRadarState(previousState);
+                        if (restored && retainedRadarState === previousState) retainedRadarState = null;
                         setProviderStatus(
                             restored ? 'stale' : 'error',
                             restored
@@ -5437,6 +5493,7 @@
                     }
                 } else {
                     const restored = restoreRadarState(previousState);
+                    if (restored && retainedRadarState === previousState) retainedRadarState = null;
                     setProviderStatus(
                         restored ? 'stale' : 'error',
                         restored
@@ -6247,11 +6304,11 @@
             if (replayMode) renderReplayAlerts(frames[idx].time * 1000);
         }
 
-        function clearAllFrameLayers() {
+        function clearAllFrameLayers({ dispose = true } = {}) {
             loadAborted = true;
             frameLayers.forEach(layer => {
                 if (map.hasLayer(layer)) map.removeLayer(layer);
-                if (layer._stormviewObjectUrl) URL.revokeObjectURL(layer._stormviewObjectUrl);
+                if (dispose) revokeLayerObjectUrl(layer);
             });
             frameLayers = [];
             framesLoaded = 0;
@@ -6357,7 +6414,13 @@
             switch(name) {
                 case 'radar':
                     if (on) loadRadarData();
-                    else clearAllFrameLayers();
+                    else {
+                        radarAbortController?.abort(new DOMException('Radar layer disabled', 'AbortError'));
+                        radarLoadGeneration += 1;
+                        clearAllFrameLayers();
+                        disposeRadarState(retainedRadarState);
+                        retainedRadarState = null;
+                    }
                     break;
                 case 'couplets':
                     on ? renderLevel2Couplets() : removeLayer('couplets');
@@ -6490,7 +6553,7 @@
                 layerRequests.delete(name);
             }
             if (layerRefs[name]) {
-                if (layerRefs[name]._stormviewObjectUrl) URL.revokeObjectURL(layerRefs[name]._stormviewObjectUrl);
+                revokeLayerObjectUrl(layerRefs[name]);
                 map.removeLayer(layerRefs[name]);
                 layerRefs[name].off?.();
                 layerRefs[name].clearLayers?.();
@@ -6740,6 +6803,8 @@
                 radarAbortController?.abort(new DOMException('Historical replay started', 'AbortError'));
                 radarLoadGeneration += 1;
                 clearAllFrameLayers();
+                disposeRadarState(retainedRadarState);
+                retainedRadarState = null;
                 removeLayer('alerts');
                 replayMode = true;
                 replayWarnings = warnings;

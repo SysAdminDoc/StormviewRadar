@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Made Level II and MESH cancellation terminate active worker computation, reject all pending work cleanly, ignore stale worker events, and recreate worker state on retry; radar refreshes now retain rollback layers until restore or one-time permanent disposal.
 - Isolated tile failure windows and retry backoff by provider origin so one failing service cannot pause healthy radar or basemap tiles, with paused-provider diagnostics and retry times.
 - Made SPC watch, MCD, probabilistic outlook, and SIGMET/AIRMET loads generation-safe, preserving stale overlays on refresh failure and reporting distinct lifecycle states in diagnostics.
 - Consolidated NWS CAP updates and cancellations into stable alert series, resolved zone-only alerts through a bounded NWS geometry cache, and exposed any still-unmapped alerts in an explicit list.
