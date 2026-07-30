@@ -85,5 +85,8 @@ if (/<(?:script|link)[^>]+(?:src|href)="https:\/\//i.test(html)) {
 if (/\beval\s*\(|\bnew\s+Function\s*\(/.test(cesiumEngine)) {
   throw new Error('The Cesium engine bundle contains dynamic code evaluation forbidden by the CSP');
 }
+if (!/@(?:license|preserve)\b/i.test(cesiumEngine)) {
+  throw new Error('The Cesium engine bundle is missing retained dependency license notices');
+}
 
 console.log(`Vendor checks passed (${pairs.length + directoryAssetCount} locked assets plus the local Cesium engine bundle).`);

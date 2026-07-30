@@ -46,7 +46,9 @@ await build({
   outfile: 'vendor/cesium/engine.js',
   platform: 'browser',
   target: ['es2022'],
-  legalComments: 'none',
+  // Keep dependency license notices in the deployed bundle in addition to the
+  // exact package license copied into vendor/cesium/LICENSE.md.
+  legalComments: 'eof',
   plugins: [stormViewCesiumPlugin],
   logLevel: 'info'
 });

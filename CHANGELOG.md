@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Made clean-checkout builds license-complete by tracking the exact Cesium license and retaining dependency notices in the deployed engine bundle.
 - Fixed RainViewer integration to use its supported past-radar frames, Universal Blue palette, and native zoom limit.
 - Added source capability guidance and disabled unsupported radar products.
 - Clarified analysis, forecast, past, and latest timestamps.
