@@ -332,9 +332,11 @@
         /* ==================== SAVED LOCATIONS ==================== */
         .bookmarks-wrap { position: relative; }
         .bookmarks-panel {
-            position: absolute;
-            top: calc(100% + 8px); right: 0;
+            position: fixed;
+            top: 76px; right: 12px;
             width: 300px;
+            max-width: calc(100vw - 24px);
+            max-height: calc(100dvh - 88px);
             background: var(--panel-bg);
             border: 1px solid var(--glass-border);
             border-radius: var(--radius);
@@ -356,7 +358,7 @@
         .bm-header-count { font-size: 11px; color: var(--text-muted); }
 
         .bm-list {
-            max-height: 320px; overflow-y: auto;
+            max-height: min(320px, calc(100dvh - 132px)); overflow-y: auto;
         }
         .bm-list::-webkit-scrollbar { width: 5px; }
         .bm-list::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 3px; }
@@ -382,7 +384,8 @@
         .bm-item-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .bm-item-coords { font-size: 10px; color: var(--text-muted); }
         .bm-item-actions { display: flex; gap: 4px; flex-shrink: 0; opacity: 0; transition: opacity 0.15s; }
-        .bm-item:hover .bm-item-actions { opacity: 1; }
+        .bm-item:hover .bm-item-actions,
+        .bm-item:focus-within .bm-item-actions { opacity: 1; }
         .bm-action {
             width: 28px; height: 28px;
             background: var(--glass-hover);
@@ -412,7 +415,11 @@
         .fc-save svg { width: 18px; height: 18px; }
 
         @media (max-width: 768px) {
-            .bookmarks-panel { width: calc(100vw - 24px); right: -40px; }
+            .bookmarks-panel { right: 12px; width: min(300px, calc(100vw - 24px)); }
+        }
+
+        @media (hover: none) {
+            .bm-item-actions { opacity: 1; }
         }
 
         /* Sidebar - Collapsible Drawer */
@@ -1665,8 +1672,15 @@
         }
 
         @media (max-width: 480px) {
-            .logo span { display: none; }
-            .search-box { max-width: 140px; }
+            .header {
+                gap: 8px;
+                padding-right: 8px;
+                padding-left: 8px;
+            }
+            .logo { display: none; }
+            .search-box { min-width: 0; max-width: none; }
+            .header-btns { flex-shrink: 0; gap: 4px; }
+            #refreshBtn { display: none; }
         }
 
         /* Frame indicator below timeline */
@@ -1942,13 +1956,6 @@
                         <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>
                     </svg>
                 </button>
-                <div class="bookmarks-panel" id="bookmarksPanel" role="region" aria-label="Saved locations">
-                    <div class="bm-header">
-                        <span class="bm-header-title">Saved Locations</span>
-                        <span class="bm-header-count" id="bmCount"></span>
-                    </div>
-                    <div class="bm-list" id="bmList"></div>
-                </div>
             </div>
             <button class="icon-btn" id="themeBtn" title="Toggle Theme">
                 <svg viewBox="0 0 24 24" stroke-width="2">
@@ -1970,6 +1977,14 @@
             </button>
         </div>
     </header>
+
+    <div class="bookmarks-panel" id="bookmarksPanel" role="region" aria-label="Saved locations">
+        <div class="bm-header">
+            <span class="bm-header-title">Saved Locations</span>
+            <span class="bm-header-count" id="bmCount"></span>
+        </div>
+        <div class="bm-list" id="bmList"></div>
+    </div>
 
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <aside class="sidebar" id="sidebar">
@@ -3478,13 +3493,28 @@
 
         function syncAccessibleControlStates(root = document) {
             root.querySelectorAll('[data-layer], [data-qt]').forEach(element => {
-                element.setAttribute('aria-checked', String(element.classList.contains('active')));
+                const layer = element.dataset.layer || element.dataset.qt;
+                const active = Boolean(settings.layers?.[layer]);
+                element.classList.toggle('active', active);
+                element.setAttribute('aria-checked', String(active));
             });
             root.querySelectorAll('.toggle').forEach(element => {
                 element.setAttribute('aria-checked', String(element.classList.contains('on')));
             });
-            root.querySelectorAll('.source-tab[data-source], .layer-chip[data-product], .basemap-btn[data-basemap]').forEach(element => {
-                element.setAttribute('aria-checked', String(element.classList.contains('active')));
+            root.querySelectorAll('.source-tab[data-source]').forEach(element => {
+                const active = element.dataset.source === settings.source;
+                element.classList.toggle('active', active);
+                element.setAttribute('aria-checked', String(active));
+            });
+            root.querySelectorAll('.layer-chip[data-product]').forEach(element => {
+                const active = element.dataset.product === settings.radarProduct;
+                element.classList.toggle('active', active);
+                element.setAttribute('aria-checked', String(active));
+            });
+            root.querySelectorAll('.basemap-btn[data-basemap]').forEach(element => {
+                const active = element.dataset.basemap === settings.basemap;
+                element.classList.toggle('active', active);
+                element.setAttribute('aria-checked', String(active));
             });
             root.querySelectorAll('.panel-header').forEach(element => {
                 element.setAttribute('aria-expanded', String(!element.closest('.panel-section')?.classList.contains('collapsed')));
@@ -4309,6 +4339,7 @@
                 el.classList.toggle('active', el.dataset.basemap === selectedId);
             });
             saveSettings();
+            syncAccessibleControlStates();
         }
 
         // ==================== RATE LIMIT HANDLING ====================
@@ -6410,6 +6441,7 @@
         function handleLayerToggle(name, on, silent = false) {
             settings.layers[name] = on;
             saveSettings();
+            syncAccessibleControlStates();
 
             switch(name) {
                 case 'radar':
@@ -8678,7 +8710,7 @@
 
             // Close on outside click
             document.addEventListener('click', (e) => {
-                if (!e.target.closest('.bookmarks-wrap')) {
+                if (!e.target.closest('.bookmarks-wrap, #bookmarksPanel')) {
                     closeBookmarksPanel();
                 }
             });
@@ -8738,15 +8770,7 @@
                 btn.classList.toggle('active', settings.layers[layer]);
                 
                 btn.addEventListener('click', () => {
-                    const on = btn.classList.toggle('active');
-                    settings.layers[layer] = on;
-                    saveSettings();
-                    handleLayerToggle(layer, on);
-                    
-                    // Sync sidebar and mobile sheet chips
-                    document.querySelectorAll(`[data-layer="${layer}"]`).forEach(el => {
-                        el.classList.toggle('active', on);
-                    });
+                    handleLayerToggle(layer, !settings.layers[layer]);
                 });
             });
         }
@@ -8789,6 +8813,32 @@
             });
             syncLevel2SiteControls();
             updateCoverageStatus();
+            syncAccessibleControlStates();
+        }
+
+        function selectRadarSource(source) {
+            if (!RADAR_CAPABILITIES[source]) return;
+            settings.source = source;
+            syncRadarCapabilities();
+            saveSettings();
+            pause();
+            updatePlaybackVisibility();
+            updateLegend();
+            loadRadarData();
+        }
+
+        function selectRadarProduct(product) {
+            const capability = RADAR_CAPABILITIES[settings.source] || RADAR_CAPABILITIES.mrms;
+            if (!capability.products.includes(product)) {
+                showToast(`${capability.label} does not provide that product`, 'warn');
+                return;
+            }
+            settings.radarProduct = product;
+            saveSettings();
+            syncRadarCapabilities();
+            pause();
+            updateLegend();
+            loadRadarData();
         }
 
         function initUI() {
@@ -8806,43 +8856,20 @@
                         showToast('Rotation candidates require NEXRAD Level II', 'warn');
                         return;
                     }
-                    const on = el.classList.toggle('active');
-                    handleLayerToggle(layer, on);
-                    // Sync quick toolbar
-                    document.querySelector(`.qt-btn[data-qt="${layer}"]`)?.classList.toggle('active', on);
+                    handleLayerToggle(layer, !settings.layers[layer]);
                 });
             });
 
             // Source tabs (sidebar only)
             document.querySelectorAll('.sidebar [data-source]').forEach(el => {
                 el.classList.toggle('active', el.dataset.source === settings.source);
-                el.addEventListener('click', () => {
-                    settings.source = el.dataset.source;
-                    syncRadarCapabilities();
-                    saveSettings();
-                    pause();
-                    updatePlaybackVisibility();
-                    updateLegend();
-                    loadRadarData();
-                });
+                el.addEventListener('click', () => selectRadarSource(el.dataset.source));
             });
             
             // Radar product tabs (sidebar only)
             document.querySelectorAll('.sidebar [data-product]').forEach(el => {
                 el.classList.toggle('active', el.dataset.product === settings.radarProduct);
-                el.addEventListener('click', () => {
-                    if (el.getAttribute('aria-disabled') === 'true') {
-                        showToast(`${RADAR_CAPABILITIES[settings.source].label} does not provide that product`, 'warn');
-                        return;
-                    }
-                    document.querySelectorAll('[data-product]').forEach(e => e.classList.remove('active'));
-                    el.classList.add('active');
-                    settings.radarProduct = el.dataset.product;
-                    saveSettings();
-                    pause();
-                    updateLegend();
-                    loadRadarData();
-                });
+                el.addEventListener('click', () => selectRadarProduct(el.dataset.product));
             });
             syncRadarCapabilities();
 
@@ -9470,25 +9497,13 @@
                         showToast('Rotation candidates require NEXRAD Level II', 'warn');
                         return;
                     }
-                    const on = el.classList.toggle('active');
-                    // Sync sidebar + quick toolbar
-                    document.querySelector(`.sidebar [data-layer="${layer}"]`)?.classList.toggle('active', on);
-                    document.querySelector(`.qt-btn[data-qt="${layer}"]`)?.classList.toggle('active', on);
-                    handleLayerToggle(layer, on);
+                    handleLayerToggle(layer, !settings.layers[layer]);
                 });
             });
 
             content.querySelectorAll('[data-source]').forEach(el => {
                 el.classList.toggle('active', el.dataset.source === settings.source);
-                el.addEventListener('click', () => {
-                    settings.source = el.dataset.source;
-                    syncRadarCapabilities();
-                    saveSettings();
-                    pause();
-                    updatePlaybackVisibility();
-                    updateLegend();
-                    loadRadarData();
-                });
+                el.addEventListener('click', () => selectRadarSource(el.dataset.source));
             });
 
             content.querySelectorAll('[data-basemap]').forEach(el => {
@@ -9498,21 +9513,7 @@
             
             content.querySelectorAll('[data-product]').forEach(el => {
                 el.classList.toggle('active', el.dataset.product === settings.radarProduct);
-                el.addEventListener('click', () => {
-                    if (el.getAttribute('aria-disabled') === 'true') {
-                        showToast(`${RADAR_CAPABILITIES[settings.source].label} does not provide that product`, 'warn');
-                        return;
-                    }
-                    content.querySelectorAll('[data-product]').forEach(e => e.classList.remove('active'));
-                    document.querySelectorAll('.sidebar [data-product]').forEach(e => e.classList.remove('active'));
-                    el.classList.add('active');
-                    document.querySelector(`.sidebar [data-product="${el.dataset.product}"]`)?.classList.add('active');
-                    settings.radarProduct = el.dataset.product;
-                    saveSettings();
-                    pause();
-                    updateLegend();
-                    loadRadarData();
-                });
+                el.addEventListener('click', () => selectRadarProduct(el.dataset.product));
             });
             
             // Panel collapsing in mobile

@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Kept saved locations and header controls within 320px/390px viewports, exposed bookmark actions on touch and keyboard focus, and centralized duplicate layer, source, product, basemap, and ARIA state across desktop, quick, and mobile controls.
 - Added full Chromium plus Firefox/WebKit startup, radar, keyboard, and ARIA release coverage; both production radar workers now decode deterministic binary fixtures, hosted checks cover lazy modules and Cesium assets, and local HTTP assets remain usable in WebKit without weakening hosted HTTPS.
 - Made Level II and MESH cancellation terminate active worker computation, reject all pending work cleanly, ignore stale worker events, and recreate worker state on retry; radar refreshes now retain rollback layers until restore or one-time permanent disposal.
 - Isolated tile failure windows and retry backoff by provider origin so one failing service cannot pause healthy radar or basemap tiles, with paused-provider diagnostics and retry times.

@@ -112,3 +112,82 @@ test('mobile sheet traps focus, closes with Escape, and honors contrast preferen
   await expect(sheet).toHaveAttribute('aria-hidden', 'true');
   await expect(opener).toBeFocused();
 });
+
+test('narrow layouts keep saved locations onscreen and synchronize duplicate controls', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('stormview_bookmarks', JSON.stringify([
+      { id: 1, name: 'Wichita, Kansas', lat: 37.6872, lng: -97.3301 }
+    ]));
+  });
+  await page.route('https://mesonet.agron.iastate.edu/data/gis/images/4326/USCOMP/n0q_0.json', route => route.fulfill({
+    json: { meta: { valid: '2026-07-25T20:55:00Z', product: 'N0Q' } }
+  }));
+
+  const assertNoHorizontalOverflow = async width => {
+    expect(await page.evaluate(() => ({
+      documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      bodyOverflow: document.body.scrollWidth - document.body.clientWidth
+    }))).toEqual({ documentOverflow: 0, bodyOverflow: 0 });
+    const panelBounds = await page.locator('#bookmarksPanel').boundingBox();
+    expect(panelBounds).not.toBeNull();
+    expect(panelBounds.x).toBeGreaterThanOrEqual(0);
+    expect(panelBounds.x + panelBounds.width).toBeLessThanOrEqual(width);
+  };
+  const assertRadioGroupState = async (selector, selectedValue, dataName) => {
+    const states = await page.locator(selector).evaluateAll((elements, { selectedValue: value, dataName: name }) =>
+      elements.map(element => ({
+        value: element.dataset[name],
+        active: element.classList.contains('active'),
+        checked: element.getAttribute('aria-checked')
+      })), { selectedValue, dataName });
+    expect(states.length).toBeGreaterThan(1);
+    expect(states.every(state =>
+      state.active === (state.value === selectedValue)
+      && state.checked === String(state.value === selectedValue)
+    )).toBe(true);
+  };
+  const assertLayerState = async (layer, active) => {
+    const states = await page.locator(`[data-layer="${layer}"], [data-qt="${layer}"]`).evaluateAll(elements =>
+      elements.map(element => ({
+        active: element.classList.contains('active'),
+        checked: element.getAttribute('aria-checked')
+      })));
+    expect(states.length).toBeGreaterThan(1);
+    expect(states.every(state => state.active === active && state.checked === String(active))).toBe(true);
+  };
+
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto('/');
+  await expect(page.locator('#dataStatusText')).toHaveText('HRRR: current');
+  await page.locator('#bookmarksBtn').click();
+  await expect(page.locator('#bookmarksPanel')).toHaveClass(/open/);
+  await assertNoHorizontalOverflow(320);
+  await expect(page.locator('.bm-item-name')).toHaveText('Wichita, Kansas');
+  await page.locator('#bookmarksBtn').click();
+
+  await page.locator('#quickToolbar [data-qt="radar"]').evaluate(element => element.click());
+  await assertLayerState('radar', false);
+  await page.locator('#mobileFab').click();
+  await page.locator('#mobileContent [data-layer="radar"]').click();
+  await assertLayerState('radar', true);
+
+  await page.locator('[data-sheet-tab="sources"]').click();
+  await page.locator('#mobileContent [data-source="mrms"]').click();
+  await expect(page.locator('#dataStatusText')).toHaveText('MRMS: current');
+  await assertRadioGroupState('.source-tab[data-source]', 'mrms', 'source');
+  await page.locator('#mobileContent [data-product="velocity"]').click();
+  await expect(page.locator('#dataStatusText')).toHaveText('MRMS: current');
+  await assertRadioGroupState('.layer-chip[data-product]', 'velocity', 'product');
+
+  await page.locator('[data-sheet-tab="map"]').click();
+  await page.locator('#mobileContent [data-basemap="light"]').click();
+  await assertRadioGroupState('.basemap-btn[data-basemap]', 'light', 'basemap');
+
+  await page.locator('.sidebar [data-layer="radar"]').evaluate(element => element.click());
+  await assertLayerState('radar', false);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#sheetOverlay').click();
+  await page.locator('#bookmarksBtn').click();
+  await assertNoHorizontalOverflow(390);
+});
