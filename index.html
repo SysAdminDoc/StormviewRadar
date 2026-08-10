@@ -2673,6 +2673,17 @@
                     </div>
                     <input type="file" id="importFile" accept=".json" style="display:none;">
                 </div>
+                <div class="settings-section">
+                    <div class="settings-section-title">Local Map Overlay</div>
+                    <p class="setting-hint" role="note">Load a session-only GeoJSON or KML file (maximum 2 MB, 500 features, and 50,000 coordinate pairs). Local overlays are never saved or sent over the network.</p>
+                    <div class="btn-row" style="margin-top:10px;">
+                        <button class="btn" id="localOverlayImportBtn" type="button">Load GeoJSON / KML</button>
+                        <button class="btn" id="localOverlayToggleBtn" type="button" disabled>Hide overlay</button>
+                        <button class="btn" id="localOverlayRemoveBtn" type="button" disabled>Remove overlay</button>
+                    </div>
+                    <div class="setting-hint" id="localOverlayStatus" role="status" aria-live="polite">No local overlay loaded</div>
+                    <input type="file" id="localOverlayFile" accept=".geojson,.json,.kml,application/geo+json,application/vnd.google-earth.kml+xml" style="display:none;">
+                </div>
             </div>
             <!-- Radar Tab -->
             <div class="settings-tab-content" id="settingsPanelRadar" data-tab-content="radar" role="tabpanel" aria-labelledby="settingsTabRadar" hidden>
@@ -2894,6 +2905,7 @@
     <script type="module">
     import { createProviderRegistry, RADAR_CAPABILITIES } from './src/providers/registry.js';
     import { createMessageFormatter } from './src/i18n.js';
+    import { LOCAL_OVERLAY_LIMITS, parseLocalOverlay } from './src/local-overlay.js';
 
     (function() {
         'use strict';
@@ -3232,7 +3244,16 @@
                 diagnosticNone: 'None',
                 diagnosticRetryAvailable: 'Retry available',
                 diagnosticNoRetry: 'No retry pending',
-                diagnosticNoTilePause: 'No tile providers paused'
+                diagnosticNoTilePause: 'No tile providers paused',
+                localOverlayLoaded_one: '{count} feature loaded from {name}',
+                localOverlayLoaded_other: '{count} features loaded from {name}',
+                localOverlayShown: 'Local overlay shown',
+                localOverlayHidden: 'Local overlay hidden',
+                localOverlayRemoved: 'Local overlay removed',
+                localOverlayImportFailed: 'Overlay import failed: {message}',
+                localOverlayHide: 'Hide overlay',
+                localOverlayShow: 'Show overlay',
+                localOverlayNone: 'No local overlay loaded'
             },
             es: {
                 loading: 'Cargando...',
@@ -3342,7 +3363,16 @@
                 diagnosticNone: 'Ninguno',
                 diagnosticRetryAvailable: 'Reintento disponible',
                 diagnosticNoRetry: 'Sin reintento pendiente',
-                diagnosticNoTilePause: 'Ningún proveedor de teselas está pausado'
+                diagnosticNoTilePause: 'Ningún proveedor de teselas está pausado',
+                localOverlayLoaded_one: '{count} elemento cargado desde {name}',
+                localOverlayLoaded_other: '{count} elementos cargados desde {name}',
+                localOverlayShown: 'Capa local visible',
+                localOverlayHidden: 'Capa local oculta',
+                localOverlayRemoved: 'Capa local eliminada',
+                localOverlayImportFailed: 'Falló la importación de la capa: {message}',
+                localOverlayHide: 'Ocultar capa',
+                localOverlayShow: 'Mostrar capa',
+                localOverlayNone: 'No hay capa local cargada'
             }
         };
         const STATIC_MESSAGE_TRANSLATIONS = {
@@ -3363,6 +3393,12 @@
             'Import / Export': 'Importar / Exportar',
             'Export': 'Exportar',
             'Import': 'Importar',
+            'Local Map Overlay': 'Capa de mapa local',
+            'Load a session-only GeoJSON or KML file (maximum 2 MB, 500 features, and 50,000 coordinate pairs). Local overlays are never saved or sent over the network.': 'Carga un archivo GeoJSON o KML solo para esta sesión (máximo 2 MB, 500 elementos y 50.000 pares de coordenadas). Las capas locales nunca se guardan ni se envían por la red.',
+            'Load GeoJSON / KML': 'Cargar GeoJSON / KML',
+            'Hide overlay': 'Ocultar capa',
+            'Remove overlay': 'Eliminar capa',
+            'No local overlay loaded': 'No hay capa local cargada',
             'Radar Display': 'Pantalla de radar',
             'Historical Replay': 'Repetición histórica',
             'Replay IEM NEXRAD composites and storm-based warning polygons. Times use your browser timezone; ranges are limited to 6 hours.': 'Reproduce mosaicos NEXRAD de IEM y polígonos históricos de alertas. Las horas usan la zona del navegador; el intervalo máximo es de 6 horas.',
@@ -3583,6 +3619,7 @@
             const geofenceNameInput = document.getElementById('geofenceNameInput');
             if (geofenceNameInput) geofenceNameInput.placeholder = t('geofenceNamePlaceholder');
             renderGeofenceList();
+            updateLocalOverlayControls();
             updateTimestamp();
             renderDiagnostics();
         }
@@ -4265,6 +4302,10 @@
             // Map overlays
             states: null, counties: null, labels: null, highways: null, geofences: null
         };
+        let localOverlayLayer = null;
+        let localOverlayVisible = false;
+        let localOverlayName = '';
+        let localOverlayFeatureCount = 0;
 
         const dataCache = { statesGeo: null, countiesGeo: null };
         
@@ -9394,6 +9435,132 @@
             initMobileSheet();
         }
 
+        function updateLocalOverlayControls(statusMessage = '') {
+            const toggle = document.getElementById('localOverlayToggleBtn');
+            const remove = document.getElementById('localOverlayRemoveBtn');
+            const status = document.getElementById('localOverlayStatus');
+            if (!toggle || !remove || !status) return;
+            const loaded = Boolean(localOverlayLayer);
+            toggle.disabled = !loaded;
+            remove.disabled = !loaded;
+            toggle.textContent = localOverlayVisible ? t('localOverlayHide') : t('localOverlayShow');
+            status.textContent = statusMessage || (loaded
+                ? t('localOverlayLoaded', { count: localOverlayFeatureCount, name: localOverlayName })
+                : t('localOverlayNone'));
+        }
+
+        function localOverlayPopup(feature) {
+            const container = document.createElement('div');
+            const entries = Object.entries(feature.properties || {}).filter(([, value]) =>
+                ['string', 'number', 'boolean'].includes(typeof value) && String(value).trim()
+            ).slice(0, 8);
+            const title = document.createElement('strong');
+            const named = entries.find(([key]) => key.toLowerCase() === 'name');
+            title.textContent = safeText(named?.[1] || localOverlayName || 'Local overlay', 160);
+            container.append(title);
+            entries.filter(([key]) => key.toLowerCase() !== 'name').forEach(([key, value]) => {
+                const row = document.createElement('div');
+                row.textContent = `${safeText(key, 80)}: ${safeText(value, 300)}`;
+                container.append(row);
+            });
+            return container;
+        }
+
+        function renderLocalOverlay(payload, fileName) {
+            if (localOverlayLayer) {
+                map.removeLayer(localOverlayLayer);
+                localOverlayLayer.off();
+            }
+            const renderer = L.svg({ padding: 0.5 });
+            localOverlayName = safeText(fileName, 160);
+            localOverlayFeatureCount = payload.features.length;
+            localOverlayLayer = L.geoJSON(payload, {
+                renderer,
+                style: {
+                    color: '#f59e0b',
+                    weight: 3,
+                    opacity: 0.95,
+                    fillColor: '#f59e0b',
+                    fillOpacity: 0.16
+                },
+                pointToLayer: (_feature, latlng) => L.circleMarker(latlng, {
+                    renderer,
+                    radius: 7,
+                    color: '#fff',
+                    weight: 2,
+                    fillColor: '#f59e0b',
+                    fillOpacity: 0.9
+                }),
+                onEachFeature: (feature, layer) => layer.bindPopup(localOverlayPopup(feature))
+            }).addTo(map);
+            localOverlayVisible = true;
+            map.getContainer().dataset.localOverlayFeatureCount = String(localOverlayFeatureCount);
+            map.getContainer().dataset.localOverlayVisible = 'true';
+            const bounds = localOverlayLayer.getBounds();
+            if (bounds.isValid()) map.fitBounds(bounds.pad(0.1), { maxZoom: 12 });
+            updateLocalOverlayControls();
+        }
+
+        function toggleLocalOverlay() {
+            if (!localOverlayLayer) return;
+            if (localOverlayVisible) map.removeLayer(localOverlayLayer);
+            else localOverlayLayer.addTo(map);
+            localOverlayVisible = !localOverlayVisible;
+            map.getContainer().dataset.localOverlayVisible = String(localOverlayVisible);
+            updateLocalOverlayControls(localOverlayVisible ? t('localOverlayShown') : t('localOverlayHidden'));
+        }
+
+        function removeLocalOverlay() {
+            if (localOverlayLayer) {
+                map.removeLayer(localOverlayLayer);
+                localOverlayLayer.off();
+            }
+            localOverlayLayer = null;
+            localOverlayVisible = false;
+            localOverlayName = '';
+            localOverlayFeatureCount = 0;
+            map.getContainer().dataset.localOverlayFeatureCount = '0';
+            map.getContainer().dataset.localOverlayVisible = 'false';
+            updateLocalOverlayControls(t('localOverlayRemoved'));
+        }
+
+        function initLocalOverlayImport() {
+            const input = document.getElementById('localOverlayFile');
+            document.getElementById('localOverlayImportBtn').addEventListener('click', () => input.click());
+            document.getElementById('localOverlayToggleBtn').addEventListener('click', toggleLocalOverlay);
+            document.getElementById('localOverlayRemoveBtn').addEventListener('click', removeLocalOverlay);
+            input.addEventListener('change', async event => {
+                const file = event.target.files[0];
+                if (!file) return;
+                try {
+                    if (file.size > LOCAL_OVERLAY_LIMITS.bytes) {
+                        throw new Error(`Overlay exceeds ${LOCAL_OVERLAY_LIMITS.bytes} bytes`);
+                    }
+                    const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+                    if (!['.json', '.geojson', '.kml'].includes(extension)) {
+                        throw new Error('Choose a GeoJSON or KML file');
+                    }
+                    const payload = parseLocalOverlay(
+                        await file.text(),
+                        extension,
+                        () => new DOMParser()
+                    );
+                    renderLocalOverlay(payload, file.name);
+                    showToast(t('localOverlayLoaded', {
+                        count: payload.features.length,
+                        name: safeText(file.name, 160)
+                    }), 'success', 4000);
+                } catch (error) {
+                    const message = t('localOverlayImportFailed', { message: safeText(error.message, 160) });
+                    updateLocalOverlayControls(message);
+                    showToast(message, 'error', 6000);
+                } finally {
+                    input.value = '';
+                }
+            });
+            updateLocalOverlayControls();
+        }
+
         function initSettingsPanel() {
             const overlay = document.getElementById('settingsOverlay');
             const panel = document.getElementById('settingsPanel');
@@ -9690,6 +9857,7 @@
                 reader.readAsText(file);
                 e.target.value = '';
             });
+            initLocalOverlayImport();
         }
 
         function initSlider(sliderId, valueId, settingKey, unit, callback, isPercent = false) {

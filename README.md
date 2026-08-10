@@ -68,6 +68,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Keyboard Shortcuts** — Quick controls for power users
 - **Versioned Settings** — Validated preferences migrate forward in browser storage
 - **Import/Export** — Backup and restore configuration without exporting API keys
+- **Session-Only Map Files** — Load bounded GeoJSON or KML overlays locally, hide or remove them, and keep their contents out of settings, diagnostics, and network requests
 - **Redacted Diagnostics** — Inspect provider freshness, fallback, coverage, resource counts, retry state, and request results without copying secrets or precise coordinates
 - **Reduced Data Mode** — Limit radar frames and pause data-heavy optional overlays on constrained connections
 - **Language & Units** — Persist English or Spanish UI plus US customary or metric weather units, with locale-aware dates and safe English fallback

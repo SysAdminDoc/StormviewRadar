@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Added bounded session-only GeoJSON/KML overlays with safe geometry/property parsing, escaped popups, explicit visibility/removal controls, and no persistence or network upload.
 - Replaced exact-English UI rewriting with parity-checked English/Spanish message catalogs, centralized locale-aware plurals/numbers/dates/units, and localized primary ARIA labels plus recovery states.
 - Kept startup loading visible until radar reaches ready/fallback/error, added semantic progress and retry states, exposed first-frame/loop/render/drop/byte diagnostics, and added Reduced Data mode with bounded frame preload and paused data-heavy overlays.
 - Corrected provider/runtime/privacy documentation, documented key modules and coverage limits, and added a clean-tree release command that synchronizes every version surface, runs the release gate, commits, and tags.
@@ -69,3 +70,48 @@ All notable changes to StormviewRadar will be documented in this file.
 - Many optimizations
 - Revise README for StormView Radar application
 - Added: Add files via upload
+
+## Roadmap archive — 2026-08-10 — ROADMAP.md
+
+<details>
+<summary>Original roadmap snapshot</summary>
+
+```markdown
+# StormView Radar Roadmap
+
+Incomplete, actionable work only.
+
+## Planned Features
+
+### Map and overlays
+
+- Highway overlay with state DOT closure feeds where available
+  Research note: start with the public USDOT WZDx Feed Registry and Iowa DOT’s credential-free WZDx/ArcGIS feeds; show jurisdiction, freshness, and feed coverage rather than implying national completeness.
+- Overlay opacity individually controllable per layer, not only radar
+
+### Performance and resilience
+
+- IndexedDB tile cache with LRU eviction to replace the in-memory-only cache
+- WebGL tile layer for smoother zoom and interpolation
+- Service Worker offline fallback with cached last frames and alert polygons
+- Configurable preload window around the playhead
+
+### UX
+
+- Split-screen two-city mode
+- Picture-in-picture mini radar that remains visible while scrolling alerts
+- High-contrast and color-blind-safe palettes
+- One-click attributed PNG snapshot of the current view and frame
+- Embed mode with configurable URL parameters
+
+### Later product ideas
+
+- Chasecaster mode with compass-assisted mobile field orientation
+- Training overlays with annotated example storms
+- PWA install prompt tied to offline last-frame availability
+- Animated GIF/MP4 export through canvas capture
+- Six-hour radar-history slider with frame-aware caching
+- Environment Canada radar source for cross-border coverage
+```
+
+</details>
