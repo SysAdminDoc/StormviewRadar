@@ -2580,6 +2580,7 @@
 
     <!-- Status Bar -->
     <div class="status-bar">
+        <div class="status-chip" id="offlineStatus" data-state="stale" role="status" aria-live="polite"><span class="dot yellow"></span><span id="offlineStatusText">Offline · cached data may be unavailable</span></div>
         <div class="status-chip" id="tileStatus"><span class="dot blue"></span><span id="tileStatusText">Caching...</span></div>
         <button class="status-chip" id="dataStatus" type="button" aria-live="polite"><span class="dot green"></span><span id="dataStatusText">Data loaded</span></button>
         <div class="status-chip show" id="coverageStatus" aria-live="polite"><span class="dot green"></span><span id="coverageStatusText">Coverage loading…</span></div>
@@ -3195,6 +3196,12 @@
                 noRadarFrame: 'No radar frame',
                 languageUpdated: 'Language updated',
                 unitsUpdated: 'Units updated',
+                offlineUnavailable: 'Offline · cached data may be unavailable',
+                offlineCached: 'Offline · cached {resources}',
+                cachedFallback: 'Cached fallback · {resources}',
+                offlineRadar: 'radar',
+                offlineAlerts: 'alerts',
+                offlineShell: 'app shell',
                 providerLoading: '{provider}: loading…',
                 providerCurrent: '{provider}: current',
                 providerFallback: 'MRMS fallback: {provider} failed',
@@ -3328,6 +3335,12 @@
                 noRadarFrame: 'Sin imagen de radar',
                 languageUpdated: 'Idioma actualizado',
                 unitsUpdated: 'Unidades actualizadas',
+                offlineUnavailable: 'Sin conexión · los datos almacenados podrían no estar disponibles',
+                offlineCached: 'Sin conexión · {resources} en caché',
+                cachedFallback: 'Respaldo en caché · {resources}',
+                offlineRadar: 'radar',
+                offlineAlerts: 'alertas',
+                offlineShell: 'aplicación',
                 providerLoading: '{provider}: cargando…',
                 providerCurrent: '{provider}: actual',
                 providerFallback: 'Respaldo MRMS: falló {provider}',
@@ -3590,6 +3603,41 @@
             return messageFormatter.message(key, variables);
         }
 
+        const offlineFallbackResources = new Set();
+
+        function updateOfflineStatus() {
+            const chip = document.getElementById('offlineStatus');
+            const text = document.getElementById('offlineStatusText');
+            if (!chip || !text) return;
+            const isOffline = navigator.onLine === false;
+            const resources = [...offlineFallbackResources]
+                .map(resource => t({ radar: 'offlineRadar', alerts: 'offlineAlerts', shell: 'offlineShell' }[resource] || 'offlineShell'))
+                .join(', ');
+            chip.classList.toggle('show', isOffline || Boolean(resources));
+            chip.dataset.state = 'stale';
+            document.body.dataset.offlineFallback = resources ? 'cached' : (isOffline ? 'offline' : 'online');
+            text.textContent = resources
+                ? t(isOffline ? 'offlineCached' : 'cachedFallback', { resources })
+                : t('offlineUnavailable');
+        }
+
+        function initOfflineFallback() {
+            window.addEventListener('offline', updateOfflineStatus);
+            window.addEventListener('online', () => {
+                offlineFallbackResources.clear();
+                updateOfflineStatus();
+            });
+            updateOfflineStatus();
+            if (!('serviceWorker' in navigator)) return;
+            navigator.serviceWorker.addEventListener('message', event => {
+                if (event.data?.type !== 'stormview-offline-fallback') return;
+                offlineFallbackResources.add(event.data.resource);
+                updateOfflineStatus();
+            });
+            navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+                .catch(error => console.warn('Offline fallback could not be enabled:', error));
+        }
+
         function localizedStaticText(value) {
             const key = STATIC_MESSAGE_KEY_BY_ENGLISH.get(value);
             return key ? STATIC_MESSAGE_CATALOG[key][languageCode()] : value;
@@ -3692,6 +3740,7 @@
             updateLocalOverlayControls();
             updateTimestamp();
             renderDiagnostics();
+            updateOfflineStatus();
         }
 
         function redactedEndpoint(input) {
@@ -4500,6 +4549,7 @@
             initRadarSystem();
             initUI();
             applyLanguage();
+            initOfflineFallback();
             initSidebarDrawer();
             initForecastPanel();
             initQuickToolbar();

@@ -13,6 +13,7 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     viewport: { width: 1280, height: 800 },
+    serviceWorkers: 'block',
     trace: 'retain-on-failure'
   },
   projects: [

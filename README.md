@@ -32,6 +32,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Accessible Controls** — Keyboard-operable layers and timeline, labeled search suggestions, focus-managed dialogs, and reduced-motion/forced-colors support
 - **Adjustable Opacity** — Fine-tune radar transparency for optimal map visibility
 - **Smart Tile Caching** — Optimized loading with rate limit protection
+- **Offline Last View** — A service worker retains the app shell, recent credential-free radar frames, and NWS alert polygons for an explicitly labeled cached fallback
 
 ### Weather Layers
 - **NWS Alerts** — Real-time watches, warnings, and advisories with hazard-colored borders and warning fills that fade by time since issuance

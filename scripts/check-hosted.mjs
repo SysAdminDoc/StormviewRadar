@@ -33,6 +33,7 @@ if (deployed.version !== packageManifest.version) {
 
 const requiredAssets = [
   ['index.html', 'text/html'],
+  ['service-worker.js', 'javascript'],
   ['logo/StormView-512x512.png', 'image/png'],
   ['vendor/leaflet/leaflet.css', 'text/css'],
   ['vendor/leaflet/leaflet.js', 'javascript'],

@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Added a bounded, credential-safe service-worker fallback for the app shell, recent radar frames/metadata, and NWS alert polygons with localized cached-data disclosure.
 - Added single-frame WebGL radar compositing with linear texture filtering, seam-free padded rendering, GPU context release during animation/teardown, and automatic DOM-tile fallback.
 - Added a credential-safe IndexedDB tile cache with read-recency tracking, entry/byte limits, LRU eviction, expiry policies, cache diagnostics, blob URL cleanup, and direct-image fallback.
 - Added persistent per-overlay visibility controls for tile, marker, SVG, and canvas layers while preserving each layer's authored styling.
