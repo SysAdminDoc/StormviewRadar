@@ -70,6 +70,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Dark/Light Theme** — Full theme support with smooth transitions
 - **Location Search** — Find any location with OpenStreetMap geocoding
 - **Geolocation** — Jump to your current position with one click
+- **Chasecaster Field Mode** — Follow high-accuracy mobile GPS with compass-assisted orientation, course fallback, speed/accuracy telemetry, and an always-visible driving-safety reminder
 - **Mobile Optimized** — Responsive design with bottom sheet navigation on mobile
 - **Keyboard Shortcuts** — Quick controls for power users
 - **Versioned Settings** — Validated preferences migrate forward in browser storage

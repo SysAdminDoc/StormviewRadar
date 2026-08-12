@@ -352,6 +352,113 @@
         #pipMap { position: relative; min-height: 0; }
         #pipMap .leaflet-control-attribution { max-width: 100%; font-size: 7px; }
         body.pip-radar-active .non-map-alerts { right: 356px; }
+        .chasecaster-panel {
+            position: fixed;
+            right: 12px;
+            bottom: 128px;
+            z-index: 1050;
+            display: grid;
+            grid-template-columns: 82px minmax(0, 1fr);
+            gap: 10px 12px;
+            width: min(310px, calc(100vw - 24px));
+            padding: 12px;
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            color: var(--text);
+        }
+        .chasecaster-panel[hidden] { display: none; }
+        .chasecaster-header {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .chasecaster-title { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+        .chasecaster-status { color: var(--text-muted); font-size: 10px; font-weight: 500; }
+        .chasecaster-stop,
+        .chasecaster-follow {
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            background: var(--glass-hover);
+            color: var(--text);
+            cursor: pointer;
+            font: inherit;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .chasecaster-stop { width: 34px; height: 34px; font-size: 18px; }
+        .chasecaster-compass {
+            position: relative;
+            width: 82px;
+            height: 82px;
+            border: 2px solid var(--glass-border);
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--glass-hover) 0 54%, transparent 56%);
+            font-size: 9px;
+            font-weight: 800;
+        }
+        .chasecaster-compass > span { position: absolute; color: var(--text-muted); }
+        .chasecaster-compass .north { top: 4px; left: 50%; color: var(--danger); transform: translateX(-50%); }
+        .chasecaster-compass .east { top: 50%; right: 5px; transform: translateY(-50%); }
+        .chasecaster-compass .south { bottom: 4px; left: 50%; transform: translateX(-50%); }
+        .chasecaster-compass .west { top: 50%; left: 5px; transform: translateY(-50%); }
+        .chasecaster-needle {
+            position: absolute;
+            inset: 15px;
+            transform: rotate(0deg);
+            transition: transform 0.15s linear;
+        }
+        .chasecaster-needle::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-right: 6px solid transparent;
+            border-bottom: 27px solid var(--accent);
+            border-left: 6px solid transparent;
+            transform: translateX(-50%);
+        }
+        .chasecaster-reading { display: grid; align-content: center; gap: 5px; min-width: 0; }
+        .chasecaster-heading { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .chasecaster-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+        .chasecaster-metric { color: var(--text-muted); font-size: 9px; text-transform: uppercase; }
+        .chasecaster-metric strong { display: block; margin-top: 1px; color: var(--text); font-size: 11px; text-transform: none; }
+        .chasecaster-follow { grid-column: 1 / -1; min-height: 34px; }
+        .chasecaster-follow.active { border-color: var(--accent); color: var(--accent); }
+        .chasecaster-safety {
+            grid-column: 1 / -1;
+            color: var(--warning);
+            font-size: 9px;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+        .chasecaster-location-icon { border: 0; background: transparent; }
+        .chasecaster-location-arrow {
+            position: relative;
+            width: 34px;
+            height: 34px;
+            transform: rotate(0deg);
+            transition: transform 0.15s linear;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.65));
+        }
+        .chasecaster-location-arrow::before {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 1px;
+            width: 0;
+            height: 0;
+            border-right: 10px solid transparent;
+            border-bottom: 30px solid var(--accent);
+            border-left: 10px solid transparent;
+        }
+        body.chasecaster-mode .mobile-fab,
+        body.chasecaster-mode .loc-btn,
+        body.chasecaster-mode .map-forecast-btn { display: none !important; }
+        body.chasecaster-mode .legend { top: 40%; }
         @media (max-width: 768px) {
             .pip-radar-panel {
                 right: 10px;
@@ -359,6 +466,7 @@
                 width: min(300px, calc(100vw - 20px));
                 height: 190px;
             }
+            .chasecaster-panel { right: 10px; bottom: 132px; }
             body.pip-radar-active .non-map-alerts {
                 right: 10px;
                 bottom: 332px;
@@ -2811,11 +2919,35 @@
             <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1"/></svg>
             <span class="qt-label">Mini</span>
         </button>
+        <button class="qt-btn" id="chasecasterBtn" type="button" title="Toggle chasecaster field mode" aria-label="Toggle chasecaster field mode" aria-pressed="false">
+            <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/><path d="M12 1v2M12 21v2M1 12h2M21 12h2"/></svg>
+            <span class="qt-label">Chase</span>
+        </button>
         <button class="qt-btn" id="stormTop3dBtn" type="button" title="Toggle 3D storm-top heights" aria-label="Toggle 3D storm-top heights" aria-pressed="false">
             <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path d="m12 2 8 4.5v9L12 20l-8-4.5v-9L12 2Z"/><path d="m4 6.5 8 4.5 8-4.5M12 11v9"/></svg>
             <span class="qt-label">3D Tops</span>
         </button>
     </div>
+
+    <section class="chasecaster-panel glass" id="chasecasterPanel" role="region" aria-label="Chasecaster field orientation" aria-live="polite" hidden>
+        <div class="chasecaster-header">
+            <strong class="chasecaster-title"><span id="chasecasterTitle">Chasecaster</span><span class="chasecaster-status" id="chasecasterStatus">Starting sensors…</span></strong>
+            <button class="chasecaster-stop" id="chasecasterStop" type="button" aria-label="Stop chasecaster mode">×</button>
+        </div>
+        <div class="chasecaster-compass" aria-hidden="true">
+            <span class="north">N</span><span class="east">E</span><span class="south">S</span><span class="west">W</span>
+            <i class="chasecaster-needle" id="chasecasterNeedle"></i>
+        </div>
+        <div class="chasecaster-reading">
+            <div class="chasecaster-heading" id="chasecasterHeading">—° —</div>
+            <div class="chasecaster-metrics">
+                <span class="chasecaster-metric" id="chasecasterAccuracyLabel">Accuracy<strong id="chasecasterAccuracy">—</strong></span>
+                <span class="chasecaster-metric" id="chasecasterSpeedLabel">Speed<strong id="chasecasterSpeed">—</strong></span>
+            </div>
+        </div>
+        <button class="chasecaster-follow active" id="chasecasterFollow" type="button" aria-pressed="true">Following location</button>
+        <p class="chasecaster-safety" id="chasecasterSafety">For situational awareness only. Do not interact with StormView while driving.</p>
+    </section>
 
     <!-- Legend -->
     <div class="legend glass" id="legend">
@@ -3314,6 +3446,7 @@
     import { buildIowa511Query, normalizeIowa511Events } from './src/road-events.js';
     import { captureLeafletSnapshot, snapshotFilename } from './src/map-snapshot.js';
     import { applyEmbedConfiguration, parseEmbedConfig } from './src/embed-mode.js';
+    import { cardinalDirection, normalizeChasePosition, orientationHeading, smoothHeading } from './src/chasecaster.js';
     import { IndexedDbTileCache, isCacheableTileUrl, tileCacheMaxAge } from './src/tile-cache.js';
     import { WebGLTileRenderer } from './src/webgl-tile-renderer.js';
 
@@ -3445,6 +3578,16 @@
 
         // ==================== STATE ====================
         let map, baseLayer, locationMarker;
+        let chasecasterActive = false;
+        let chasecasterWatchId = null;
+        let chasecasterMarker = null;
+        let chasecasterAccuracyCircle = null;
+        let chasecasterPosition = null;
+        let chasecasterHeading = null;
+        let chasecasterFollowing = true;
+        let chasecasterCompassState = 'waiting';
+        let chasecasterCompassTimer = null;
+        let chasecasterSuspendedViews = null;
         let compareMap = null;
         let compareBaseLayer = null;
         let compareRadarLayer = null;
@@ -3676,6 +3819,22 @@
                 snapshotMapOnly: 'Exit 3D storm tops before saving a radar snapshot',
                 snapshotFailed: 'Map snapshot failed: {message}',
                 embedOpenFullMap: 'Open full StormView Radar map',
+                chasecasterToggle: 'Toggle chasecaster field mode',
+                chasecasterPanel: 'Chasecaster field orientation',
+                chasecasterStop: 'Stop chasecaster mode',
+                chasecasterStarting: 'Starting GPS and compass…',
+                chasecasterGpsOnly: 'GPS active · compass unavailable',
+                chasecasterAbsolute: 'GPS active · absolute compass',
+                chasecasterRelative: 'GPS active · relative compass',
+                chasecasterUncalibrated: 'GPS active · compass needs calibration',
+                chasecasterFollowing: 'Following location',
+                chasecasterRecenter: 'Recenter and follow',
+                chasecasterAccuracy: 'Accuracy',
+                chasecasterSpeed: 'Speed',
+                chasecasterSafety: 'For situational awareness only. Do not interact with StormView while driving.',
+                chasecasterUnavailable: 'Chasecaster requires browser location support',
+                chasecasterDenied: 'Location permission is required for chasecaster mode. Enable it in browser site settings and retry.',
+                chasecasterError: 'Live location is unavailable. Check location services and retry.',
                 searchPlaceholder: 'Search location…',
                 searchAria: 'Search for a US location',
                 searchClearAria: 'Clear location search',
@@ -3840,6 +3999,22 @@
                 snapshotMapOnly: 'Sal de las cimas de tormenta 3D antes de guardar una captura de radar',
                 snapshotFailed: 'Falló la captura del mapa: {message}',
                 embedOpenFullMap: 'Abrir el mapa completo de StormView Radar',
+                chasecasterToggle: 'Alternar modo de campo Chasecaster',
+                chasecasterPanel: 'Orientación de campo Chasecaster',
+                chasecasterStop: 'Detener modo Chasecaster',
+                chasecasterStarting: 'Iniciando GPS y brújula…',
+                chasecasterGpsOnly: 'GPS activo · brújula no disponible',
+                chasecasterAbsolute: 'GPS activo · brújula absoluta',
+                chasecasterRelative: 'GPS activo · brújula relativa',
+                chasecasterUncalibrated: 'GPS activo · calibra la brújula',
+                chasecasterFollowing: 'Siguiendo ubicación',
+                chasecasterRecenter: 'Centrar y seguir',
+                chasecasterAccuracy: 'Precisión',
+                chasecasterSpeed: 'Velocidad',
+                chasecasterSafety: 'Solo para conciencia situacional. No interactúes con StormView mientras conduces.',
+                chasecasterUnavailable: 'Chasecaster requiere compatibilidad con ubicación del navegador',
+                chasecasterDenied: 'Se requiere permiso de ubicación para Chasecaster. Actívalo en la configuración del sitio y vuelve a intentarlo.',
+                chasecasterError: 'La ubicación en vivo no está disponible. Revisa los servicios de ubicación y vuelve a intentarlo.',
                 searchPlaceholder: 'Buscar ubicación…',
                 searchAria: 'Buscar una ubicación de Estados Unidos',
                 searchClearAria: 'Borrar búsqueda de ubicación',
@@ -3902,6 +4077,7 @@
             'Primary view': 'Vista principal',
             'Comparison view': 'Vista comparativa',
             '2-City': '2 ciudades',
+            'Chase': 'Campo',
             'Display': 'Pantalla',
             'Status': 'Estado',
             'Appearance': 'Apariencia',
@@ -4153,6 +4329,9 @@
                 pipRadarBtn: ['title', 'pipToggleAria'],
                 pipRadarClose: ['aria-label', 'pipCloseAria'],
                 pipRadarRecenter: ['title', 'pipRecenterAria'],
+                chasecasterBtn: ['title', 'chasecasterToggle'],
+                chasecasterPanel: ['aria-label', 'chasecasterPanel'],
+                chasecasterStop: ['aria-label', 'chasecasterStop'],
                 searchInput: ['aria-label', 'searchAria'],
                 searchClear: ['aria-label', 'searchClearAria'],
                 searchResults: ['aria-label', 'searchResultsAria'],
@@ -4213,6 +4392,7 @@
             updateSplitViewLabels();
             updatePipRadarLabel();
             syncVisualPaletteControls();
+            updateChasecasterLanguage();
             const splitViewButton = document.getElementById('splitViewBtn');
             if (splitViewButton) {
                 splitViewButton.title = t('splitViewAria');
@@ -5070,6 +5250,7 @@
             initQuickToolbar();
             initSplitView();
             initPipRadar();
+            initChasecaster();
             initBookmarks();
             initAccessibility();
             updatePlaybackVisibility();
@@ -9147,6 +9328,7 @@
         }
 
         async function enterStormTop3d() {
+            if (chasecasterActive) stopChasecaster();
             const button = document.getElementById('stormTop3dBtn');
             const view = document.getElementById('cesiumView');
             if (settings.splitView) setSplitView(false);
@@ -11787,6 +11969,273 @@
             };
             overlay.addEventListener('click', closeSheet);
             document.getElementById('sheetClose').addEventListener('click', closeSheet);
+        }
+
+        function chasecasterStatusMessage() {
+            const keys = {
+                waiting: 'chasecasterStarting',
+                gps: 'chasecasterGpsOnly',
+                absolute: 'chasecasterAbsolute',
+                relative: 'chasecasterRelative',
+                uncalibrated: 'chasecasterUncalibrated'
+            };
+            return t(keys[chasecasterCompassState] || 'chasecasterGpsOnly');
+        }
+
+        function updateChasecasterLanguage() {
+            const title = document.getElementById('chasecasterTitle');
+            const status = document.getElementById('chasecasterStatus');
+            const accuracy = document.getElementById('chasecasterAccuracyLabel');
+            const speed = document.getElementById('chasecasterSpeedLabel');
+            const follow = document.getElementById('chasecasterFollow');
+            const safety = document.getElementById('chasecasterSafety');
+            if (title) title.textContent = 'Chasecaster';
+            if (status) status.textContent = chasecasterStatusMessage();
+            if (accuracy?.firstChild) accuracy.firstChild.nodeValue = t('chasecasterAccuracy');
+            if (speed?.firstChild) speed.firstChild.nodeValue = t('chasecasterSpeed');
+            if (follow) follow.textContent = chasecasterFollowing ? t('chasecasterFollowing') : t('chasecasterRecenter');
+            if (safety) safety.textContent = t('chasecasterSafety');
+        }
+
+        function formatChasecasterAccuracy(meters) {
+            if (!Number.isFinite(meters)) return '—';
+            if (settings.units === 'metric') return `${Math.round(meters)} m`;
+            const feet = meters * 3.28084;
+            return feet < 5280 ? `${Math.round(feet)} ft` : `${(feet / 5280).toFixed(1)} mi`;
+        }
+
+        function formatChasecasterSpeed(metersPerSecond) {
+            if (!Number.isFinite(metersPerSecond)) return '—';
+            const converted = settings.units === 'metric' ? metersPerSecond * 3.6 : metersPerSecond * 2.23694;
+            return `${Math.round(converted)} ${settings.units === 'metric' ? 'km/h' : 'mph'}`;
+        }
+
+        function setChasecasterFollowing(active) {
+            chasecasterFollowing = Boolean(active);
+            const button = document.getElementById('chasecasterFollow');
+            button?.classList.toggle('active', chasecasterFollowing);
+            button?.setAttribute('aria-pressed', String(chasecasterFollowing));
+            if (button) button.textContent = chasecasterFollowing ? t('chasecasterFollowing') : t('chasecasterRecenter');
+        }
+
+        function updateChasecasterHeading(value) {
+            chasecasterHeading = smoothHeading(chasecasterHeading, value);
+            if (chasecasterHeading === null) return;
+            const rounded = Math.round(chasecasterHeading) % 360;
+            const cardinal = cardinalDirection(chasecasterHeading);
+            const heading = document.getElementById('chasecasterHeading');
+            const needle = document.getElementById('chasecasterNeedle');
+            if (heading) heading.textContent = `${String(rounded).padStart(3, '0')}° ${cardinal}`;
+            if (needle) needle.style.transform = `rotate(${chasecasterHeading.toFixed(1)}deg)`;
+            const markerArrow = chasecasterMarker?.getElement()?.querySelector('.chasecaster-location-arrow');
+            if (markerArrow) markerArrow.style.transform = `rotate(${chasecasterHeading.toFixed(1)}deg)`;
+            const markerElement = chasecasterMarker?.getElement();
+            if (markerElement) markerElement.setAttribute('aria-label', `Current location, heading ${rounded} degrees ${cardinal}`);
+        }
+
+        function handleChasecasterOrientation(event) {
+            if (!chasecasterActive) return;
+            const screenAngle = screen.orientation?.angle ?? window.orientation ?? 0;
+            const reading = orientationHeading(event, screenAngle);
+            if (!reading) return;
+            clearTimeout(chasecasterCompassTimer);
+            chasecasterCompassState = !reading.calibrated
+                ? 'uncalibrated'
+                : (reading.absolute ? 'absolute' : 'relative');
+            updateChasecasterHeading(reading.heading);
+            updateChasecasterLanguage();
+        }
+
+        async function enableChasecasterCompass() {
+            const orientationApi = globalThis.DeviceOrientationEvent;
+            if (typeof orientationApi !== 'function') return false;
+            if (typeof orientationApi.requestPermission === 'function') {
+                try {
+                    if (await orientationApi.requestPermission() !== 'granted') return false;
+                } catch {
+                    return false;
+                }
+            }
+            if (!chasecasterActive) return false;
+            window.addEventListener('deviceorientationabsolute', handleChasecasterOrientation, true);
+            window.addEventListener('deviceorientation', handleChasecasterOrientation, true);
+            chasecasterCompassTimer = setTimeout(() => {
+                if (!chasecasterActive || chasecasterHeading !== null) return;
+                chasecasterCompassState = 'gps';
+                updateChasecasterLanguage();
+            }, 1800);
+            return true;
+        }
+
+        function ensureChasecasterLayers(position) {
+            const latlng = [position.latitude, position.longitude];
+            if (!chasecasterAccuracyCircle) {
+                chasecasterAccuracyCircle = L.circle(latlng, {
+                    pane: 'markerPane',
+                    radius: position.accuracyMeters || 0,
+                    color: '#38bdf8',
+                    weight: 1,
+                    fillColor: '#38bdf8',
+                    fillOpacity: 0.08,
+                    interactive: false
+                }).addTo(map);
+            } else {
+                chasecasterAccuracyCircle.setLatLng(latlng);
+                chasecasterAccuracyCircle.setRadius(position.accuracyMeters || 0);
+            }
+            if (!chasecasterMarker) {
+                chasecasterMarker = L.marker(latlng, {
+                    pane: 'markerPane',
+                    keyboard: false,
+                    zIndexOffset: 1200,
+                    icon: L.divIcon({
+                        className: 'chasecaster-location-icon',
+                        html: '<div class="chasecaster-location-arrow"></div>',
+                        iconSize: [34, 34],
+                        iconAnchor: [17, 17]
+                    })
+                }).addTo(map);
+                chasecasterMarker.on('add', () => {
+                    const element = chasecasterMarker?.getElement();
+                    element?.setAttribute('role', 'img');
+                    if (chasecasterHeading !== null) updateChasecasterHeading(chasecasterHeading);
+                });
+            } else {
+                chasecasterMarker.setLatLng(latlng);
+            }
+        }
+
+        function handleChasecasterPosition(rawPosition) {
+            if (!chasecasterActive) return;
+            const position = normalizeChasePosition(rawPosition);
+            if (!position) return;
+            const firstPosition = chasecasterPosition === null;
+            chasecasterPosition = position;
+            ensureChasecasterLayers(position);
+            document.getElementById('chasecasterAccuracy').textContent = formatChasecasterAccuracy(position.accuracyMeters);
+            document.getElementById('chasecasterSpeed').textContent = formatChasecasterSpeed(position.speedMps);
+            if (chasecasterHeading === null && position.course !== null) updateChasecasterHeading(position.course);
+            if (chasecasterCompassState === 'waiting' && !chasecasterCompassTimer) chasecasterCompassState = 'gps';
+            updateChasecasterLanguage();
+            if (chasecasterFollowing) {
+                const zoom = firstPosition ? Math.max(map.getZoom(), 11) : map.getZoom();
+                map.setView([position.latitude, position.longitude], zoom, { animate: false });
+            }
+            document.getElementById('chasecasterPanel').dataset.positionTimestamp = String(position.timestamp);
+        }
+
+        function handleChasecasterLocationError(error) {
+            const denied = error?.code === 1;
+            const message = denied ? t('chasecasterDenied') : t('chasecasterError');
+            stopChasecaster();
+            showToast(message, denied ? 'warn' : 'error', 6500);
+        }
+
+        function suspendChasecasterConflicts() {
+            chasecasterSuspendedViews = {
+                splitView: settings.splitView,
+                pipRadar: settings.pipRadar
+            };
+            if (settings.splitView) setSplitView(false, { persist: false });
+            if (settings.pipRadar) setPipRadar(false, { persist: false });
+            if (stormTop3dMode) exitStormTop3d();
+        }
+
+        function restoreChasecasterConflicts() {
+            const suspended = chasecasterSuspendedViews;
+            chasecasterSuspendedViews = null;
+            if (!suspended) return;
+            if (suspended.splitView) setSplitView(true, { persist: false });
+            if (suspended.pipRadar) setPipRadar(true, { persist: false });
+        }
+
+        async function startChasecaster() {
+            if (chasecasterActive) return;
+            if (!navigator.geolocation) {
+                showToast(t('chasecasterUnavailable'), 'warn', 5000);
+                return;
+            }
+            suspendChasecasterConflicts();
+            chasecasterActive = true;
+            chasecasterPosition = null;
+            chasecasterHeading = null;
+            chasecasterCompassState = 'waiting';
+            setChasecasterFollowing(true);
+            document.body.classList.add('chasecaster-mode');
+            const panel = document.getElementById('chasecasterPanel');
+            const button = document.getElementById('chasecasterBtn');
+            panel.hidden = false;
+            button.classList.add('active');
+            button.setAttribute('aria-pressed', 'true');
+            updateChasecasterLanguage();
+            const compassEnabled = await enableChasecasterCompass();
+            if (!chasecasterActive) return;
+            if (!compassEnabled) {
+                chasecasterCompassState = 'gps';
+                updateChasecasterLanguage();
+            }
+            try {
+                chasecasterWatchId = navigator.geolocation.watchPosition(
+                    handleChasecasterPosition,
+                    handleChasecasterLocationError,
+                    { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
+                );
+            } catch (error) {
+                handleChasecasterLocationError(error);
+            }
+        }
+
+        function stopChasecaster({ restore = true } = {}) {
+            if (chasecasterWatchId !== null) navigator.geolocation?.clearWatch?.(chasecasterWatchId);
+            chasecasterWatchId = null;
+            clearTimeout(chasecasterCompassTimer);
+            chasecasterCompassTimer = null;
+            window.removeEventListener('deviceorientationabsolute', handleChasecasterOrientation, true);
+            window.removeEventListener('deviceorientation', handleChasecasterOrientation, true);
+            if (chasecasterMarker) map.removeLayer(chasecasterMarker);
+            if (chasecasterAccuracyCircle) map.removeLayer(chasecasterAccuracyCircle);
+            chasecasterMarker = null;
+            chasecasterAccuracyCircle = null;
+            chasecasterPosition = null;
+            chasecasterHeading = null;
+            chasecasterActive = false;
+            document.body.classList.remove('chasecaster-mode');
+            const panel = document.getElementById('chasecasterPanel');
+            const button = document.getElementById('chasecasterBtn');
+            if (panel) {
+                panel.hidden = true;
+                delete panel.dataset.positionTimestamp;
+            }
+            button?.classList.remove('active');
+            button?.setAttribute('aria-pressed', 'false');
+            document.getElementById('chasecasterHeading').textContent = '—° —';
+            document.getElementById('chasecasterAccuracy').textContent = '—';
+            document.getElementById('chasecasterSpeed').textContent = '—';
+            if (restore) restoreChasecasterConflicts();
+            else chasecasterSuspendedViews = null;
+        }
+
+        function initChasecaster() {
+            document.getElementById('chasecasterBtn').addEventListener('click', () => {
+                if (chasecasterActive) stopChasecaster();
+                else startChasecaster();
+            });
+            document.getElementById('chasecasterStop').addEventListener('click', stopChasecaster);
+            document.getElementById('chasecasterFollow').addEventListener('click', () => {
+                setChasecasterFollowing(true);
+                if (chasecasterPosition) {
+                    map.setView(
+                        [chasecasterPosition.latitude, chasecasterPosition.longitude],
+                        Math.max(map.getZoom(), 11),
+                        { animate: false }
+                    );
+                }
+            });
+            map.on('dragstart', () => {
+                if (chasecasterActive) setChasecasterFollowing(false);
+            });
+            window.addEventListener('pagehide', () => stopChasecaster({ restore: false }));
+            updateChasecasterLanguage();
         }
 
         let locationPermissionBlocked = false;
