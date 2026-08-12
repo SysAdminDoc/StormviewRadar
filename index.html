@@ -162,6 +162,8 @@
 
         .leaflet-tile-container { transition: opacity 0.15s ease-out !important; }
         .radar-layer { transition: opacity 0.12s linear !important; }
+        .webgl-tile-canvas { image-rendering: auto; }
+        .leaflet-layer.webgl-active > .leaflet-tile-container { visibility: hidden; }
         .radar-layer .leaflet-tile { 
             transition: opacity 0.1s linear !important;
             image-rendering: pixelated;
@@ -2937,6 +2939,7 @@
     import { LOCAL_OVERLAY_LIMITS, parseLocalOverlay } from './src/local-overlay.js';
     import { buildIowa511Query, normalizeIowa511Events } from './src/road-events.js';
     import { IndexedDbTileCache, isCacheableTileUrl, tileCacheMaxAge } from './src/tile-cache.js';
+    import { WebGLTileRenderer } from './src/webgl-tile-renderer.js';
 
     (function() {
         'use strict';
@@ -4939,11 +4942,40 @@
             onAdd: function(mapInstance) {
                 cachedTileLayers.add(this);
                 L.TileLayer.prototype.onAdd.call(this, mapInstance);
+                if (this.options.webgl && Number(this.options.opacity) > 0) {
+                    this._ensureWebGLRenderer();
+                }
             },
 
             onRemove: function(mapInstance) {
                 cachedTileLayers.delete(this);
+                this._destroyWebGLRenderer();
                 L.TileLayer.prototype.onRemove.call(this, mapInstance);
+            },
+
+            setOpacity: function(opacity) {
+                L.TileLayer.prototype.setOpacity.call(this, opacity);
+                if (!this.options.webgl || !this._map) return this;
+                if (Number(opacity) > 0) this._ensureWebGLRenderer();
+                else this._destroyWebGLRenderer();
+                return this;
+            },
+
+            _ensureWebGLRenderer: function() {
+                if (this._webglRenderer || !this._map || !this._container) return;
+                const renderer = new WebGLTileRenderer(this, this._map);
+                if (renderer.mount()) {
+                    this._webglRenderer = renderer;
+                    this._container.dataset.renderer = 'webgl';
+                } else {
+                    this._container.dataset.renderer = 'dom';
+                }
+            },
+
+            _destroyWebGLRenderer: function() {
+                this._webglRenderer?.destroy();
+                this._webglRenderer = null;
+                if (this._container) this._container.dataset.renderer = 'dom';
             },
 
             _removeTile: function(key) {
@@ -5206,6 +5238,7 @@
             if (!radarSystem.mrmsBase) {
                 radarSystem.mrmsBase = L.tileLayer.cached(radarSystem.sources.n0q, {
                     opacity: mrmsIsPrimary ? settings.opacity : settings.opacity * 0.6,
+                    webgl: true,
                     pane: 'radarPane',
                     maxNativeZoom: 8,
                     maxZoom: 18,
@@ -6094,6 +6127,7 @@
             // Memory-optimized tile configuration
             const tileOptions = {
                 opacity: 0,
+                webgl: true,
                 pane: 'radarPane',
                 className: 'radar-layer radar-cached',
                 updateWhenIdle: true,
@@ -6187,6 +6221,7 @@
             
             const layer = L.tileLayer.cached(productUrl, {
                 opacity: settings.opacity,
+                webgl: true,
                 pane: 'radarPane',
                 className: 'radar-layer radar-cached',
                 maxNativeZoom: 8,
@@ -6315,6 +6350,7 @@
                 
                 const tileOptions = {
                     opacity: 0,
+                    webgl: true,
                     pane: 'radarPane',
                     className: 'radar-layer radar-cached radar-smooth',
                     updateWhenIdle: true,
@@ -6791,10 +6827,10 @@
                 // Add cross-fade class for smooth CSS transition
                 newContainer.classList.add('radar-crossfade');
                 // Start at 0, then transition to target opacity
-                newContainer.style.opacity = '0';
+                frameLayers[idx].setOpacity(0);
                 // Force reflow so the browser registers the 0 state
                 void newContainer.offsetWidth;
-                newContainer.style.opacity = String(frameOpacity);
+                frameLayers[idx].setOpacity(frameOpacity);
             } else {
                 // Fallback: use Leaflet's setOpacity directly
                 frameLayers[idx]?.setOpacity(frameOpacity);
@@ -6813,7 +6849,7 @@
                 const prevContainer = frameLayers[prevFrame]?.getContainer?.();
                 if (prevContainer) {
                     prevContainer.classList.add('radar-crossfade');
-                    prevContainer.style.opacity = '0';
+                    frameLayers[prevFrame].setOpacity(0);
                 } else {
                     frameLayers[prevFrame].setOpacity(0);
                 }
@@ -6851,7 +6887,7 @@
                         const cont = layer.getContainer?.();
                         if (cont) {
                             cont.classList.remove('radar-crossfade');
-                            cont.style.opacity = '0';
+                            layer.setOpacity(0);
                         } else {
                             layer.setOpacity(0);
                         }
@@ -6902,7 +6938,7 @@
                     const cont = frameLayers[nextIdx].getContainer?.();
                     if (cont) {
                         cont.classList.remove('radar-crossfade');
-                        cont.style.opacity = '0';
+                        frameLayers[nextIdx].setOpacity(0);
                     } else {
                         frameLayers[nextIdx].setOpacity(0);
                     }

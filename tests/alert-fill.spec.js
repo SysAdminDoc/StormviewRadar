@@ -65,7 +65,7 @@ test('warning polygons fade by issuance age while retaining hazard borders and c
   await expect(page.locator('.alert-age-legend')).toContainText('Warning age');
   await expect(page.locator('.alert-age-legend')).toContainText('Fill fades with time since issue');
 
-  const [newAlpha, agingAlpha] = await page.locator('#map canvas').evaluate(canvas => {
+  const [newAlpha, agingAlpha] = await page.locator('#map canvas.leaflet-zoom-animated').evaluate(canvas => {
     const context = canvas.getContext('2d');
     const bounds = canvas.getBoundingClientRect();
     const sample = viewportRatio => {

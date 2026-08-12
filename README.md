@@ -209,6 +209,7 @@ StormView includes several optimizations for smooth performance:
 
 - **Batched Frame Loading** — Radar frames load in small batches to avoid rate limiting
 - **Persistent Tile Cache** — IndexedDB-backed Leaflet tiles use recency updates and LRU eviction, capped at 1,200 entries / 96 MB, with direct-image fallback when storage or CORS is unavailable
+- **WebGL Radar Compositing** — Visible HRRR, MRMS, and RainViewer tile frames use linearly filtered GPU compositing with DOM-tile fallback and context release between frames
 - **Seamless Zoom** — Tiles remain visible during zoom, new tiles load in background
 - **Memory Management** — Only nearby frames kept in memory during animation
 - **Bounded Overlays** — River requests follow the visible map area; report and observation markers are spatially sampled with hard limits
