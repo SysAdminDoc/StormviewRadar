@@ -101,6 +101,83 @@ test('river gauges use the visible bbox and enforce the marker budget', async ({
   await expect(toggle).toHaveAttribute('data-feature-count', '0');
 });
 
+test('Iowa road events disclose bounded coverage, freshness, and grouped closures', async ({ page }) => {
+  let requestUrl;
+  await page.route('https://services.arcgis.com/**/CARS511_Iowa_View/FeatureServer/0/query?**', route => {
+    requestUrl = new URL(route.request().url());
+    return route.fulfill({
+      json: {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {
+              OBJECTID: 1,
+              ID: 'IACARS4-82461',
+              STYLE: 'closure',
+              headline: '<img src=x onerror=alert(1)> Bus 30 closed',
+              phrase: 'Closed',
+              Route: 'Bus 30',
+              msg0: 'Closed due to road construction.',
+              EditDate: 1786533787662,
+              linktxt: 'https://511ia.org/event/IACARS4-82461'
+            },
+            geometry: { type: 'Point', coordinates: [-92.58, 41.98] }
+          },
+          {
+            type: 'Feature',
+            properties: {
+              OBJECTID: 2,
+              ID: 'IACARS4-82461',
+              STYLE: 'closure',
+              EditDate: 1786533787662
+            },
+            geometry: { type: 'Point', coordinates: [-92.57, 41.99] }
+          },
+          {
+            type: 'Feature',
+            properties: {
+              OBJECTID: 3,
+              ID: 'IADOT-ROADWORK',
+              STYLE: 'roadwork',
+              headline: 'I-80 road construction',
+              Route: 'I-80',
+              EditDate: 1786533787000
+            },
+            geometry: { type: 'Point', coordinates: [-93.62, 41.59] }
+          }
+        ]
+      }
+    });
+  });
+
+  await page.goto('/');
+  const toggle = page.locator('.sidebar [data-layer="highways"]');
+  await toggle.evaluate(element => element.click());
+
+  await expect.poll(() => requestUrl?.searchParams.get('geometry')).toBeTruthy();
+  expect(requestUrl.searchParams.get('geometry')).toContain('-96.70000');
+  expect(requestUrl.searchParams.get('where')).toContain('closure');
+  await expect(toggle).toHaveAttribute('data-feature-count', '2');
+  await expect(toggle).toHaveAttribute('data-load-state', 'current');
+  await expect(page.locator('.road-event-marker')).toHaveCount(3);
+
+  const firstMarker = page.locator('.road-event-marker').first();
+  await firstMarker.hover();
+  await expect(page.locator('.leaflet-tooltip')).toContainText('Bus 30');
+  await expect(page.locator('.leaflet-tooltip img')).toHaveCount(0);
+
+  await firstMarker.click();
+  const popup = page.locator('.leaflet-popup-content');
+  await expect(popup).toContainText('Iowa-only coverage');
+  await expect(popup.locator('img')).toHaveCount(0);
+  await expect(popup.locator('a[href="https://511ia.org/event/IACARS4-82461"]')).toBeVisible();
+
+  await toggle.evaluate(element => element.click());
+  await expect(page.locator('.road-event-marker')).toHaveCount(0);
+  await expect(toggle).toHaveAttribute('data-feature-count', '0');
+});
+
 const delayedOverlayScenarios = [
   {
     layer: 'spcWatches',

@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#1e1e2e">
     <meta charset="UTF-8">
     <meta name="application-version" content="0.1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.open-meteo.com https://api.openweathermap.org https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://stamen-tiles.a.ssl.fastly.net https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.open-meteo.com https://api.openweathermap.org https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://services.arcgis.com https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StormView Radar 0.1.0</title>
     
@@ -1215,6 +1215,16 @@
         .popup-content .badge.info { background: var(--accent); color: #fff; }
         .popup-content .badge.success { background: var(--success); color: #000; }
 
+        .road-event-icon {
+            border: 2px solid #fff;
+            border-radius: 50%;
+            background: #facc15;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.75);
+        }
+        .road-event-icon.closure { background: #ef4444; }
+        .road-event-icon.laneClosure { background: #f97316; }
+        .road-event-icon.restriction { background: #a855f7; }
+
         /* ==================== FORECAST PANEL ==================== */
         .forecast-overlay {
             position: fixed; inset: 0;
@@ -2350,9 +2360,11 @@
                         <span class="dot" style="background: var(--text)"></span>
                         <span class="layer-name">Labels</span>
                     </div>
-                    <div class="layer-chip" data-layer="highways">
+                    <div class="layer-chip full-width" data-layer="highways">
                         <span class="dot" style="background: var(--orange)"></span>
-                        <span class="layer-name">Roads</span>
+                        <span class="layer-name">Road Events</span>
+                        <span class="road-event-count"></span>
+                        <span class="badge">IA ONLY</span>
                     </div>
                     <div class="layer-chip full-width" data-layer="geofences">
                         <span class="dot" style="background: var(--accent)"></span>
@@ -2897,7 +2909,8 @@
         <a href="https://www.usgs.gov/" target="_blank" rel="noopener">USGS</a>,
         <a href="https://www.nhc.noaa.gov/" target="_blank" rel="noopener">NHC</a>,
         <a href="https://www.noaa.gov/" target="_blank" rel="noopener">NOAA/GOES</a>,
-        <a href="https://aviationweather.gov/" target="_blank" rel="noopener">Aviation Weather</a>
+        <a href="https://aviationweather.gov/" target="_blank" rel="noopener">Aviation Weather</a>,
+        <a href="https://iowadot.gov/travel-tools/iowa-511/511-data-feeds" target="_blank" rel="noopener">Iowa DOT</a>
     </div>
 
     <script src="vendor/leaflet/leaflet.js"></script>
@@ -2906,6 +2919,7 @@
     import { createProviderRegistry, RADAR_CAPABILITIES } from './src/providers/registry.js';
     import { createMessageFormatter } from './src/i18n.js';
     import { LOCAL_OVERLAY_LIMITS, parseLocalOverlay } from './src/local-overlay.js';
+    import { buildIowa511Query, normalizeIowa511Events } from './src/road-events.js';
 
     (function() {
         'use strict';
@@ -3047,6 +3061,7 @@
         let lastFrameTime = 0;
         let speedMult = 1;
         let searchTimeout = null;
+        let roadEventReloadTimeout = null;
         let searchAbortController = null;
         let nextNominatimRequestAt = 0;
         let lastRefreshTime = null;
@@ -3133,7 +3148,7 @@
         const REDUCED_DATA_OPTIONAL_LAYERS = new Set([
             'stormReports', 'stormTracks', 'hailMesh', 'lightning', 'satellite', 'satelliteIR',
             'satelliteWV', 'satelliteGeoColor', 'satelliteSandwich', 'satelliteMesoscale',
-            'riverGauges', 'surfaceObs', 'tropical', 'sigmets'
+            'riverGauges', 'surfaceObs', 'tropical', 'sigmets', 'highways'
         ]);
         const MESSAGE_CATALOG = {
             en: {
@@ -3245,6 +3260,20 @@
                 diagnosticRetryAvailable: 'Retry available',
                 diagnosticNoRetry: 'No retry pending',
                 diagnosticNoTilePause: 'No tile providers paused',
+                roadEventsCurrent_one: '{count} Iowa 511 road event in view · updated {updated} · Iowa only',
+                roadEventsCurrent_other: '{count} Iowa 511 road events in view · updated {updated} · Iowa only',
+                roadEventsEmpty: 'No Iowa DOT road events in this view · Iowa only',
+                roadEventsOutside: 'Outside Iowa DOT road-event coverage',
+                roadEventsUnavailable: 'Iowa road events unavailable: {message}',
+                roadClosure: 'Road closure',
+                laneClosure: 'Lane closure',
+                roadRestriction: 'Road restriction',
+                roadWork: 'Road work',
+                roadEventUpdated: 'Updated: {updated}',
+                roadEventRestrictions: 'Restrictions: {value}',
+                roadEventAlternateRoute: 'Alternate route: {value}',
+                roadEventSource: 'Iowa 511 · Iowa-only coverage',
+                roadEventDetails: 'View Iowa 511 details',
                 localOverlayLoaded_one: '{count} feature loaded from {name}',
                 localOverlayLoaded_other: '{count} features loaded from {name}',
                 localOverlayShown: 'Local overlay shown',
@@ -3364,6 +3393,20 @@
                 diagnosticRetryAvailable: 'Reintento disponible',
                 diagnosticNoRetry: 'Sin reintento pendiente',
                 diagnosticNoTilePause: 'Ningún proveedor de teselas está pausado',
+                roadEventsCurrent_one: '{count} evento vial de Iowa 511 en la vista · actualizado {updated} · solo Iowa',
+                roadEventsCurrent_other: '{count} eventos viales de Iowa 511 en la vista · actualizados {updated} · solo Iowa',
+                roadEventsEmpty: 'No hay eventos viales del DOT de Iowa en esta vista · solo Iowa',
+                roadEventsOutside: 'Fuera de la cobertura de eventos viales del DOT de Iowa',
+                roadEventsUnavailable: 'Eventos viales de Iowa no disponibles: {message}',
+                roadClosure: 'Carretera cerrada',
+                laneClosure: 'Carril cerrado',
+                roadRestriction: 'Restricción vial',
+                roadWork: 'Obras viales',
+                roadEventUpdated: 'Actualizado: {updated}',
+                roadEventRestrictions: 'Restricciones: {value}',
+                roadEventAlternateRoute: 'Ruta alternativa: {value}',
+                roadEventSource: 'Iowa 511 · cobertura solo en Iowa',
+                roadEventDetails: 'Ver detalles de Iowa 511',
                 localOverlayLoaded_one: '{count} elemento cargado desde {name}',
                 localOverlayLoaded_other: '{count} elementos cargados desde {name}',
                 localOverlayShown: 'Capa local visible',
@@ -3383,6 +3426,7 @@
             'Dark Theme': 'Tema oscuro',
             'Show Legend': 'Mostrar leyenda',
             'Language': 'Idioma',
+            'Road Events': 'Eventos viales',
             'Units': 'Unidades',
             'US customary': 'Sistema estadounidense',
             'Metric': 'Métrico',
@@ -4626,6 +4670,11 @@
             map.on('moveend', () => updateMobileAlertBanner(currentAlertFeatures));
             map.on('moveend', () => {
                 if (settings.layers.stormReports && stormReportPayload) renderStormReports();
+            });
+            map.on('moveend', () => {
+                clearTimeout(roadEventReloadTimeout);
+                if (!settings.layers.highways) return;
+                roadEventReloadTimeout = setTimeout(loadHighwayEvents, 500);
             });
             updateCoverageStatus();
         }
@@ -6833,7 +6882,7 @@
                 states: simpleOverlayAdapter('states', loadStates),
                 counties: simpleOverlayAdapter('counties', loadCounties),
                 labels: simpleOverlayAdapter('labels', () => toggleLabelsLayer(true), () => toggleLabelsLayer(false)),
-                highways: simpleOverlayAdapter('highways', () => toggleHighwaysLayer(true), () => toggleHighwaysLayer(false)),
+                highways: simpleOverlayAdapter('highways', loadHighwayEvents, disposeHighwayEvents),
                 geofences: simpleOverlayAdapter('geofences', loadGeofenceLayer)
             },
             cancel: id => layerRequests.get(id)?.abort(new DOMException('Provider cancelled', 'AbortError')),
@@ -6892,6 +6941,11 @@
                     element.textContent = diagnosticsState.layerCounts[name] || '';
                 });
             }
+            if (name === 'highways') {
+                document.querySelectorAll('[data-layer="highways"] .road-event-count').forEach(element => {
+                    element.textContent = diagnosticsState.layerCounts[name] || '';
+                });
+            }
             renderDiagnostics();
         }
 
@@ -6908,7 +6962,7 @@
                 spcWatches: 'SPC Watches', spcMCD: 'Mesoscale Discussions',
                 spcTornado: 'Tornado Prob', spcWind: 'Wind Prob', spcHail: 'Hail Prob',
                 tropical: 'Tropical Systems', sigmets: 'SIGMETs / AIRMETs',
-                states: 'State Borders', counties: 'County Borders', labels: 'City Labels', highways: 'Highways',
+                states: 'State Borders', counties: 'County Borders', labels: 'City Labels', highways: 'Iowa Road Events',
                 geofences: 'Local Geofences'
             };
             return names[key] || key;
@@ -8244,17 +8298,109 @@
             }
         }
 
-        function toggleHighwaysLayer(on) {
-            removeLayer('highways');
-            if (on) {
-                layerRefs.highways = L.tileLayer.cached('https://stamen-tiles.a.ssl.fastly.net/toner-lines/{z}/{x}/{y}.png', {
-                    opacity: 0.4, 
-                    zIndex: 350, 
-                    pane: 'boundaryPane',
-                    attribution: 'Map tiles by <a href="https://stamen.com/">Stamen Design</a>, data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        function roadEventPresentation(kind) {
+            const presentations = {
+                closure: { label: t('roadClosure') },
+                laneClosure: { label: t('laneClosure') },
+                restriction: { label: t('roadRestriction') },
+                workZone: { label: t('roadWork') }
+            };
+            return presentations[kind] || presentations.workZone;
+        }
+
+        function bindRoadEventPopup(feature, layer) {
+            const properties = feature.properties || {};
+            const presentation = roadEventPresentation(properties.kind);
+            const updated = properties.updatedAt ? formatExternalDate(properties.updatedAt, '') : '';
+            const title = properties.headline || properties.phrase || presentation.label;
+            const route = properties.route ? `<p><strong>${escapeHTML(properties.route, 80)}</strong></p>` : '';
+            const description = properties.description ? `<p>${escapeHTML(properties.description, 500)}</p>` : '';
+            const details = properties.details ? `<p>${escapeHTML(properties.details, 240)}</p>` : '';
+            const restrictions = properties.restrictions
+                ? `<p>${escapeHTML(t('roadEventRestrictions', { value: properties.restrictions }), 300)}</p>`
+                : '';
+            const alternateRoute = properties.alternateRoute
+                ? `<p>${escapeHTML(t('roadEventAlternateRoute', { value: properties.alternateRoute }), 300)}</p>`
+                : '';
+            const updatedLine = updated ? `<div class="meta">${escapeHTML(t('roadEventUpdated', { updated }), 160)}</div>` : '';
+            const sourceLink = properties.sourceUrl
+                ? `<p><a href="${escapeHTML(properties.sourceUrl, 300)}" target="_blank" rel="noopener">${escapeHTML(t('roadEventDetails'), 100)}</a></p>`
+                : '';
+            layer.bindTooltip(`${escapeHTML(presentation.label, 80)}: ${escapeHTML(properties.route || title, 120)}`, { direction: 'top' });
+            layer.bindPopup(`
+                <div class="popup-content">
+                    <span class="badge ${properties.kind === 'closure' ? 'danger' : 'warning'}">${escapeHTML(presentation.label, 80)}</span>
+                    <h4>${escapeHTML(title, 240)}</h4>
+                    ${route}${description}${details}${restrictions}${alternateRoute}${sourceLink}${updatedLine}
+                    <div class="meta">${escapeHTML(t('roadEventSource'), 120)}</div>
+                </div>
+            `);
+        }
+
+        function roadEventMapBounds() {
+            const bounds = map.getBounds();
+            return [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
+        }
+
+        async function loadHighwayEvents() {
+            const controller = beginLayerRequest('highways', true);
+            try {
+                const query = buildIowa511Query(roadEventMapBounds());
+                if (!query) {
+                    commitOverlayLayer('highways', controller, L.layerGroup(), 0, t('roadEventsOutside'));
+                    return;
+                }
+                const response = await fetchWithTimeout(query, { signal: controller.signal });
+                const payload = await response.json();
+                if (!isLayerRequestCurrent('highways', controller)) return;
+                const roadEvents = normalizeIowa511Events(payload);
+                const nextLayer = L.geoJSON(roadEvents, {
+                    pane: 'markerPane',
+                    pointToLayer: (feature, latlng) => {
+                        const presentation = roadEventPresentation(feature.properties?.kind);
+                        const kind = ['closure', 'laneClosure', 'restriction', 'workZone'].includes(feature.properties?.kind)
+                            ? feature.properties.kind
+                            : 'workZone';
+                        const marker = L.marker(latlng, {
+                            pane: 'markerPane',
+                            keyboard: true,
+                            title: `${presentation.label}: ${safeText(feature.properties?.route || feature.properties?.headline, 120)}`,
+                            icon: L.divIcon({
+                                className: `road-event-icon road-event-marker ${kind}`,
+                                iconSize: [kind === 'closure' ? 16 : 14, kind === 'closure' ? 16 : 14],
+                                iconAnchor: [kind === 'closure' ? 8 : 7, kind === 'closure' ? 8 : 7]
+                            })
+                        });
+                        marker.on('add', () => {
+                            const element = marker.getElement();
+                            element?.setAttribute('role', 'button');
+                            element?.setAttribute('aria-label', marker.options.title);
+                        });
+                        return marker;
+                    },
+                    onEachFeature: bindRoadEventPopup
                 });
-                layerRefs.highways.addTo(map);
+                const updated = roadEvents.updatedAt
+                    ? formatExternalDate(roadEvents.updatedAt, t('latest'))
+                    : t('latest');
+                const message = roadEvents.features.length
+                    ? t('roadEventsCurrent', { count: roadEvents.features.length, updated })
+                    : t('roadEventsEmpty');
+                commitOverlayLayer('highways', controller, nextLayer, roadEvents.features.length, message);
+            } catch (error) {
+                if (error?.name === 'AbortError') return;
+                console.error('Iowa road events error:', error);
+                failOverlayRequest('highways', error);
+                showToast(t('roadEventsUnavailable', { message: safeText(error.message, 120) }), 'warn', 5000);
+            } finally {
+                finishLayerRequest('highways', controller);
             }
+        }
+
+        function disposeHighwayEvents() {
+            clearTimeout(roadEventReloadTimeout);
+            roadEventReloadTimeout = null;
+            removeLayer('highways');
         }
 
         // ==================== UI ====================
@@ -9407,6 +9553,7 @@
                 if (settings.layers.spcMCD) loadSPCMCD();
                 if (settings.layers.tropical) loadTropical();
                 if (settings.layers.sigmets) loadSIGMETs();
+                if (settings.layers.highways) loadHighwayEvents();
             });
 
             document.getElementById('locBtn').addEventListener('click', goToLocation);
@@ -9645,6 +9792,7 @@
                 saveSettings();
                 applyLanguage();
                 updateMobileAlertBanner(currentAlertFeatures);
+                if (settings.layers.highways) loadHighwayEvents();
                 if (stormTop3dMode) renderStormTop3d();
                 showToast(t('languageUpdated'), 'success', 2200);
                 if (layerRefs.hailMesh) showMeshLegend();

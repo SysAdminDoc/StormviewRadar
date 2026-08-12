@@ -58,7 +58,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **5 Basemap Styles** — Dark, light, terrain, satellite, and streets
 - **State & County Borders** — Toggleable political boundaries
 - **City Labels** — Optional place name labels
-- **Highway Overlay** — Road network visualization
+- **Iowa Road Events** — Show credential-free Iowa 511 closures, lane closures, restrictions, and work zones with visible-map queries, provider freshness, source links, and explicit Iowa-only coverage
 
 ### User Experience
 - **Dark/Light Theme** — Full theme support with smooth transitions
@@ -134,6 +134,7 @@ API keys are stored unencrypted in the current browser profile and sent directly
 | Lightning | Iowa State Mesonet | ~5 minutes |
 | Satellite | GOES East (IEM) | ~15 minutes |
 | River Gauges | [USGS](https://waterservices.usgs.gov/) | Varies |
+| Iowa road events | [Iowa DOT 511](https://iowadot.gov/travel-tools/iowa-511/511-data-feeds) | As events change |
 
 Location searches use the public [Nominatim](https://nominatim.openstreetmap.org/) service. Requests are limited to one per second, include the project contact address required by the service policy, and are not stored in StormView search history.
 

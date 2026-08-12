@@ -72,7 +72,7 @@ const OVERLAY_DEFINITIONS = Object.freeze({
   states: ['State boundaries', 'boundaries', 'United States'],
   counties: ['County boundaries', 'boundaries', 'United States'],
   labels: ['Map labels', 'reference', 'provider coverage'],
-  highways: ['Highways', 'reference', 'provider coverage'],
+  highways: ['Iowa road events', 'hazards', 'Iowa only'],
   geofences: ['Local geofences', 'local', 'browser profile']
 });
 
