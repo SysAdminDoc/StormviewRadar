@@ -595,6 +595,63 @@
         .pwa-install-copy span { margin-top: 3px; color: var(--text-muted); font-size: 10px; line-height: 1.35; }
         .pwa-install-actions { display: flex; flex-wrap: wrap; gap: 7px; grid-column: 2; }
         .pwa-install-actions .btn { min-height: 34px; padding: 7px 12px; font-size: 11px; }
+        body.animation-exporting .radar-crossfade { transition: none !important; }
+        .animation-export-panel {
+            position: fixed;
+            right: 16px;
+            bottom: 128px;
+            z-index: 1300;
+            width: min(360px, calc(100vw - 32px));
+            padding: 13px;
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            color: var(--text);
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.48);
+        }
+        .animation-export-panel[hidden] { display: none; }
+        .animation-export-header,
+        .animation-export-actions,
+        .animation-export-fields {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .animation-export-header { justify-content: space-between; }
+        .animation-export-title { font-size: 13px; }
+        .animation-export-close {
+            display: grid;
+            place-items: center;
+            width: 34px;
+            height: 34px;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            background: var(--glass-hover);
+            color: var(--text);
+            cursor: pointer;
+            font: inherit;
+            font-size: 18px;
+        }
+        .animation-export-copy { margin: 7px 0 10px; color: var(--text-muted); font-size: 10px; line-height: 1.4; }
+        .animation-export-fields { align-items: flex-end; }
+        .animation-export-field { display: grid; flex: 1; gap: 4px; color: var(--text-muted); font-size: 10px; }
+        .animation-export-field select {
+            min-height: 36px;
+            padding: 6px 8px;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            background: var(--glass-heavy);
+            color: var(--text);
+            font: inherit;
+            font-size: 11px;
+        }
+        .animation-export-summary { margin-top: 8px; color: var(--text-muted); font-size: 10px; }
+        .animation-export-progress { display: grid; gap: 5px; margin-top: 10px; }
+        .animation-export-progress[hidden] { display: none; }
+        .animation-export-progress progress { width: 100%; accent-color: var(--accent); }
+        .animation-export-progress span { color: var(--text-muted); font-size: 10px; }
+        .animation-export-actions { justify-content: flex-end; margin-top: 10px; }
+        .animation-export-actions .btn { min-height: 36px; }
+        .animation-export-actions [hidden] { display: none; }
         @media (max-width: 768px) {
             .pip-radar-panel {
                 right: 10px;
@@ -612,6 +669,7 @@
                 max-height: min(48dvh, 390px);
             }
             .pwa-install-prompt { right: 10px; bottom: 132px; width: min(350px, calc(100vw - 20px)); }
+            .animation-export-panel { right: 10px; bottom: 132px; width: min(350px, calc(100vw - 20px)); }
             body.pip-radar-active .non-map-alerts {
                 right: 10px;
                 bottom: 332px;
@@ -3224,8 +3282,43 @@
             <button class="ctrl-btn" id="loopBtn" title="Loop">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
             </button>
+            <button class="ctrl-btn" id="animationExportBtn" type="button" title="Export radar animation" aria-label="Export radar animation" aria-expanded="false" aria-controls="animationExportPanel">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 19h14"/></svg>
+            </button>
         </div>
     </div>
+
+    <section class="animation-export-panel glass" id="animationExportPanel" role="region" aria-label="Export radar animation" hidden>
+        <div class="animation-export-header">
+            <strong class="animation-export-title" id="animationExportTitle">Export radar animation</strong>
+            <button class="animation-export-close" id="animationExportClose" type="button" aria-label="Close animation export">×</button>
+        </div>
+        <p class="animation-export-copy" id="animationExportCopy">Capture the current map and attribution across up to 24 sampled radar frames.</p>
+        <div class="animation-export-fields">
+            <label class="animation-export-field" for="animationExportFormat"><span id="animationExportFormatLabel">Format</span>
+                <select id="animationExportFormat">
+                    <option value="gif">Animated GIF</option>
+                    <option value="mp4">MP4 video</option>
+                </select>
+            </label>
+            <label class="animation-export-field" for="animationExportDelay"><span id="animationExportDelayLabel">Frame timing</span>
+                <select id="animationExportDelay">
+                    <option value="250">0.25 s</option>
+                    <option value="500" selected>0.5 s</option>
+                    <option value="750">0.75 s</option>
+                </select>
+            </label>
+        </div>
+        <p class="animation-export-summary" id="animationExportSummary"></p>
+        <div class="animation-export-progress" id="animationExportProgress" hidden>
+            <progress id="animationExportProgressBar" value="0" max="1"></progress>
+            <span id="animationExportProgressText" role="status" aria-live="polite"></span>
+        </div>
+        <div class="animation-export-actions">
+            <button class="btn" id="animationExportCancel" type="button" hidden>Cancel</button>
+            <button class="btn btn-primary" id="animationExportStart" type="button">Export</button>
+        </div>
+    </section>
 
     <!-- Load Progress -->
     <div class="load-progress" id="loadProgress" role="status" aria-live="polite">
@@ -3622,11 +3715,12 @@
     import { applyLayerOpacity, normalizeLayerOpacities } from './src/layer-opacity.js';
     import { LOCAL_OVERLAY_LIMITS, parseLocalOverlay } from './src/local-overlay.js';
     import { buildIowa511Query, normalizeIowa511Events } from './src/road-events.js';
-    import { captureLeafletSnapshot, snapshotFilename } from './src/map-snapshot.js';
+    import { captureLeafletSnapshot, renderLeafletSnapshot, snapshotFilename } from './src/map-snapshot.js';
     import { applyEmbedConfiguration, parseEmbedConfig } from './src/embed-mode.js';
     import { cardinalDirection, normalizeChasePosition, orientationHeading, smoothHeading } from './src/chasecaster.js';
     import { getTrainingScenario, trainingFeatureCollection, trainingScenarioCatalog } from './src/training-overlays.js';
     import { normalizeOfflineAvailability, shouldOfferInstall } from './src/pwa-install.js';
+    import { animationDimensions, animationFilename, encodeAnimatedGif, recordCanvasMp4, rgbaToGifIndices, sampledFrameIndices, supportedMp4MimeType } from './src/animation-export.js';
     import { IndexedDbTileCache, isCacheableTileUrl, tileCacheMaxAge } from './src/tile-cache.js';
     import { WebGLTileRenderer } from './src/webgl-tile-renderer.js';
 
@@ -3776,6 +3870,7 @@
         let offlineInstallAvailability = { shell: false, radarFrame: false, radarEntries: 0, ready: false };
         let offlineFrameMarkPending = false;
         let initialLoadComplete = false;
+        let animationExportController = null;
         let compareMap = null;
         let compareBaseLayer = null;
         let compareRadarLayer = null;
@@ -4014,6 +4109,25 @@
                 snapshotUnavailable: 'Wait for a radar frame before saving a snapshot',
                 snapshotMapOnly: 'Exit 3D storm tops before saving a radar snapshot',
                 snapshotFailed: 'Map snapshot failed: {message}',
+                animationExportAria: 'Export radar animation',
+                animationExportClose: 'Close animation export',
+                animationExportTitle: 'Export radar animation',
+                animationExportCopy: 'Capture the current map and attribution across up to 24 sampled radar frames.',
+                animationExportFormat: 'Format',
+                animationExportDelay: 'Frame timing',
+                animationExportGif: 'Animated GIF',
+                animationExportMp4: 'MP4 video',
+                animationExportMp4Unavailable: 'MP4 is unavailable in this browser; GIF export remains available.',
+                animationExportSummary: '{count} sampled frames · about {seconds} seconds',
+                animationExportStart: 'Export',
+                animationExportCancel: 'Cancel',
+                animationExportCapturing: 'Capturing frame {current} of {total}…',
+                animationExportEncoding: 'Encoding {format}…',
+                animationExportSaved: '{format} animation saved',
+                animationExportCancelled: 'Animation export cancelled',
+                animationExportUnavailable: 'At least two ready radar frames are required for animation export',
+                animationExportMapOnly: 'Exit 3D storm tops before exporting a radar animation',
+                animationExportFailed: 'Animation export failed: {message}',
                 embedOpenFullMap: 'Open full StormView Radar map',
                 chasecasterToggle: 'Toggle chasecaster field mode',
                 chasecasterPanel: 'Chasecaster field orientation',
@@ -4215,6 +4329,25 @@
                 snapshotUnavailable: 'Espera una imagen de radar antes de guardar una captura',
                 snapshotMapOnly: 'Sal de las cimas de tormenta 3D antes de guardar una captura de radar',
                 snapshotFailed: 'Falló la captura del mapa: {message}',
+                animationExportAria: 'Exportar animación de radar',
+                animationExportClose: 'Cerrar exportación de animación',
+                animationExportTitle: 'Exportar animación de radar',
+                animationExportCopy: 'Captura el mapa actual y la atribución en hasta 24 cuadros de radar muestreados.',
+                animationExportFormat: 'Formato',
+                animationExportDelay: 'Tiempo por cuadro',
+                animationExportGif: 'GIF animado',
+                animationExportMp4: 'Video MP4',
+                animationExportMp4Unavailable: 'MP4 no está disponible en este navegador; la exportación GIF sigue disponible.',
+                animationExportSummary: '{count} cuadros muestreados · aproximadamente {seconds} segundos',
+                animationExportStart: 'Exportar',
+                animationExportCancel: 'Cancelar',
+                animationExportCapturing: 'Capturando cuadro {current} de {total}…',
+                animationExportEncoding: 'Codificando {format}…',
+                animationExportSaved: 'Animación {format} guardada',
+                animationExportCancelled: 'Exportación de animación cancelada',
+                animationExportUnavailable: 'Se requieren al menos dos cuadros de radar listos para exportar una animación',
+                animationExportMapOnly: 'Sal de las cimas de tormenta 3D antes de exportar una animación de radar',
+                animationExportFailed: 'Falló la exportación de animación: {message}',
                 embedOpenFullMap: 'Abrir el mapa completo de StormView Radar',
                 chasecasterToggle: 'Alternar modo de campo Chasecaster',
                 chasecasterPanel: 'Orientación de campo Chasecaster',
@@ -4695,6 +4828,9 @@
                 bookmarksPanel: ['aria-label', 'savedLocationsAria'],
                 themeBtn: ['title', 'toggleThemeAria'],
                 snapshotBtn: ['title', 'snapshotAria'],
+                animationExportBtn: ['title', 'animationExportAria'],
+                animationExportPanel: ['aria-label', 'animationExportAria'],
+                animationExportClose: ['aria-label', 'animationExportClose'],
                 embedBrand: ['aria-label', 'embedOpenFullMap'],
                 refreshBtn: ['title', 'refreshDataAria'],
                 settingsBtn: ['title', 'settingsAria'],
@@ -4720,6 +4856,7 @@
             if (compareSearchInput) compareSearchInput.placeholder = t('compareSearchPlaceholder');
             updateTrainingLanguage();
             updatePwaInstallLanguage();
+            updateAnimationExportLanguage();
             if (alertAgeLegendControl && currentAlertFeatures.length) {
                 const referenceTime = replayMode && frames[currentFrame]
                     ? frames[currentFrame].time * 1000
@@ -5610,6 +5747,7 @@
             initPipRadar();
             initChasecaster();
             initTrainingOverlays();
+            initAnimationExport();
             initBookmarks();
             initAccessibility();
             updatePlaybackVisibility();
@@ -10939,6 +11077,24 @@
             return localizedStaticText(names[product] || product || 'Radar');
         }
 
+        function mapCaptureOptions(frame = frames[currentFrame]) {
+            const sourceLabel = RADAR_CAPABILITIES[settings.source]?.label || settings.source;
+            const productLabel = radarProductLabel(settings.radarProduct);
+            const attribution = map.attributionControl?.getContainer()?.textContent || '';
+            const styles = getComputedStyle(document.body);
+            return {
+                scale: 1,
+                title: `StormView Radar — ${sourceLabel} ${productLabel}`,
+                frameLabel: `${document.getElementById('timestampText').textContent} • ${document.getElementById('timestampTz').textContent}`,
+                attribution,
+                backgroundColor: settings.theme === 'light' ? '#e2e8f0' : '#111827',
+                accentColor: styles.getPropertyValue('--accent').trim() || '#38bdf8',
+                sourceLabel,
+                productLabel,
+                frameDate: new Date((frame?.time || 0) * 1000)
+            };
+        }
+
         async function exportMapSnapshot() {
             if (stormTop3dMode) {
                 showToast(t('snapshotMapOnly'), 'info', 3200);
@@ -10961,22 +11117,11 @@
             });
 
             try {
-                const sourceLabel = RADAR_CAPABILITIES[settings.source]?.label || settings.source;
-                const productLabel = radarProductLabel(settings.radarProduct);
-                const frameDate = new Date(frame.time * 1000);
-                const attribution = map.attributionControl?.getContainer()?.textContent || '';
-                const styles = getComputedStyle(document.body);
-                const blob = await captureLeafletSnapshot(map.getContainer(), {
-                    scale: 2,
-                    title: `StormView Radar — ${sourceLabel} ${productLabel}`,
-                    frameLabel: `${document.getElementById('timestampText').textContent} • ${document.getElementById('timestampTz').textContent}`,
-                    attribution,
-                    backgroundColor: settings.theme === 'light' ? '#e2e8f0' : '#111827',
-                    accentColor: styles.getPropertyValue('--accent').trim() || '#38bdf8'
-                });
+                const captureOptions = mapCaptureOptions(frame);
+                const blob = await captureLeafletSnapshot(map.getContainer(), { ...captureOptions, scale: 2 });
                 const anchor = document.createElement('a');
                 anchor.href = URL.createObjectURL(blob);
-                anchor.download = snapshotFilename(sourceLabel, settings.radarProduct, frameDate);
+                anchor.download = snapshotFilename(captureOptions.sourceLabel, settings.radarProduct, captureOptions.frameDate);
                 document.body.appendChild(anchor);
                 anchor.click();
                 anchor.remove();
@@ -10989,6 +11134,253 @@
                 button.disabled = false;
                 button.removeAttribute('aria-busy');
             }
+        }
+
+        function updateAnimationExportLanguage() {
+            const panel = document.getElementById('animationExportPanel');
+            if (!panel) return;
+            document.getElementById('animationExportTitle').textContent = t('animationExportTitle');
+            document.getElementById('animationExportCopy').textContent = t('animationExportCopy');
+            document.getElementById('animationExportFormatLabel').textContent = t('animationExportFormat');
+            document.getElementById('animationExportDelayLabel').textContent = t('animationExportDelay');
+            document.querySelector('#animationExportFormat option[value="gif"]').textContent = t('animationExportGif');
+            document.querySelector('#animationExportFormat option[value="mp4"]').textContent = t('animationExportMp4');
+            document.getElementById('animationExportStart').textContent = t('animationExportStart');
+            document.getElementById('animationExportCancel').textContent = t('animationExportCancel');
+            updateAnimationExportControls();
+        }
+
+        function updateAnimationExportControls() {
+            const format = document.getElementById('animationExportFormat');
+            if (!format) return;
+            const mp4Option = format.querySelector('option[value="mp4"]');
+            const mp4Mime = supportedMp4MimeType();
+            mp4Option.disabled = !mp4Mime;
+            mp4Option.title = mp4Mime ? '' : t('animationExportMp4Unavailable');
+            if (!mp4Mime && format.value === 'mp4') format.value = 'gif';
+            const count = sampledFrameIndices(frames.length).length;
+            const delayMs = Number(document.getElementById('animationExportDelay').value) || 500;
+            const summary = t('animationExportSummary', {
+                count,
+                seconds: messageFormatter.number(count * delayMs / 1000, { maximumFractionDigits: 1 })
+            });
+            document.getElementById('animationExportSummary').textContent = mp4Mime
+                ? summary
+                : `${summary} · ${t('animationExportMp4Unavailable')}`;
+            document.getElementById('animationExportStart').disabled = Boolean(animationExportController)
+                || !framesReady || count < 2;
+        }
+
+        function setAnimationExportPanel(open) {
+            const panel = document.getElementById('animationExportPanel');
+            const button = document.getElementById('animationExportBtn');
+            panel.hidden = !open;
+            button.setAttribute('aria-expanded', String(open));
+            button.classList.toggle('active', open);
+            if (open) {
+                updateAnimationExportControls();
+                document.getElementById('animationExportFormat').focus({ preventScroll: true });
+            }
+        }
+
+        function setAnimationExportProgress(current, total, message) {
+            const wrapper = document.getElementById('animationExportProgress');
+            const progress = document.getElementById('animationExportProgressBar');
+            wrapper.hidden = false;
+            progress.max = Math.max(1, total);
+            progress.value = Math.max(0, Math.min(total, current));
+            document.getElementById('animationExportProgressText').textContent = message;
+        }
+
+        function waitForAnimationLayer(layer, signal) {
+            if (signal?.aborted) return Promise.reject(signal.reason || new DOMException('Export cancelled', 'AbortError'));
+            const container = layer?.getContainer?.();
+            const images = container ? [...container.querySelectorAll('img')] : [];
+            const waiting = layer?._loading === true || images.some(image => !image.complete || image.naturalWidth < 1);
+            if (!waiting) return Promise.resolve();
+            return new Promise((resolve, reject) => {
+                let settled = false;
+                const finish = error => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeout);
+                    layer?.off?.('load', onLoad);
+                    signal?.removeEventListener('abort', onAbort);
+                    if (error) reject(error);
+                    else resolve();
+                };
+                const onLoad = () => finish();
+                const onAbort = () => finish(signal.reason || new DOMException('Export cancelled', 'AbortError'));
+                const timeout = setTimeout(() => finish(new Error('A radar frame did not finish loading for export')), 7000);
+                layer?.once?.('load', onLoad);
+                signal?.addEventListener('abort', onAbort, { once: true });
+            });
+        }
+
+        function nextPaint(signal) {
+            return new Promise((resolve, reject) => {
+                if (signal?.aborted) {
+                    reject(signal.reason || new DOMException('Export cancelled', 'AbortError'));
+                    return;
+                }
+                requestAnimationFrame(() => requestAnimationFrame(resolve));
+            });
+        }
+
+        async function renderAnimationFrame(frameIndex, outputCanvas, signal) {
+            if (signal.aborted) throw signal.reason;
+            showPreloadedFrame(frameIndex);
+            if (replayMode) await renderReplayAlerts(frames[frameIndex].time * 1000);
+            await waitForAnimationLayer(frameLayers[frameIndex], signal);
+            cachedTileLayers.forEach(layer => {
+                if (layer._map === map) layer._webglRenderer?.render();
+            });
+            await nextPaint(signal);
+            const captureOptions = mapCaptureOptions(frames[frameIndex]);
+            const snapshotCanvas = await renderLeafletSnapshot(map.getContainer(), captureOptions);
+            if (!outputCanvas.width || !outputCanvas.height) {
+                const dimensions = animationDimensions(snapshotCanvas.width, snapshotCanvas.height);
+                outputCanvas.width = dimensions.width;
+                outputCanvas.height = dimensions.height;
+            }
+            const context = outputCanvas.getContext('2d', { alpha: false, willReadFrequently: true });
+            context.imageSmoothingEnabled = true;
+            context.imageSmoothingQuality = 'high';
+            context.drawImage(snapshotCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
+        }
+
+        function downloadAnimation(blob, filename) {
+            const anchor = document.createElement('a');
+            anchor.href = URL.createObjectURL(blob);
+            anchor.download = filename;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            setTimeout(() => URL.revokeObjectURL(anchor.href), 2000);
+        }
+
+        async function exportRadarAnimation() {
+            if (stormTop3dMode) {
+                showToast(t('animationExportMapOnly'), 'info', 3200);
+                return;
+            }
+            const frameIndices = sampledFrameIndices(frames.length);
+            if (!framesReady || frameIndices.length < 2) {
+                showToast(t('animationExportUnavailable'), 'info', 3600);
+                return;
+            }
+            const format = document.getElementById('animationExportFormat').value;
+            const mp4Mime = supportedMp4MimeType();
+            if (format === 'mp4' && !mp4Mime) {
+                showToast(t('animationExportMp4Unavailable'), 'warn', 4500);
+                updateAnimationExportControls();
+                return;
+            }
+            const delayMs = Math.max(250, Math.min(750, Number(document.getElementById('animationExportDelay').value) || 500));
+            const originalFrame = currentFrame;
+            const wasPlaying = isPlaying;
+            const controller = new AbortController();
+            animationExportController = controller;
+            pause();
+            map.stop();
+            document.body.classList.add('animation-exporting');
+            document.getElementById('animationExportCancel').hidden = false;
+            document.getElementById('animationExportClose').disabled = true;
+            updateAnimationExportControls();
+            const outputCanvas = document.createElement('canvas');
+            outputCanvas.width = 0;
+            outputCanvas.height = 0;
+            try {
+                let blob;
+                const formatLabel = format === 'mp4' ? 'MP4' : 'GIF';
+                if (format === 'mp4') {
+                    const mapRect = map.getContainer().getBoundingClientRect();
+                    const dimensions = animationDimensions(Math.round(mapRect.width), Math.round(mapRect.height) + 88);
+                    outputCanvas.width = dimensions.width;
+                    outputCanvas.height = dimensions.height;
+                    blob = await recordCanvasMp4(outputCanvas, {
+                        mimeType: mp4Mime,
+                        frameCount: frameIndices.length,
+                        delayMs,
+                        signal: controller.signal,
+                        drawFrame: async exportIndex => {
+                            setAnimationExportProgress(exportIndex, frameIndices.length, t('animationExportCapturing', {
+                                current: exportIndex + 1,
+                                total: frameIndices.length
+                            }));
+                            await renderAnimationFrame(frameIndices[exportIndex], outputCanvas, controller.signal);
+                        }
+                    });
+                } else {
+                    const gifFrames = [];
+                    for (let exportIndex = 0; exportIndex < frameIndices.length; exportIndex += 1) {
+                        setAnimationExportProgress(exportIndex, frameIndices.length, t('animationExportCapturing', {
+                            current: exportIndex + 1,
+                            total: frameIndices.length
+                        }));
+                        await renderAnimationFrame(frameIndices[exportIndex], outputCanvas, controller.signal);
+                        const context = outputCanvas.getContext('2d', { willReadFrequently: true });
+                        gifFrames.push(rgbaToGifIndices(context.getImageData(0, 0, outputCanvas.width, outputCanvas.height).data));
+                    }
+                    setAnimationExportProgress(frameIndices.length, frameIndices.length, t('animationExportEncoding', { format: formatLabel }));
+                    await nextPaint(controller.signal);
+                    blob = encodeAnimatedGif({
+                        width: outputCanvas.width,
+                        height: outputCanvas.height,
+                        frames: gifFrames,
+                        delayMs
+                    });
+                }
+                const firstFrame = frames[frameIndices[0]];
+                const captureOptions = mapCaptureOptions(firstFrame);
+                downloadAnimation(blob, animationFilename(
+                    captureOptions.sourceLabel,
+                    settings.radarProduct,
+                    captureOptions.frameDate,
+                    format
+                ));
+                showToast(t('animationExportSaved', { format: format === 'mp4' ? 'MP4' : 'GIF' }), 'success', 3200);
+                setAnimationExportPanel(false);
+            } catch (error) {
+                if (error?.name === 'AbortError') {
+                    showToast(t('animationExportCancelled'), 'info', 2800);
+                } else {
+                    console.error('Animation export error:', error);
+                    showToast(t('animationExportFailed', { message: safeText(error?.message || error, 160) }), 'error', 6500);
+                }
+            } finally {
+                if (frameLayers[originalFrame]) showPreloadedFrame(originalFrame);
+                document.body.classList.remove('animation-exporting');
+                animationExportController = null;
+                document.getElementById('animationExportCancel').hidden = true;
+                document.getElementById('animationExportClose').disabled = false;
+                document.getElementById('animationExportProgress').hidden = true;
+                updateAnimationExportControls();
+                if (wasPlaying) play();
+            }
+        }
+
+        function initAnimationExport() {
+            const button = document.getElementById('animationExportBtn');
+            button.addEventListener('click', () => {
+                if (stormTop3dMode) {
+                    showToast(t('animationExportMapOnly'), 'info', 3200);
+                    return;
+                }
+                if (!framesReady || sampledFrameIndices(frames.length).length < 2) {
+                    showToast(t('animationExportUnavailable'), 'info', 3600);
+                    return;
+                }
+                setAnimationExportPanel(document.getElementById('animationExportPanel').hidden);
+            });
+            document.getElementById('animationExportClose').addEventListener('click', () => setAnimationExportPanel(false));
+            document.getElementById('animationExportFormat').addEventListener('change', updateAnimationExportControls);
+            document.getElementById('animationExportDelay').addEventListener('change', updateAnimationExportControls);
+            document.getElementById('animationExportStart').addEventListener('click', exportRadarAnimation);
+            document.getElementById('animationExportCancel').addEventListener('click', () => {
+                animationExportController?.abort(new DOMException('Export cancelled', 'AbortError'));
+            });
+            updateAnimationExportLanguage();
         }
 
         function addBookmark(name, lat, lng) {

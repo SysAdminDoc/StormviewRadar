@@ -191,7 +191,7 @@ function canvasBlob(canvas) {
   });
 }
 
-export async function captureLeafletSnapshot(container, options = {}) {
+export async function renderLeafletSnapshot(container, options = {}) {
   if (!(container instanceof HTMLElement)) throw new Error('A map container is required');
   const viewport = container.getBoundingClientRect();
   const width = Math.round(viewport.width);
@@ -279,8 +279,12 @@ export async function captureLeafletSnapshot(container, options = {}) {
     2
   );
 
+  return output;
+}
+
+export async function captureLeafletSnapshot(container, options = {}) {
   try {
-    return await canvasBlob(output);
+    return await canvasBlob(await renderLeafletSnapshot(container, options));
   } catch (error) {
     if (error?.name === 'SecurityError') {
       throw new Error('A visible map provider does not permit browser image export');

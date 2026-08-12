@@ -44,6 +44,7 @@ const requiredAssets = [
   ['src/chasecaster.js', 'javascript'],
   ['src/training-overlays.js', 'javascript'],
   ['src/pwa-install.js', 'javascript'],
+  ['src/animation-export.js', 'javascript'],
   ['logo/StormView-512x512.png', 'image/png'],
   ['vendor/leaflet/leaflet.css', 'text/css'],
   ['vendor/leaflet/leaflet.js', 'javascript'],

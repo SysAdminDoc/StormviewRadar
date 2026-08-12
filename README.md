@@ -39,6 +39,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Two-City Comparison** — Split the map into independently pannable desktop or stacked mobile views that share the active radar frame and warning polygons, with a persistent searchable comparison city
 - **Mini Radar** — Keep a floating, browser-portable radar overview visible while active-alert details scroll, with synchronized frames, warning polygons, primary-map following, and complete teardown when closed
 - **Attributed PNG Snapshots** — Save the visible primary map and current radar frame at bounded 2× resolution with source/product, provider-valid time, and live map/data credits
+- **GIF / MP4 Animation Export** — Capture up to 24 sampled attributed frames as a portable looping GIF or, when the browser advertises support, an MP4 canvas recording with bounded dimensions and cancellation
 - **Iframe Embed Mode** — Publish a deterministic, attributed radar map with URL-configurable view, source, product, overlays, appearance, localization, controls, and playback without changing viewer settings
 
 ### Weather Layers
