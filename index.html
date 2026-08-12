@@ -578,6 +578,8 @@
         }
         .icon-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
         .icon-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .icon-btn:disabled { cursor: wait; opacity: 0.72; }
+        .icon-btn[aria-busy="true"] svg { animation: spin 0.8s linear infinite; }
         .icon-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; }
         .sidebar-toggle svg { width: 18px; height: 18px; }
 
@@ -2351,6 +2353,12 @@
                     <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
                 </svg>
             </button>
+            <button class="icon-btn" id="snapshotBtn" title="Save map snapshot">
+                <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+                    <path d="M14.5 4 16 6h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l1.5-2h5z"/>
+                    <circle cx="12" cy="13" r="3.5"/>
+                </svg>
+            </button>
             <button class="icon-btn" id="refreshBtn" title="Refresh All Data">
                 <svg viewBox="0 0 24 24" stroke-width="2">
                     <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
@@ -3246,6 +3254,7 @@
     import { applyLayerOpacity, normalizeLayerOpacities } from './src/layer-opacity.js';
     import { LOCAL_OVERLAY_LIMITS, parseLocalOverlay } from './src/local-overlay.js';
     import { buildIowa511Query, normalizeIowa511Events } from './src/road-events.js';
+    import { captureLeafletSnapshot, snapshotFilename } from './src/map-snapshot.js';
     import { IndexedDbTileCache, isCacheableTileUrl, tileCacheMaxAge } from './src/tile-cache.js';
     import { WebGLTileRenderer } from './src/webgl-tile-renderer.js';
 
@@ -3599,6 +3608,12 @@
                 pipRecenterAria: 'Follow primary map',
                 pipCurrentView: 'Current view',
                 visualPaletteUpdated: '{name} visual palette enabled',
+                snapshotAria: 'Save attributed map snapshot',
+                snapshotCreating: 'Creating map snapshot…',
+                snapshotSaved: 'Map snapshot saved',
+                snapshotUnavailable: 'Wait for a radar frame before saving a snapshot',
+                snapshotMapOnly: 'Exit 3D storm tops before saving a radar snapshot',
+                snapshotFailed: 'Map snapshot failed: {message}',
                 searchPlaceholder: 'Search location…',
                 searchAria: 'Search for a US location',
                 searchClearAria: 'Clear location search',
@@ -3756,6 +3771,12 @@
                 pipRecenterAria: 'Seguir el mapa principal',
                 pipCurrentView: 'Vista actual',
                 visualPaletteUpdated: 'Paleta visual {name} activada',
+                snapshotAria: 'Guardar captura de mapa con atribución',
+                snapshotCreating: 'Creando captura del mapa…',
+                snapshotSaved: 'Captura del mapa guardada',
+                snapshotUnavailable: 'Espera una imagen de radar antes de guardar una captura',
+                snapshotMapOnly: 'Sal de las cimas de tormenta 3D antes de guardar una captura de radar',
+                snapshotFailed: 'Falló la captura del mapa: {message}',
                 searchPlaceholder: 'Buscar ubicación…',
                 searchAria: 'Buscar una ubicación de Estados Unidos',
                 searchClearAria: 'Borrar búsqueda de ubicación',
@@ -4076,6 +4097,7 @@
                 bookmarksBtn: ['title', 'savedLocationsAria'],
                 bookmarksPanel: ['aria-label', 'savedLocationsAria'],
                 themeBtn: ['title', 'toggleThemeAria'],
+                snapshotBtn: ['title', 'snapshotAria'],
                 refreshBtn: ['title', 'refreshDataAria'],
                 settingsBtn: ['title', 'settingsAria'],
                 locBtn: ['aria-label', 'myLocationAria'],
@@ -6477,6 +6499,7 @@
                 const imageUrl = URL.createObjectURL(rendered.blob);
                 const layer = L.imageOverlay(imageUrl, rendered.bounds, {
                     opacity: Math.min(0.92, settings.opacity),
+                    crossOrigin: true,
                     pane: 'hailPane',
                     className: 'hail-mesh-layer',
                     alt: `NOAA MRMS MESH hail size estimate; maximum ${formatHailSize(rendered.maximumMm)}`
@@ -6802,6 +6825,7 @@
                 );
                 layer = L.imageOverlay(imageUrl, bounds, {
                     opacity: settings.opacity,
+                    crossOrigin: true,
                     pane: 'radarPane',
                     className: 'radar-layer palette-native-radar level2-radar',
                     alt: `${rendered.site} ${settings.radarProduct} Level II radar`
@@ -7191,6 +7215,7 @@
                 layers: 'conus_base_reflectivity_mosaic',
                 format: 'image/png',
                 transparent: true,
+                crossOrigin: true,
                 version: '1.3.0',
                 time: new Date(validTime * 1000).toISOString(),
                 crs: L.CRS.EPSG3857,
@@ -8315,6 +8340,7 @@
                     [[23, -126], [50, -65]],
                     {
                         opacity: 0,
+                        crossOrigin: true,
                         pane: 'radarPane',
                         className: 'radar-layer historical-replay-frame',
                         alt: `Archived IEM NEXRAD composite ${new Date(frame.time * 1000).toISOString()}`
@@ -10255,6 +10281,70 @@
             showToast('Saved locations exported', 'success', 2500);
         }
 
+        function radarProductLabel(product) {
+            const names = {
+                reflectivity: 'Reflectivity',
+                velocity: 'Velocity',
+                echoTops: 'Echo Tops',
+                precipAccum: 'Precipitation',
+                differentialReflectivity: 'Differential Reflectivity',
+                correlationCoefficient: 'Correlation Coefficient'
+            };
+            return localizedStaticText(names[product] || product || 'Radar');
+        }
+
+        async function exportMapSnapshot() {
+            if (stormTop3dMode) {
+                showToast(t('snapshotMapOnly'), 'info', 3200);
+                return;
+            }
+            const frame = frames[currentFrame];
+            if (!framesReady || !frame) {
+                showToast(t('snapshotUnavailable'), 'info', 3200);
+                return;
+            }
+
+            const button = document.getElementById('snapshotBtn');
+            button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
+            showToast(t('snapshotCreating'), 'info', 1800);
+            pause();
+            map.stop();
+            cachedTileLayers.forEach(layer => {
+                if (layer._map === map) layer._webglRenderer?.render();
+            });
+
+            try {
+                const sourceLabel = RADAR_CAPABILITIES[settings.source]?.label || settings.source;
+                const productLabel = radarProductLabel(settings.radarProduct);
+                const frameDate = new Date(frame.time * 1000);
+                const attribution = map.attributionControl?.getContainer()?.textContent || '';
+                const styles = getComputedStyle(document.body);
+                const blob = await captureLeafletSnapshot(map.getContainer(), {
+                    scale: 2,
+                    title: `StormView Radar — ${sourceLabel} ${productLabel}`,
+                    frameLabel: `${document.getElementById('timestampText').textContent} • ${document.getElementById('timestampTz').textContent}`,
+                    attribution,
+                    backgroundColor: settings.theme === 'light' ? '#e2e8f0' : '#111827',
+                    accentColor: styles.getPropertyValue('--accent').trim() || '#38bdf8'
+                });
+                const anchor = document.createElement('a');
+                anchor.href = URL.createObjectURL(blob);
+                anchor.download = snapshotFilename(sourceLabel, settings.radarProduct, frameDate);
+                document.body.appendChild(anchor);
+                anchor.click();
+                anchor.remove();
+                setTimeout(() => URL.revokeObjectURL(anchor.href), 1500);
+                showToast(t('snapshotSaved'), 'success', 2600);
+            } catch (error) {
+                console.error('Map snapshot error:', error);
+                showToast(t('snapshotFailed', { message: safeText(error?.message || error, 160) }), 'error', 6000);
+            } finally {
+                button.disabled = false;
+                button.removeAttribute('aria-busy');
+            }
+        }
+
         function addBookmark(name, lat, lng) {
             name = safeText(name || 'Saved location', 120);
             lat = Number(lat);
@@ -10679,6 +10769,8 @@
                 saveSettings();
                 if (settings.layers.labels) toggleLabelsLayer(true);
             });
+
+            document.getElementById('snapshotBtn').addEventListener('click', exportMapSnapshot);
 
             document.getElementById('refreshBtn').addEventListener('click', async () => {
                 if (replayMode) {
