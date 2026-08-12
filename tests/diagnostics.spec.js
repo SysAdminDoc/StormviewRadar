@@ -1,4 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+
+const { version: appVersion } = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+);
 
 const transparentPng = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
@@ -56,7 +61,7 @@ test('diagnostics expose freshness and failures without secrets or coordinates',
 
   await page.locator('#settingsBtn').click();
   await page.locator('.settings-tab[data-tab="diagnostics"]').click();
-  await expect(page.locator('#diagVersion')).toHaveText('0.1.0');
+  await expect(page.locator('#diagVersion')).toHaveText(appVersion);
   await expect(page.locator('#diagProvider')).toHaveText('MRMS / reflectivity');
   await expect(page.locator('#diagState')).toContainText('fallback: MRMS fallback: RainViewer failed');
   await expect(page.locator('#diagFreshness')).toContainText('min old');

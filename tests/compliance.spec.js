@@ -1,4 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+
+const { version: appVersion } = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+);
 
 const transparentPng = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
@@ -47,8 +52,8 @@ test('active map providers and bundled identity assets remain visible', async ({
   await expect(page.locator('.data-credit a[href*="eccc-msc.github.io/open-data/licence"]')).toHaveText('ECCC');
   await expect(page.locator('img[src*="raw.githubusercontent.com"]')).toHaveCount(0);
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', 'logo/StormView-512x512.png');
-  await expect(page.locator('meta[name="application-version"]')).toHaveAttribute('content', '0.1.0');
-  await expect(page).toHaveTitle('StormView Radar 0.1.0');
+  await expect(page.locator('meta[name="application-version"]')).toHaveAttribute('content', appVersion);
+  await expect(page).toHaveTitle(`StormView Radar ${appVersion}`);
 });
 
 test('Nominatim search is identified and serialized to one request per second', async ({ page }) => {
