@@ -222,6 +222,7 @@ Access the settings panel (⚙️) to customize:
 - Units (US customary/metric)
 - Show legend
 - Border widths and opacity
+- Independent overlay visibility (10%–100% per layer)
 
 **Radar**
 - Opacity (30%–100%)

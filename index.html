@@ -2672,6 +2672,21 @@
                     </div>
                 </div>
                 <div class="settings-section">
+                    <div class="settings-section-title">Overlay Visibility</div>
+                    <p class="setting-hint" role="note">Adjust each map overlay independently. Radar opacity remains in the Radar tab.</p>
+                    <div class="setting-row">
+                        <label class="setting-label" for="overlayOpacityLayerSelect">Layer</label>
+                        <select class="api-input" id="overlayOpacityLayerSelect" style="width:175px;padding:8px;"></select>
+                    </div>
+                    <div class="setting-row">
+                        <label class="setting-label" for="overlayOpacitySlider">Visibility</label>
+                        <div class="slider-row">
+                            <input type="range" class="slider" id="overlayOpacitySlider" min="0.1" max="1" step="0.05" value="1" aria-label="Selected overlay visibility">
+                            <span class="slider-value" id="overlayOpacityValue">100%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-section">
                     <div class="settings-section-title">Import / Export</div>
                     <div class="btn-row">
                         <button class="btn" id="exportBtn">
@@ -2918,6 +2933,7 @@
     <script type="module">
     import { createProviderRegistry, RADAR_CAPABILITIES } from './src/providers/registry.js';
     import { createMessageFormatter } from './src/i18n.js';
+    import { applyLayerOpacity, normalizeLayerOpacities } from './src/layer-opacity.js';
     import { LOCAL_OVERLAY_LIMITS, parseLocalOverlay } from './src/local-overlay.js';
     import { buildIowa511Query, normalizeIowa511Events } from './src/road-events.js';
 
@@ -3062,6 +3078,8 @@
         let speedMult = 1;
         let searchTimeout = null;
         let roadEventReloadTimeout = null;
+        let overlayOpacityApplyFrame = null;
+        const pendingOpacityLayers = new Set();
         let searchAbortController = null;
         let nextNominatimRequestAt = 0;
         let lastRefreshTime = null;
@@ -3123,7 +3141,7 @@
         const layerRequests = new Map();
         const layerRequestGenerations = new Map();
         const MAX_SETTINGS_BYTES = 32768;
-        const SETTINGS_SCHEMA_VERSION = 4;
+        const SETTINGS_SCHEMA_VERSION = 5;
         const SETTINGS_STORAGE_KEY = 'stormview_settings';
         const GEOFENCE_STORAGE_KEY = 'stormview_geofences';
         const MAX_GEOFENCES = 20;
@@ -3434,6 +3452,10 @@
             'State Border Width': 'Ancho de estados',
             'County Border Width': 'Ancho de condados',
             'Border Opacity': 'Opacidad de bordes',
+            'Overlay Visibility': 'Visibilidad de capas',
+            'Adjust each map overlay independently. Radar opacity remains in the Radar tab.': 'Ajusta cada capa del mapa de forma independiente. La opacidad del radar permanece en la pestaña Radar.',
+            'Layer': 'Capa',
+            'Visibility': 'Visibilidad',
             'Import / Export': 'Importar / Exportar',
             'Export': 'Exportar',
             'Import': 'Importar',
@@ -4082,6 +4104,31 @@
             layer.clearLayers?.();
         }
 
+        function overlayLayerById(id) {
+            return id === 'localOverlay' ? localOverlayLayer : layerRefs[id];
+        }
+
+        function applyOverlayOpacity(id) {
+            if (!OVERLAY_OPACITY_LAYER_IDS.includes(id)) return;
+            applyLayerOpacity(overlayLayerById(id), settings.layerOpacity[id]);
+        }
+
+        function scheduleOverlayOpacityApply(event) {
+            if (event?.layer) pendingOpacityLayers.add(event.layer);
+            if (overlayOpacityApplyFrame !== null) return;
+            overlayOpacityApplyFrame = requestAnimationFrame(() => {
+                overlayOpacityApplyFrame = null;
+                const addedLayers = [...pendingOpacityLayers];
+                pendingOpacityLayers.clear();
+                OVERLAY_OPACITY_LAYER_IDS.forEach(id => {
+                    const overlay = overlayLayerById(id);
+                    if (overlay && addedLayers.some(layer => layer === overlay || overlay.hasLayer?.(layer))) {
+                        applyOverlayOpacity(id);
+                    }
+                });
+            });
+        }
+
         function commitOverlayLayer(name, controller, nextLayer, featureCount, message) {
             if (!isLayerRequestCurrent(name, controller)) {
                 disposeOverlayLayer(nextLayer);
@@ -4129,6 +4176,7 @@
             const result = {
                 ...settings,
                 layers: { ...settings.layers },
+                layerOpacity: { ...settings.layerOpacity },
                 colorScheme: 2
             };
             const enumFields = {
@@ -4158,6 +4206,11 @@
             result.stateBorderWidth = finiteNumber(candidate.stateBorderWidth, 0, 8, result.stateBorderWidth);
             result.countyBorderWidth = finiteNumber(candidate.countyBorderWidth, 0, 8, result.countyBorderWidth);
             result.borderOpacity = finiteNumber(candidate.borderOpacity, 0, 1, result.borderOpacity);
+            result.layerOpacity = normalizeLayerOpacities(
+                candidate.layerOpacity,
+                OVERLAY_OPACITY_LAYER_IDS,
+                result.layerOpacity
+            );
             result.alertAudioDistanceMiles = [0, 25, 50, 100, 250, 500].includes(Number(candidate.alertAudioDistanceMiles))
                 ? Number(candidate.alertAudioDistanceMiles)
                 : result.alertAudioDistanceMiles;
@@ -4352,6 +4405,18 @@
         let localOverlayFeatureCount = 0;
 
         const dataCache = { statesGeo: null, countiesGeo: null };
+
+        const OVERLAY_OPACITY_LAYER_IDS = Object.freeze([
+            'alerts', 'spcOutlook', 'stormReports', 'stormTracks', 'couplets', 'hailMesh',
+            'lightning', 'satellite', 'satelliteIR', 'satelliteWV', 'satelliteGeoColor',
+            'satelliteSandwich', 'satelliteMesoscale', 'riverGauges', 'surfaceObs',
+            'spcWatches', 'spcMCD', 'spcTornado', 'spcWind', 'spcHail', 'tropical',
+            'sigmets', 'temp', 'wind', 'clouds', 'pressure', 'states', 'counties',
+            'labels', 'highways', 'geofences', 'localOverlay'
+        ]);
+        const DEFAULT_LAYER_OPACITY = Object.freeze(Object.fromEntries(
+            OVERLAY_OPACITY_LAYER_IDS.map(id => [id, 1])
+        ));
         
         // HRRR state
         let hrrrInitTime = null;
@@ -4385,6 +4450,7 @@
             stateBorderWidth: 2,
             countyBorderWidth: 1,
             borderOpacity: 0.6,
+            layerOpacity: { ...DEFAULT_LAYER_OPACITY },
             layers: {
                 // Core weather
                 radar: true, alerts: true, spcOutlook: true, stormReports: false, stormTracks: false, couplets: true, hailMesh: false,
@@ -4676,6 +4742,7 @@
                 if (!settings.layers.highways) return;
                 roadEventReloadTimeout = setTimeout(loadHighwayEvents, 500);
             });
+            map.on('layeradd', scheduleOverlayOpacityApply);
             updateCoverageStatus();
         }
 
@@ -6963,7 +7030,7 @@
                 spcTornado: 'Tornado Prob', spcWind: 'Wind Prob', spcHail: 'Hail Prob',
                 tropical: 'Tropical Systems', sigmets: 'SIGMETs / AIRMETs',
                 states: 'State Borders', counties: 'County Borders', labels: 'City Labels', highways: 'Iowa Road Events',
-                geofences: 'Local Geofences'
+                geofences: 'Local Geofences', localOverlay: 'Local Map Overlay'
             };
             return names[key] || key;
         }
@@ -9824,7 +9891,10 @@
             initSlider('borderOpacitySlider', 'borderOpacityValue', 'borderOpacity', '%', () => {
                 if (layerRefs.states) layerRefs.states.setStyle({ opacity: settings.borderOpacity });
                 if (layerRefs.counties) layerRefs.counties.setStyle({ opacity: settings.borderOpacity * 0.7 });
+                applyOverlayOpacity('states');
+                applyOverlayOpacity('counties');
             }, true);
+            initOverlayOpacityControls();
 
             // Radar settings
             initSlider('opacitySlider', 'opacityValue', 'opacity', '%', () => {
@@ -10023,6 +10093,37 @@
                 saveSettings();
                 if (callback) callback();
             });
+        }
+
+        function initOverlayOpacityControls() {
+            const select = document.getElementById('overlayOpacityLayerSelect');
+            const slider = document.getElementById('overlayOpacitySlider');
+            const value = document.getElementById('overlayOpacityValue');
+            if (!select || !slider || !value) return;
+
+            OVERLAY_OPACITY_LAYER_IDS.forEach(id => {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = getLayerName(id);
+                select.append(option);
+            });
+
+            const syncControl = () => {
+                const opacity = settings.layerOpacity[select.value] ?? 1;
+                slider.value = String(opacity);
+                value.textContent = `${Math.round(opacity * 100)}%`;
+                slider.setAttribute('aria-label', `${getLayerName(select.value)} visibility`);
+            };
+
+            select.addEventListener('change', syncControl);
+            slider.addEventListener('input', () => {
+                const opacity = Number(slider.value);
+                settings.layerOpacity[select.value] = opacity;
+                value.textContent = `${Math.round(opacity * 100)}%`;
+                applyOverlayOpacity(select.value);
+                saveSettings();
+            });
+            syncControl();
         }
 
         function initSearch() {

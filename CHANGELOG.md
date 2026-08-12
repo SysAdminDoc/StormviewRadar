@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Added persistent per-overlay visibility controls for tile, marker, SVG, and canvas layers while preserving each layer's authored styling.
 - Replaced the legacy line-tile road overlay with bounded, cancellable Iowa 511 closure/work-zone events, grouped duplicate endpoints, provider freshness, safe source links, and explicit Iowa-only coverage.
 - Added bounded session-only GeoJSON/KML overlays with safe geometry/property parsing, escaped popups, explicit visibility/removal controls, and no persistence or network upload.
 - Replaced exact-English UI rewriting with parity-checked English/Spanish message catalogs, centralized locale-aware plurals/numbers/dates/units, and localized primary ARIA labels plus recovery states.

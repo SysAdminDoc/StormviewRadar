@@ -178,6 +178,49 @@ test('Iowa road events disclose bounded coverage, freshness, and grouped closure
   await expect(toggle).toHaveAttribute('data-feature-count', '0');
 });
 
+test('overlay opacity is independent, persisted, and applied to future layer loads', async ({ page }) => {
+  await page.route('https://services.arcgis.com/**/CARS511_Iowa_View/FeatureServer/0/query?**', route => route.fulfill({
+    json: {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        properties: {
+          OBJECTID: 1,
+          ID: 'IADOT-OPACITY',
+          STYLE: 'roadwork',
+          headline: 'I-80 road construction',
+          Route: 'I-80',
+          EditDate: 1786533787000
+        },
+        geometry: { type: 'Point', coordinates: [-93.62, 41.59] }
+      }]
+    }
+  }));
+
+  await page.goto('/');
+  const toggle = page.locator('.sidebar [data-layer="highways"]');
+  await toggle.evaluate(element => element.click());
+  await expect(page.locator('.road-event-marker')).toHaveCount(1);
+
+  await page.locator('#settingsBtn').click();
+  await page.locator('#overlayOpacityLayerSelect').selectOption('highways');
+  await page.locator('#overlayOpacitySlider').evaluate(element => {
+    element.value = '0.35';
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
+  await expect(page.locator('#overlayOpacityValue')).toHaveText('35%');
+  await expect(page.locator('.road-event-marker')).toHaveCSS('opacity', '0.35');
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('stormview_settings')));
+  expect(stored.schemaVersion).toBe(5);
+  expect(stored.settings.layerOpacity.highways).toBe(0.35);
+  expect(stored.settings.layerOpacity.alerts).toBe(1);
+
+  await page.reload();
+  await expect(page.locator('.road-event-marker')).toHaveCount(1);
+  await expect(page.locator('.road-event-marker')).toHaveCSS('opacity', '0.35');
+});
+
 const delayedOverlayScenarios = [
   {
     layer: 'spcWatches',
