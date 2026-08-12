@@ -75,12 +75,19 @@ test('MRMS uses IEM provider metadata rather than the client clock', async ({ pa
     contentType: 'image/png',
     body: transparentPng
   }));
+  await page.route('https://mesonet.agron.iastate.edu/archive/data/**', route => route.fulfill({
+    status: 200,
+    headers: { 'access-control-allow-origin': '*' },
+    contentType: 'image/png',
+    body: transparentPng
+  }));
 
   await page.goto('/');
   await expect(page.locator('#dataStatusText')).toHaveText('MRMS: current');
   await expect(page.locator('#timestampBox')).toHaveAttribute('data-provider-time', '2026-07-25T20:55:00.000Z');
   await expect(page.locator('#timestampBox')).toHaveAttribute('data-kind', 'latest');
-  await expect(page.locator('#playback')).toBeHidden();
+  await expect(page.locator('#playback')).toBeVisible();
+  await expect(page.locator('#timeline')).toHaveAttribute('aria-valuemax', '73');
 });
 
 test('RainViewer preserves provider frame timestamps and global coverage', async ({ page }) => {
@@ -120,6 +127,12 @@ test('failed providers fall back to MRMS with an actionable status', async ({ pa
   }));
   await page.route('https://mesonet.agron.iastate.edu/cache/tile.py/**', route => route.fulfill({
     status: 200,
+    contentType: 'image/png',
+    body: transparentPng
+  }));
+  await page.route('https://mesonet.agron.iastate.edu/archive/data/**', route => route.fulfill({
+    status: 200,
+    headers: { 'access-control-allow-origin': '*' },
     contentType: 'image/png',
     body: transparentPng
   }));

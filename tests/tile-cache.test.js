@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  ARCHIVE_RADAR_MAX_AGE_MS,
   BASEMAP_MAX_AGE_MS,
   DEFAULT_MAX_AGE_MS,
+  DYNAMIC_RADAR_MAX_AGE_MS,
   IndexedDbTileCache,
   isCacheableTileUrl,
   tileCacheMaxAge
@@ -29,13 +31,25 @@ test('tile cache disables itself when IndexedDB is unavailable', async () => {
   });
 });
 
-test('stable basemaps outlive frequently changing weather tiles', () => {
+test('cache lifetimes distinguish immutable frames from mutable radar tiles', () => {
   assert.equal(
     tileCacheMaxAge('https://a.basemaps.cartocdn.com/dark_all/4/2/3.png'),
     BASEMAP_MAX_AGE_MS
   );
   assert.equal(
     tileCacheMaxAge('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad/4/2/3.png'),
+    DYNAMIC_RADAR_MAX_AGE_MS
+  );
+  assert.equal(
+    tileCacheMaxAge('https://mesonet.agron.iastate.edu/archive/data/2026/08/12/GIS/uscomp/n0q_202608121800.png'),
+    ARCHIVE_RADAR_MAX_AGE_MS
+  );
+  assert.equal(
+    tileCacheMaxAge('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/hrrr::REFD-F0060-202608121800/4/2/3.png'),
+    ARCHIVE_RADAR_MAX_AGE_MS
+  );
+  assert.equal(
+    tileCacheMaxAge('https://tiles.example.test/weather/4/2/3.png'),
     DEFAULT_MAX_AGE_MS
   );
 });

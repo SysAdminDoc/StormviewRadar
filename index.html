@@ -3721,6 +3721,7 @@
     import { getTrainingScenario, trainingFeatureCollection, trainingScenarioCatalog } from './src/training-overlays.js';
     import { normalizeOfflineAvailability, shouldOfferInstall } from './src/pwa-install.js';
     import { animationDimensions, animationFilename, encodeAnimatedGif, recordCanvasMp4, rgbaToGifIndices, sampledFrameIndices, supportedMp4MimeType } from './src/animation-export.js';
+    import { buildRadarHistoryFrames, radarHistoryHours, radarHistoryTickIndices } from './src/radar-history.js';
     import { IndexedDbTileCache, isCacheableTileUrl, tileCacheMaxAge } from './src/tile-cache.js';
     import { WebGLTileRenderer } from './src/webgl-tile-renderer.js';
 
@@ -3900,6 +3901,8 @@
         let isPlaying = false;
         let animationId = null;
         let lastFrameTime = 0;
+        let frameTransitionPending = false;
+        let frameTransitionGeneration = 0;
         let speedMult = 1;
         let searchTimeout = null;
         let roadEventReloadTimeout = null;
@@ -6152,7 +6155,7 @@
                 settings.source,
                 settings.radarProduct,
                 currentFrame,
-                layer._url || '',
+                layer._stormviewFrameUrl || layer._url || '',
                 layer.wmsParams?.time || '',
                 bounds?.isValid?.() ? bounds.toBBoxString() : ''
             ]);
@@ -6174,6 +6177,14 @@
             }
             const bounds = sourceLayer.getBounds?.();
             if (sourceLayer instanceof L.ImageOverlay && bounds?.isValid?.()) {
+                if (sourceLayer._stormviewFrameAware && sourceLayer._stormviewFrameUrl) {
+                    return createFrameAwareImageOverlay(
+                        sourceLayer._stormviewFrameUrl,
+                        bounds,
+                        options,
+                        { trackLoad: false }
+                    );
+                }
                 return L.imageOverlay(sourceLayer._url, bounds, options);
             }
             return null;
@@ -6508,10 +6519,11 @@
         const cachedTileLayers = new Set();
         const tileCacheMetrics = { hits: 0, misses: 0 };
         const tileCacheState = { state: 'initializing', count: 0, bytes: 0 };
+        const TRANSPARENT_FRAME_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
         const persistentTileCache = new IndexedDbTileCache({
             maxEntries: 1200,
             maxBytes: 96 * 1024 * 1024,
-            maxTileBytes: 2 * 1024 * 1024,
+            maxTileBytes: 8 * 1024 * 1024,
             onStatus: status => {
                 tileCacheState.state = safeText(status.state, 24);
                 if (Number.isFinite(status.count)) tileCacheState.count = status.count;
@@ -6527,6 +6539,120 @@
             if (!element) return;
             element.dataset.cacheHits = String(tileCacheMetrics.hits);
             element.dataset.cacheMisses = String(tileCacheMetrics.misses);
+        }
+
+        function createFrameAwareImageOverlay(url, bounds, options = {}, { trackLoad = true } = {}) {
+            const layer = L.imageOverlay(TRANSPARENT_FRAME_IMAGE, bounds, {
+                ...options,
+                crossOrigin: false
+            });
+            layer._stormviewFrameAware = true;
+            layer._stormviewFrameUrl = url;
+            layer._stormviewFrameBlob = null;
+            layer._stormviewFramePromise = null;
+            layer._stormviewFrameController = null;
+            layer._stormviewFrameObjectUrl = '';
+            layer._stormviewFrameGeneration = 0;
+            layer._stormviewFrameReady = false;
+            layer._stormviewFrameCounted = false;
+
+            layer.preloadFrame = function() {
+                if (this._stormviewFrameBlob) return Promise.resolve(this._stormviewFrameBlob);
+                if (this._stormviewFramePromise) return this._stormviewFramePromise;
+                const controller = new AbortController();
+                this._stormviewFrameController = controller;
+                this._stormviewFramePromise = (async () => {
+                    const cached = await persistentTileCache.get(url, tileCacheMaxAge(url));
+                    if (cached) {
+                        recordTileCacheResult(true);
+                        return cached;
+                    }
+
+                    recordTileCacheResult(false);
+                    const response = await fetchWithTimeout(url, {
+                        signal: controller.signal,
+                        mode: 'cors',
+                        credentials: 'omit',
+                        cache: 'no-store'
+                    }, 15000);
+                    const blob = await response.blob();
+                    if ((!blob.type || blob.type.startsWith('image/')) && blob.size > 0) {
+                        persistentTileCache.put(url, blob).catch(() => {});
+                        return blob;
+                    }
+                    throw new Error('Archived radar frame was not a supported image');
+                })().then(blob => {
+                    this._stormviewFrameBlob = blob;
+                    return blob;
+                }).finally(() => {
+                    if (this._stormviewFrameController === controller) this._stormviewFrameController = null;
+                    this._stormviewFramePromise = null;
+                });
+                return this._stormviewFramePromise;
+            };
+
+            layer.activateFrame = function() {
+                if (this._stormviewFrameReady && this.getElement()?.naturalWidth > 0) {
+                    return Promise.resolve(true);
+                }
+                if (this._stormviewActivatePromise) return this._stormviewActivatePromise;
+                const generation = ++this._stormviewFrameGeneration;
+                this._loading = true;
+                this._stormviewActivatePromise = (async () => {
+                    const blob = await this.preloadFrame();
+                    if (generation !== this._stormviewFrameGeneration || !this._map) return false;
+                    if (this._stormviewFrameObjectUrl) URL.revokeObjectURL(this._stormviewFrameObjectUrl);
+                    const objectUrl = URL.createObjectURL(blob);
+                    this._stormviewFrameObjectUrl = objectUrl;
+                    const image = this.getElement();
+                    if (!image) return false;
+                    const loaded = new Promise((resolve, reject) => {
+                        image.addEventListener('load', resolve, { once: true });
+                        image.addEventListener('error', () => reject(new Error('Archived radar frame could not be decoded')), { once: true });
+                    });
+                    this.setUrl(objectUrl);
+                    await loaded;
+                    if (generation !== this._stormviewFrameGeneration || !this._map) return false;
+                    this._loading = false;
+                    this._stormviewFrameReady = true;
+                    if (trackLoad && !this._stormviewFrameCounted) {
+                        this._stormviewFrameCounted = true;
+                        markRadarFrameLoaded();
+                    }
+                    return true;
+                })().catch(error => {
+                    if (error?.name !== 'AbortError') this.fire('error', { error });
+                    return false;
+                }).finally(() => {
+                    this._loading = false;
+                    this._stormviewActivatePromise = null;
+                });
+                return this._stormviewActivatePromise;
+            };
+
+            layer.releaseFrame = function({ dropPreload = false } = {}) {
+                this._stormviewFrameGeneration += 1;
+                this._stormviewFrameReady = false;
+                this._loading = false;
+                if (this._stormviewFrameObjectUrl) {
+                    URL.revokeObjectURL(this._stormviewFrameObjectUrl);
+                    this._stormviewFrameObjectUrl = '';
+                }
+                if (this.getElement()) this.setUrl(TRANSPARENT_FRAME_IMAGE);
+                if (dropPreload) {
+                    this._stormviewFrameController?.abort(new DOMException('Frame left the preload window', 'AbortError'));
+                    this._stormviewFrameController = null;
+                    this._stormviewFrameBlob = null;
+                }
+            };
+
+            layer.on('add', () => {
+                layer.activateFrame();
+            });
+            layer.on('remove', () => {
+                layer.releaseFrame();
+            });
+            return layer;
         }
 
         const rateLimiter = (() => {
@@ -7675,6 +7801,7 @@
         function disposeRadarState(snapshot) {
             snapshot?.frameLayers?.forEach(layer => {
                 if (map.hasLayer(layer)) map.removeLayer(layer);
+                layer.releaseFrame?.({ dropPreload: true });
                 revokeLayerObjectUrl(layer);
             });
         }
@@ -7701,6 +7828,7 @@
             const layer = frameLayers[currentFrame];
             if (layer && !map.hasLayer(layer)) layer.addTo(map);
             layer?.setOpacity(settings.opacity);
+            applyFramePreloadWindow(currentFrame);
             syncRadarCapabilities();
             updatePlaybackVisibility();
             updateLegend();
@@ -7932,7 +8060,7 @@
             const validTime = providerEpochSeconds(metadata?.meta?.valid, 'IEM radar metadata');
             ensureCurrentRadarLoad(generation, signal);
             
-            const layer = L.tileLayer.cached(productUrl, {
+            const currentLayer = L.tileLayer.cached(productUrl, {
                 opacity: settings.opacity,
                 webgl: true,
                 pane: 'radarPane',
@@ -7944,25 +8072,46 @@
                 updateWhenIdle: true,
                 attribution: IEM_ATTRIBUTION
             });
-            framesTotal = 1;
+            const historyEnabled = settings.radarProduct === 'reflectivity';
+            frames = historyEnabled
+                ? buildRadarHistoryFrames(validTime, { reducedData: settings.reducedData })
+                : [{
+                    time: validTime,
+                    path: 'mrms-current',
+                    kind: 'latest',
+                    timeSource: 'IEM US composite metadata'
+                }];
+            frameLayers = historyEnabled
+                ? frames.slice(0, -1).map(frame => createFrameAwareImageOverlay(
+                    frame.path,
+                    [[23, -126], [50, -65]],
+                    {
+                        opacity: 0,
+                        pane: 'radarPane',
+                        className: 'radar-layer radar-cached radar-history-frame',
+                        alt: `Archived IEM NEXRAD composite ${new Date(frame.time * 1000).toISOString()}`,
+                        attribution: IEM_ATTRIBUTION
+                    }
+                ))
+                : [];
+            frameLayers.push(currentLayer);
+            map.getContainer().dataset.radarHistoryHours = historyEnabled
+                ? String(radarHistoryHours(settings.reducedData))
+                : '0';
+            framesTotal = frames.length;
             framesLoaded = 0;
-            layer.once('load', markRadarFrameLoaded);
-            layer.addTo(map);
-            frameLayers.push(layer);
+            currentLayer.once('load', markRadarFrameLoaded);
+            currentLayer.addTo(map);
             ensureCurrentRadarLoad(generation, signal);
-            
-            frames = [{
-                time: validTime,
-                path: 'mrms',
-                kind: 'latest',
-                timeSource: 'IEM US composite metadata'
-            }];
-            lastPastFrame = 0;
-            currentFrame = 0;
+
+            lastPastFrame = Math.max(0, frames.length - 2);
+            currentFrame = frames.length - 1;
             framesReady = true;
             lastRefreshTime = Date.now();
+            applyFramePreloadWindow(currentFrame);
             updateTimestamp();
             updateTimelineUI();
+            updatePlaybackVisibility();
             hideLoadProgress();
         }
         
@@ -8517,8 +8666,55 @@
             }
         }
 
+        async function showFrameAwareFrame(idx) {
+            const transitionGeneration = ++frameTransitionGeneration;
+            const previousFrame = currentFrame;
+            const nextLayer = frameLayers[idx];
+            currentFrame = idx;
+            frameTransitionPending = true;
+            diagnosticsState.performance.renderedFrames += 1;
+            if (!map.hasLayer(nextLayer)) nextLayer.addTo(map);
+            nextLayer.setOpacity(0);
+            applyFramePreloadWindow(idx, { preserve: [previousFrame] });
+
+            try {
+                const ready = await nextLayer.activateFrame();
+                if (transitionGeneration !== frameTransitionGeneration || currentFrame !== idx) return;
+                if (!ready) throw new Error('Archived radar frame is unavailable');
+                nextLayer.setOpacity(settings.opacity);
+                nextLayer.bringToFront?.();
+                if (previousFrame !== idx && frameLayers[previousFrame]) {
+                    frameLayers[previousFrame].setOpacity(0);
+                }
+                updateTimestamp();
+                updateTimelineFill();
+                if (replayMode) await renderReplayAlerts(frames[idx].time * 1000);
+                setTimeout(() => {
+                    if (currentFrame === idx) applyFramePreloadWindow(idx);
+                }, 320);
+            } catch (error) {
+                if (transitionGeneration !== frameTransitionGeneration) return;
+                currentFrame = previousFrame;
+                const previousLayer = frameLayers[previousFrame];
+                if (previousLayer && !map.hasLayer(previousLayer)) previousLayer.addTo(map);
+                previousLayer?.setOpacity(settings.opacity);
+                applyFramePreloadWindow(previousFrame);
+                updateTimestamp();
+                updateTimelineFill();
+                showToast(`Radar history frame unavailable: ${safeText(error.message, 100)}`, 'warn', 3500);
+            } finally {
+                if (transitionGeneration === frameTransitionGeneration) frameTransitionPending = false;
+            }
+        }
+
         function showPreloadedFrame(idx) {
             if (!frameLayers.length || idx < 0 || idx >= frameLayers.length) return;
+            if (frameLayers[idx]?._stormviewFrameAware) {
+                void showFrameAwareFrame(idx);
+                return;
+            }
+            frameTransitionGeneration += 1;
+            frameTransitionPending = false;
             
             const prevFrame = currentFrame;
             currentFrame = idx;
@@ -8597,15 +8793,19 @@
 
         function clearAllFrameLayers({ dispose = true } = {}) {
             loadAborted = true;
+            frameTransitionGeneration += 1;
+            frameTransitionPending = false;
             removeComparisonRadarLayer();
             removePipRadarLayer();
             frameLayers.forEach(layer => {
                 if (map.hasLayer(layer)) map.removeLayer(layer);
+                if (dispose) layer.releaseFrame?.({ dropPreload: true });
                 if (dispose) revokeLayerObjectUrl(layer);
             });
             frameLayers = [];
             framesLoaded = 0;
             framesReady = false;
+            map.getContainer().dataset.radarHistoryHours = '0';
             level2Couplets = [];
             removeLayer('couplets');
             
@@ -8641,7 +8841,6 @@
         }
 
         function applyFramePreloadWindow(idx, { preserve = [] } = {}) {
-            if (replayMode) return;
             const radius = effectivePreloadWindow(settings.preloadWindow, settings.reducedData);
             const desired = new Set(frameWindowIndices(
                 frameLayers.length,
@@ -8653,6 +8852,14 @@
 
             frameLayers.forEach((layer, frameIndex) => {
                 if (!layer) return;
+                if (layer._stormviewFrameAware) {
+                    if (desired.has(frameIndex)) layer.preloadFrame?.();
+                    const shouldMount = frameIndex === currentFrame || preserve.includes(frameIndex);
+                    if (shouldMount && !map.hasLayer(layer)) layer.addTo(map);
+                    else if (!shouldMount && map.hasLayer(layer)) map.removeLayer(layer);
+                    if (!desired.has(frameIndex)) layer.releaseFrame?.({ dropPreload: true });
+                    return;
+                }
                 if (desired.has(frameIndex)) {
                     if (!map.hasLayer(layer)) layer.addTo(map);
                     if (frameIndex === currentFrame) return;
@@ -8668,7 +8875,10 @@
             const mapContainer = map.getContainer();
             mapContainer.dataset.preloadWindow = String(radius);
             mapContainer.dataset.preloadedFrames = String(
-                frameLayers.filter(layer => layer && map.hasLayer(layer)).length
+                frameLayers.filter((layer, frameIndex) => layer && (
+                    map.hasLayer(layer)
+                    || (desired.has(frameIndex) && Boolean(layer._stormviewFrameBlob))
+                )).length
             );
         }
 
@@ -8679,7 +8889,7 @@
             const elapsed = now - lastFrameTime;
             const frameDelay = settings.delay / speedMult;
             
-            if (elapsed >= frameDelay) {
+            if (elapsed >= frameDelay && !frameTransitionPending) {
                 if (elapsed > frameDelay * 1.5) {
                     diagnosticsState.performance.droppedFrames += Math.max(1, Math.floor(elapsed / frameDelay) - 1);
                 }
@@ -9098,12 +9308,12 @@
                 replayWarnings = warnings;
                 frames = replayFrames;
                 framesTotal = frames.length;
-                framesLoaded = frames.length;
+                framesLoaded = 0;
                 framesReady = true;
                 currentFrame = 0;
                 lastPastFrame = frames.length - 1;
                 loadAborted = false;
-                frameLayers = frames.map(frame => L.imageOverlay(
+                frameLayers = frames.map(frame => createFrameAwareImageOverlay(
                     frame.path,
                     [[23, -126], [50, -65]],
                     {
@@ -9116,6 +9326,7 @@
                 ));
                 frameLayers[0].addTo(map);
                 frameLayers[0].setOpacity(settings.opacity);
+                applyFramePreloadWindow(0);
                 await renderReplayAlerts(frames[0].time * 1000);
                 updatePlaybackVisibility();
                 updateTimestamp();
@@ -10360,7 +10571,12 @@
             const playback = document.getElementById('playback');
             if (!playback) return;
             const capability = RADAR_CAPABILITIES[settings.source] || RADAR_CAPABILITIES.mrms;
-            playback.style.display = replayMode || capability.animation ? '' : 'none';
+            const configuredAnimation = capability.animation
+                && (settings.source !== 'mrms' || settings.radarProduct === 'reflectivity');
+            const loadedAnimation = framesReady && activeRadarSource === settings.source
+                ? frames.length > 1
+                : configuredAnimation;
+            playback.style.display = replayMode || loadedAnimation ? '' : 'none';
         }
 
         function updateTimestamp() {
@@ -10546,6 +10762,20 @@
                         container.appendChild(label);
                     }
                 }
+            } else if (settings.source === 'mrms' && settings.radarProduct === 'reflectivity') {
+                radarHistoryTickIndices(frames).forEach(({ index, hoursAgo }) => {
+                    const pct = ((index + 0.5) / frames.length) * 100;
+                    const tick = document.createElement('div');
+                    tick.className = 'timeline-tick major';
+                    tick.style.left = pct + '%';
+                    container.appendChild(tick);
+
+                    const label = document.createElement('div');
+                    label.className = 'timeline-tick-label';
+                    label.style.left = pct + '%';
+                    label.textContent = hoursAgo ? `−${hoursAgo}h` : t('now');
+                    container.appendChild(label);
+                });
             } else if (settings.source === 'rainviewer' && frames.length > 6) {
                 // Show a tick at the past/forecast boundary
                 if (lastPastFrame > 0 && lastPastFrame < frames.length - 1) {

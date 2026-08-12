@@ -18,8 +18,8 @@ const RADAR_DEFINITIONS = Object.freeze({
   mrms: {
     label: 'MRMS',
     products: ['reflectivity', 'velocity', 'echoTops', 'precipAccum'],
-    note: 'Latest US radar products from Iowa Environmental Mesonet.',
-    animation: false,
+    note: 'Reflectivity includes six hours of five-minute history; other products show the latest frame.',
+    animation: true,
     coverage: { label: 'CONUS', bounds: [-125, 24, -66, 50] },
     attribution: 'NOAA MRMS / Iowa Environmental Mesonet'
   },

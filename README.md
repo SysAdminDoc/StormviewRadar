@@ -18,6 +18,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 
 ### Radar & Animation
 - **Five Radar Sources** — Switch between HRRR forecast guidance, RainViewer global history, MRMS US products, NOAA nowCOAST, and native NEXRAD Level II
+- **Six-Hour Radar History** — Scrub five-minute MRMS reflectivity frames with a bounded playhead cache; Reduced Data automatically limits history to one hour
 - **NEXRAD Level II** — Select the nearest or a named CONUS site and render current 0.5° reflectivity, velocity, ZDR, or correlation coefficient directly from the NOAA/Unidata AWS archive
 - **Rotation Candidates** — Overlay up to 20 clustered, reflectivity-backed velocity couplets with explicit automated-heuristic and not-a-warning labeling
 - **MESH Hail Size** — Decode NOAA's current 2-minute MRMS MESH grid off-thread and overlay color-scaled hail-size estimates with metric/US legends

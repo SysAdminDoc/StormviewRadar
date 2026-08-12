@@ -34,6 +34,12 @@ test.beforeEach(async ({ page }) => {
     contentType: 'image/png',
     body: transparentPng
   }));
+  await page.route('https://mesonet.agron.iastate.edu/archive/data/**', route => route.fulfill({
+    status: 200,
+    headers: { 'access-control-allow-origin': '*' },
+    contentType: 'image/png',
+    body: transparentPng
+  }));
 });
 
 test('desktop controls pass automated accessibility checks', async ({ page }) => {

@@ -1,6 +1,8 @@
 const DAY_MS = 24 * 60 * 60 * 1000;
+const DYNAMIC_RADAR_MAX_AGE_MS = 5 * 60 * 1000;
 const DEFAULT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const BASEMAP_MAX_AGE_MS = 7 * DAY_MS;
+const ARCHIVE_RADAR_MAX_AGE_MS = 30 * DAY_MS;
 const SENSITIVE_QUERY_KEYS = new Set([
   'access_token', 'api_key', 'apikey', 'appid', 'key', 'token'
 ]);
@@ -37,10 +39,20 @@ export function isCacheableTileUrl(value) {
 
 export function tileCacheMaxAge(value) {
   try {
-    const host = new URL(String(value)).hostname.toLowerCase();
+    const url = new URL(String(value));
+    const host = url.hostname.toLowerCase();
     if (host.endsWith('.basemaps.cartocdn.com')
       || host.endsWith('.tile.opentopomap.org')
       || host === 'server.arcgisonline.com') return BASEMAP_MAX_AGE_MS;
+    if (host === 'mesonet.agron.iastate.edu' && url.pathname.includes('/archive/data/')) {
+      return ARCHIVE_RADAR_MAX_AGE_MS;
+    }
+    if (host === 'mesonet.agron.iastate.edu' && url.pathname.includes('/hrrr::')) {
+      return ARCHIVE_RADAR_MAX_AGE_MS;
+    }
+    if (host === 'mesonet.agron.iastate.edu' && url.pathname.includes('/cache/tile.py/')) {
+      return DYNAMIC_RADAR_MAX_AGE_MS;
+    }
   } catch {}
   return DEFAULT_MAX_AGE_MS;
 }
@@ -302,6 +314,8 @@ export class IndexedDbTileCache {
 }
 
 export {
+  ARCHIVE_RADAR_MAX_AGE_MS,
   BASEMAP_MAX_AGE_MS,
-  DEFAULT_MAX_AGE_MS
+  DEFAULT_MAX_AGE_MS,
+  DYNAMIC_RADAR_MAX_AGE_MS
 };

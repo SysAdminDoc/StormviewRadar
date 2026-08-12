@@ -39,6 +39,12 @@ test('diagnostics expose freshness and failures without secrets or coordinates',
     contentType: 'image/png',
     body: transparentPng
   }));
+  await page.route('https://mesonet.agron.iastate.edu/archive/data/**', route => route.fulfill({
+    status: 200,
+    headers: { 'access-control-allow-origin': '*' },
+    contentType: 'image/png',
+    body: transparentPng
+  }));
   await page.route('https://nominatim.openstreetmap.org/search**', route => route.fulfill({
     json: [{ lat: '39.1234', lon: '-96.5678', display_name: 'Private place, Test County, TS' }]
   }));
@@ -55,7 +61,8 @@ test('diagnostics expose freshness and failures without secrets or coordinates',
   await expect(page.locator('#diagState')).toContainText('fallback: MRMS fallback: RainViewer failed');
   await expect(page.locator('#diagFreshness')).toContainText('min old');
   await expect(page.locator('#diagCoverage')).toContainText('CONUS');
-  await expect(page.locator('#diagResources')).toContainText('1/1 frames');
+  await expect(page.locator('#diagResources')).toContainText('1/73 frames');
+  await expect(page.locator('#diagResources')).toContainText('preload ±4 (1 mounted)');
   await expect(page.locator('#diagRetry')).toContainText('Retry available');
   await expect(page.locator('#diagRequests')).toContainText('api.rainviewer.com/public/weather-maps.json');
   await expect(page.locator('#diagRequests')).not.toContainText('?');

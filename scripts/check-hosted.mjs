@@ -45,6 +45,7 @@ const requiredAssets = [
   ['src/training-overlays.js', 'javascript'],
   ['src/pwa-install.js', 'javascript'],
   ['src/animation-export.js', 'javascript'],
+  ['src/radar-history.js', 'javascript'],
   ['logo/StormView-512x512.png', 'image/png'],
   ['vendor/leaflet/leaflet.css', 'text/css'],
   ['vendor/leaflet/leaflet.js', 'javascript'],

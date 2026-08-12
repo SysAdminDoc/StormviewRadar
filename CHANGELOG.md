@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Added a six-hour, five-minute MRMS reflectivity timeline backed by immutable IEM archive frames, bounded playhead-window prefetching, decoded-image release, persistent LRU reuse, one-hour Reduced Data capping, and current-tile freshness limits.
 - Added bounded attributed radar-animation export with a built-in looping GIF encoder, runtime-gated MP4 canvas recording, 24-frame sampling, configurable timing, progress/cancellation, and deterministic playhead restoration.
 - Added a standards-based PWA manifest and a localized install offer gated on browser install eligibility plus service-worker verification that both the offline shell and a completed last radar frame are cached, with standalone/embed suppression and bounded dismissal.
 - Added three localized archived storm-training scenarios with replay-linked, numbered reflectivity study cues, official-warning separation, persistent not-live disclosure, mobile-safe controls, and deterministic return to live radar.

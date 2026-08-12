@@ -72,6 +72,12 @@ test('service worker restores the app shell, last radar frame, and alert polygon
       body: transparentPng
     });
   });
+  await page.route('https://mesonet.agron.iastate.edu/archive/data/**', route => route.fulfill({
+    status: 200,
+    headers: { 'access-control-allow-origin': '*' },
+    contentType: 'image/png',
+    body: transparentPng
+  }));
   await page.route('https://*.basemaps.cartocdn.com/**', route => route.fulfill({
     status: 200,
     headers: { 'access-control-allow-origin': '*' },
