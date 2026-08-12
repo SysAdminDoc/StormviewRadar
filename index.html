@@ -205,6 +205,72 @@
         @media (min-width: 701px) {
             .compare-map-controls { top: 124px; }
         }
+        .pip-radar-panel {
+            position: fixed;
+            right: 18px;
+            bottom: 138px;
+            z-index: 1100;
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
+            width: min(320px, calc(100vw - 36px));
+            height: 220px;
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            background: var(--panel-bg);
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+        }
+        .pip-radar-panel[hidden] { display: none; }
+        .pip-radar-header {
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 42px;
+            padding: 6px 7px 6px 11px;
+            border-bottom: 1px solid var(--glass-border);
+            background: var(--glass-heavy);
+        }
+        .pip-radar-heading { min-width: 0; flex: 1; }
+        .pip-radar-title,
+        .pip-radar-time {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .pip-radar-title { font-size: 12px; }
+        .pip-radar-time { margin-top: 1px; color: var(--text-muted); font-size: 9px; }
+        .pip-radar-action {
+            display: grid;
+            place-items: center;
+            flex: 0 0 32px;
+            width: 32px;
+            height: 32px;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            background: var(--glass-hover);
+            color: var(--text);
+            cursor: pointer;
+        }
+        .pip-radar-action svg { width: 16px; height: 16px; fill: none; stroke: currentColor; }
+        .pip-radar-action.active { border-color: var(--accent); color: var(--accent); }
+        #pipMap { position: relative; min-height: 0; }
+        #pipMap .leaflet-control-attribution { max-width: 100%; font-size: 7px; }
+        body.pip-radar-active .non-map-alerts { right: 356px; }
+        @media (max-width: 768px) {
+            .pip-radar-panel {
+                right: 10px;
+                bottom: 132px;
+                width: min(300px, calc(100vw - 20px));
+                height: 190px;
+            }
+            body.pip-radar-active .non-map-alerts {
+                right: 10px;
+                bottom: 332px;
+                max-height: min(180px, calc(100dvh - 352px));
+            }
+        }
         .storm-3d-view {
             position: absolute;
             inset: 0;
@@ -2602,6 +2668,10 @@
             <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>
             <span class="qt-label">2-City</span>
         </button>
+        <button class="qt-btn" id="pipRadarBtn" type="button" title="Toggle mini radar" aria-label="Toggle mini radar" aria-pressed="false">
+            <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1"/></svg>
+            <span class="qt-label">Mini</span>
+        </button>
         <button class="qt-btn" id="stormTop3dBtn" type="button" title="Toggle 3D storm-top heights" aria-label="Toggle 3D storm-top heights" aria-pressed="false">
             <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path d="m12 2 8 4.5v9L12 20l-8-4.5v-9L12 2Z"/><path d="m4 6.5 8 4.5 8-4.5M12 11v9"/></svg>
             <span class="qt-label">3D Tops</span>
@@ -2644,6 +2714,20 @@
         <summary id="nonMapAlertsSummary">Alerts without map geometry</summary>
         <ul id="nonMapAlertsList"></ul>
     </details>
+
+    <section class="pip-radar-panel" id="pipRadarPanel" aria-label="Mini radar" hidden>
+        <header class="pip-radar-header">
+            <div class="pip-radar-heading">
+                <strong class="pip-radar-title" id="pipRadarTitle">Mini radar</strong>
+                <span class="pip-radar-time" id="pipRadarTime">Current view</span>
+            </div>
+            <button class="pip-radar-action active" id="pipRadarRecenter" type="button" title="Follow primary map" aria-label="Follow primary map" aria-pressed="true">
+                <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+            </button>
+            <button class="pip-radar-action" id="pipRadarClose" type="button" aria-label="Close mini radar">×</button>
+        </header>
+        <div id="pipMap" role="region" aria-label="Picture-in-picture weather map"></div>
+    </section>
 
     <!-- Forecast Panel -->
     <div class="forecast-overlay" id="fcOverlay" aria-hidden="true"></div>
@@ -3081,6 +3165,7 @@
     import { createProviderRegistry, RADAR_CAPABILITIES } from './src/providers/registry.js';
     import { createMessageFormatter } from './src/i18n.js';
     import { effectivePreloadWindow, frameWindowIndices, normalizePreloadWindow } from './src/frame-preload.js';
+    import { overviewFromMapView } from './src/picture-in-picture.js';
     import { DEFAULT_COMPARISON_LOCATION, normalizeComparisonLocation, normalizeLocationResults, shortLocationName } from './src/split-view.js';
     import { applyLayerOpacity, normalizeLayerOpacities } from './src/layer-opacity.js';
     import { LOCAL_OVERLAY_LIMITS, parseLocalOverlay } from './src/local-overlay.js';
@@ -3223,6 +3308,14 @@
         let compareSearchAbortController = null;
         let compareAlertGeneration = 0;
         let primaryLocationName = '';
+        let pipMap = null;
+        let pipBaseLayer = null;
+        let pipRadarLayer = null;
+        let pipAlertLayer = null;
+        let pipRadarSignature = '';
+        let pipAlertGeneration = 0;
+        let pipFollowPrimary = true;
+        let syncingPipView = false;
         let rainviewerData = null;
         let frameLayers = [];
         let framesLoaded = 0;
@@ -3301,7 +3394,7 @@
         const layerRequests = new Map();
         const layerRequestGenerations = new Map();
         const MAX_SETTINGS_BYTES = 32768;
-        const SETTINGS_SCHEMA_VERSION = 7;
+        const SETTINGS_SCHEMA_VERSION = 8;
         const SETTINGS_STORAGE_KEY = 'stormview_settings';
         const GEOFENCE_STORAGE_KEY = 'stormview_geofences';
         const MAX_GEOFENCES = 20;
@@ -3423,6 +3516,12 @@
                 splitViewAria: 'Toggle two-city view',
                 closeSplitViewAria: 'Close two-city view',
                 compareSearchEmpty: 'No comparison cities found',
+                pipTitle: 'Mini radar',
+                pipMapAria: 'Picture-in-picture weather map',
+                pipToggleAria: 'Toggle mini radar',
+                pipCloseAria: 'Close mini radar',
+                pipRecenterAria: 'Follow primary map',
+                pipCurrentView: 'Current view',
                 searchPlaceholder: 'Search location…',
                 searchAria: 'Search for a US location',
                 searchClearAria: 'Clear location search',
@@ -3573,6 +3672,12 @@
                 splitViewAria: 'Alternar vista de dos ciudades',
                 closeSplitViewAria: 'Cerrar vista de dos ciudades',
                 compareSearchEmpty: 'No se encontraron ciudades para comparar',
+                pipTitle: 'Radar miniatura',
+                pipMapAria: 'Mapa meteorológico en imagen dentro de imagen',
+                pipToggleAria: 'Alternar radar miniatura',
+                pipCloseAria: 'Cerrar radar miniatura',
+                pipRecenterAria: 'Seguir el mapa principal',
+                pipCurrentView: 'Vista actual',
                 searchPlaceholder: 'Buscar ubicación…',
                 searchAria: 'Buscar una ubicación de Estados Unidos',
                 searchClearAria: 'Borrar búsqueda de ubicación',
@@ -3876,6 +3981,11 @@
                 compareSearchResults: ['aria-label', 'compareResultsAria'],
                 splitViewBtn: ['title', 'splitViewAria'],
                 compareMapClose: ['aria-label', 'closeSplitViewAria'],
+                pipRadarPanel: ['aria-label', 'pipTitle'],
+                pipMap: ['aria-label', 'pipMapAria'],
+                pipRadarBtn: ['title', 'pipToggleAria'],
+                pipRadarClose: ['aria-label', 'pipCloseAria'],
+                pipRadarRecenter: ['title', 'pipRecenterAria'],
                 searchInput: ['aria-label', 'searchAria'],
                 searchClear: ['aria-label', 'searchClearAria'],
                 searchResults: ['aria-label', 'searchResultsAria'],
@@ -3932,10 +4042,21 @@
             updateOfflineStatus();
             updatePreloadWindowControl();
             updateSplitViewLabels();
+            updatePipRadarLabel();
             const splitViewButton = document.getElementById('splitViewBtn');
             if (splitViewButton) {
                 splitViewButton.title = t('splitViewAria');
                 splitViewButton.setAttribute('aria-label', t('splitViewAria'));
+            }
+            const pipRadarButton = document.getElementById('pipRadarBtn');
+            if (pipRadarButton) {
+                pipRadarButton.title = t('pipToggleAria');
+                pipRadarButton.setAttribute('aria-label', t('pipToggleAria'));
+            }
+            const pipRecenterButton = document.getElementById('pipRadarRecenter');
+            if (pipRecenterButton) {
+                pipRecenterButton.title = t('pipRecenterAria');
+                pipRecenterButton.setAttribute('aria-label', t('pipRecenterAria'));
             }
         }
 
@@ -4013,6 +4134,12 @@
                         comparison: comparisonLocation().name || 'custom view',
                         radarLayer: Boolean(compareRadarLayer),
                         alertFeatures: compareAlertLayer?.getLayers?.().length || 0
+                    },
+                    pictureInPicture: {
+                        active: settings.pipRadar,
+                        followingPrimary: pipFollowPrimary,
+                        radarLayer: Boolean(pipRadarLayer),
+                        alertFeatures: pipAlertLayer?.getLayers?.().length || 0
                     },
                     tileCache: {
                         ...tileCacheState,
@@ -4460,7 +4587,7 @@
                 if (typeof candidate[key] === 'string' && allowed.includes(candidate[key])) result[key] = candidate[key];
             });
 
-            ['loop', 'autoRefresh', 'showLegend', 'highResMode', 'useLocalTime', 'alertAudioEnabled', 'reducedData', 'splitView'].forEach(key => {
+            ['loop', 'autoRefresh', 'showLegend', 'highResMode', 'useLocalTime', 'alertAudioEnabled', 'reducedData', 'splitView', 'pipRadar'].forEach(key => {
                 if (typeof candidate[key] === 'boolean') result[key] = candidate[key];
             });
             ['smooth', 'snowColor'].forEach(key => {
@@ -4705,6 +4832,7 @@
             delay: 600,
             preloadWindow: 4,
             splitView: false,
+            pipRadar: false,
             compareLocation: { ...DEFAULT_COMPARISON_LOCATION },
             loop: true,
             autoRefresh: true,
@@ -4767,6 +4895,7 @@
             initForecastPanel();
             initQuickToolbar();
             initSplitView();
+            initPipRadar();
             initBookmarks();
             initAccessibility();
             updatePlaybackVisibility();
@@ -5006,6 +5135,7 @@
             
             setBasemap(settings.basemap);
             map.on('moveend', updateCoverageStatus);
+            map.on('moveend', () => syncPipToPrimary());
             map.on('moveend', () => updateMobileAlertBanner(currentAlertFeatures));
             map.on('moveend', () => {
                 if (settings.layers.stormReports && stormReportPayload) renderStormReports();
@@ -5040,6 +5170,7 @@
             saveSettings();
             syncAccessibleControlStates();
             refreshComparisonBasemap();
+            refreshPipBasemap();
         }
 
         function comparisonLocation() {
@@ -5093,8 +5224,8 @@
             ]);
         }
 
-        function cloneRadarLayerForComparison(sourceLayer) {
-            const className = `${sourceLayer.options?.className || 'radar-layer'} compare-radar-layer`.trim();
+        function cloneRadarLayer(sourceLayer, cloneClassName) {
+            const className = `${sourceLayer.options?.className || 'radar-layer'} ${cloneClassName}`.trim();
             const options = {
                 ...sourceLayer.options,
                 opacity: settings.opacity,
@@ -5130,7 +5261,7 @@
                 return;
             }
             removeComparisonRadarLayer();
-            compareRadarLayer = cloneRadarLayerForComparison(sourceLayer);
+            compareRadarLayer = cloneRadarLayer(sourceLayer, 'compare-radar-layer');
             if (!compareRadarLayer) return;
             compareRadarSignature = signature;
             compareRadarLayer.addTo(compareMap);
@@ -5236,6 +5367,192 @@
             } else {
                 disposeComparisonLayers();
                 if (wasActive) setTimeout(() => map.invalidateSize(), 0);
+            }
+            if (persist) saveSettings();
+        }
+
+        function updatePipRadarLabel() {
+            const title = document.getElementById('pipRadarTitle');
+            const time = document.getElementById('pipRadarTime');
+            if (title) title.textContent = t('pipTitle');
+            if (!time) return;
+            const frame = frames[currentFrame];
+            time.textContent = frame?.time
+                ? formatLocalizedDate(frame.time * 1000, { timeStyle: 'short' })
+                : t('pipCurrentView');
+        }
+
+        function updatePipFollowState() {
+            const button = document.getElementById('pipRadarRecenter');
+            if (!button) return;
+            button.classList.toggle('active', pipFollowPrimary);
+            button.setAttribute('aria-pressed', String(pipFollowPrimary));
+        }
+
+        function syncPipToPrimary(force = false) {
+            if (!pipMap || !settings.pipRadar || (!pipFollowPrimary && !force)) return;
+            const view = overviewFromMapView(map.getCenter(), map.getZoom());
+            pipFollowPrimary = true;
+            syncingPipView = true;
+            try {
+                pipMap.setView([view.latitude, view.longitude], view.zoom, { animate: false });
+            } finally {
+                syncingPipView = false;
+            }
+            const container = pipMap.getContainer();
+            container.dataset.latitude = view.latitude.toFixed(4);
+            container.dataset.longitude = view.longitude.toFixed(4);
+            container.dataset.zoom = String(view.zoom);
+            updatePipFollowState();
+        }
+
+        function refreshPipBasemap() {
+            if (!pipMap || !settings.pipRadar) return;
+            if (pipBaseLayer && pipMap.hasLayer(pipBaseLayer)) pipMap.removeLayer(pipBaseLayer);
+            const basemap = BASEMAPS[settings.basemap] || BASEMAPS.dark;
+            pipBaseLayer = L.tileLayer.cached(basemap.url, {
+                attribution: basemap.attribution,
+                subdomains: basemap.subdomains || [],
+                maxZoom: 19,
+                errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+            }).addTo(pipMap);
+            pipBaseLayer.setZIndex(0);
+        }
+
+        function removePipRadarLayer() {
+            if (pipRadarLayer && pipMap?.hasLayer(pipRadarLayer)) pipMap.removeLayer(pipRadarLayer);
+            pipRadarLayer?.off?.();
+            pipRadarLayer = null;
+            pipRadarSignature = '';
+            const container = pipMap?.getContainer?.();
+            if (container) {
+                container.dataset.radarFrame = '';
+                container.dataset.radarSource = '';
+            }
+        }
+
+        function refreshPipRadar() {
+            if (!pipMap || !settings.pipRadar || !settings.layers.radar) {
+                removePipRadarLayer();
+                return;
+            }
+            const sourceLayer = frameLayers[currentFrame];
+            const signature = currentRadarLayerSignature(sourceLayer);
+            if (!signature) {
+                removePipRadarLayer();
+                return;
+            }
+            if (signature === pipRadarSignature && pipRadarLayer) {
+                pipRadarLayer.setOpacity?.(settings.opacity);
+                return;
+            }
+            removePipRadarLayer();
+            pipRadarLayer = cloneRadarLayer(sourceLayer, 'pip-radar-layer');
+            if (!pipRadarLayer) return;
+            pipRadarSignature = signature;
+            pipRadarLayer.addTo(pipMap);
+            pipRadarLayer.setOpacity?.(settings.opacity);
+            pipMap.getContainer().dataset.radarFrame = String(currentFrame);
+            pipMap.getContainer().dataset.radarSource = settings.source;
+            updatePipRadarLabel();
+        }
+
+        async function refreshPipAlerts() {
+            const generation = ++pipAlertGeneration;
+            if (pipAlertLayer && pipMap?.hasLayer(pipAlertLayer)) pipMap.removeLayer(pipAlertLayer);
+            pipAlertLayer?.off?.();
+            pipAlertLayer = null;
+            const container = pipMap?.getContainer?.();
+            if (container) container.dataset.alertFeatures = '0';
+            if (!pipMap || !settings.pipRadar || !settings.layers.alerts || !currentAlertFeatures.length) return;
+            try {
+                const tools = await alertFillTools();
+                if (generation !== pipAlertGeneration || !settings.pipRadar || !pipMap) return;
+                const referenceTime = replayMode && frames[currentFrame]
+                    ? frames[currentFrame].time * 1000
+                    : Date.now();
+                pipAlertLayer = L.geoJSON(currentAlertFeatures, {
+                    pane: 'alertPane',
+                    style: feature => alertPolygonPresentation(feature, tools, referenceTime).style,
+                    onEachFeature: (feature, layer) => {
+                        layer.bindTooltip(safeText(feature.properties?.event || feature.properties?.ps || 'Weather alert', 120));
+                    }
+                }).addTo(pipMap);
+                pipMap.getContainer().dataset.alertFeatures = String(pipAlertLayer.getLayers().length);
+            } catch (error) {
+                console.warn('Mini-radar alerts unavailable:', error);
+            }
+        }
+
+        function disposePipMap() {
+            removePipRadarLayer();
+            pipAlertGeneration += 1;
+            if (pipAlertLayer && pipMap?.hasLayer(pipAlertLayer)) pipMap.removeLayer(pipAlertLayer);
+            pipAlertLayer?.off?.();
+            pipAlertLayer = null;
+            if (pipBaseLayer && pipMap?.hasLayer(pipBaseLayer)) pipMap.removeLayer(pipBaseLayer);
+            pipBaseLayer = null;
+            if (pipMap) {
+                pipMap.off();
+                pipMap.remove();
+                pipMap = null;
+            }
+            document.getElementById('pipMap')?.replaceChildren();
+        }
+
+        function ensurePipMap() {
+            if (pipMap) return;
+            const view = overviewFromMapView(map.getCenter(), map.getZoom());
+            pipMap = L.map('pipMap', {
+                center: [view.latitude, view.longitude],
+                zoom: view.zoom,
+                zoomControl: false,
+                attributionControl: true,
+                preferCanvas: true
+            });
+            pipMap.createPane('radarPane');
+            pipMap.getPane('radarPane').style.zIndex = 250;
+            pipMap.createPane('alertPane');
+            pipMap.getPane('alertPane').style.zIndex = 450;
+            pipMap.on('movestart', () => {
+                if (syncingPipView) return;
+                pipFollowPrimary = false;
+                updatePipFollowState();
+            });
+            pipMap.on('moveend', () => {
+                const center = pipMap.getCenter();
+                const container = pipMap.getContainer();
+                container.dataset.latitude = center.lat.toFixed(4);
+                container.dataset.longitude = center.lng.toFixed(4);
+                container.dataset.zoom = String(pipMap.getZoom());
+            });
+        }
+
+        function setPipRadar(enabled, { persist = true } = {}) {
+            const active = Boolean(enabled);
+            const panel = document.getElementById('pipRadarPanel');
+            const button = document.getElementById('pipRadarBtn');
+            settings.pipRadar = active;
+            document.body.classList.toggle('pip-radar-active', active);
+            panel.hidden = !active;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-pressed', String(active));
+            if (active) {
+                if (stormTop3dMode) exitStormTop3d();
+                pipFollowPrimary = true;
+                ensurePipMap();
+                refreshPipBasemap();
+                refreshPipRadar();
+                refreshPipAlerts();
+                updatePipRadarLabel();
+                updatePipFollowState();
+                setTimeout(() => {
+                    if (!pipMap || !settings.pipRadar) return;
+                    pipMap.invalidateSize();
+                    syncPipToPrimary(true);
+                }, 0);
+            } else {
+                disposePipMap();
             }
             if (persist) saveSettings();
         }
@@ -7347,6 +7664,7 @@
         function clearAllFrameLayers({ dispose = true } = {}) {
             loadAborted = true;
             removeComparisonRadarLayer();
+            removePipRadarLayer();
             frameLayers.forEach(layer => {
                 if (map.hasLayer(layer)) map.removeLayer(layer);
                 if (dispose) revokeLayerObjectUrl(layer);
@@ -7494,6 +7812,7 @@
             updateAlertCount(0);
             updateMobileAlertBanner([]);
             refreshComparisonAlerts();
+            refreshPipAlerts();
         }
 
         function loadAlertsLayer() {
@@ -7785,6 +8104,7 @@
             renderNonMapAlerts(activeWarnings);
             updateMobileAlertBanner(settings.layers.alerts ? activeWarnings : []);
             refreshComparisonAlerts();
+            refreshPipAlerts();
             if (!settings.layers.alerts) return;
             layerRefs.alerts = L.geoJSON({ type: 'FeatureCollection', features: activeWarnings }, {
                 pane: 'alertPane',
@@ -8069,6 +8389,7 @@
             renderNonMapAlerts([]);
             updateMobileAlertBanner([]);
             refreshComparisonAlerts();
+            refreshPipAlerts();
             const controller = beginLayerRequest('alerts');
             try {
                 const [resp, tools, seriesTools] = await Promise.all([
@@ -8134,6 +8455,7 @@
                 updateMobileAlertBanner(features);
                 await processAlertAudio(features);
                 refreshComparisonAlerts();
+                refreshPipAlerts();
             } catch(e) {
                 if (e?.name === 'AbortError') return;
                 console.error('Alerts error:', e);
@@ -8571,6 +8893,7 @@
             const button = document.getElementById('stormTop3dBtn');
             const view = document.getElementById('cesiumView');
             if (settings.splitView) setSplitView(false);
+            if (settings.pipRadar) setPipRadar(false);
             button.disabled = true;
             view.hidden = false;
             view.setAttribute('aria-hidden', 'false');
@@ -9149,6 +9472,7 @@
             // Update mobile timestamp
             updateMobileTimestamp(timeStr, isForecast, frameKind);
             refreshComparisonRadar();
+            refreshPipRadar();
         }
         
         function formatProviderAge(frame) {
@@ -10530,6 +10854,7 @@
                     radarSystem.mrmsBase.setOpacity(settings.opacity);
                 }
                 compareRadarLayer?.setOpacity?.(settings.opacity);
+                pipRadarLayer?.setOpacity?.(settings.opacity);
             }, true);
             initSlider('delaySlider', 'delayValue', 'delay', 'ms');
             initSlider('preloadWindowSlider', 'preloadWindowValue', 'preloadWindow', '', () => {
@@ -11022,6 +11347,30 @@
                 }
             });
             setSplitView(settings.splitView, { persist: false });
+        }
+
+        function initPipRadar() {
+            document.getElementById('pipRadarBtn').addEventListener('click', () => setPipRadar(!settings.pipRadar));
+            document.getElementById('pipRadarClose').addEventListener('click', () => {
+                setPipRadar(false);
+                document.getElementById('pipRadarBtn').focus();
+            });
+            document.getElementById('pipRadarRecenter').addEventListener('click', () => syncPipToPrimary(true));
+            window.addEventListener('resize', () => {
+                if (!settings.pipRadar || !pipMap) return;
+                pipMap.invalidateSize();
+                syncPipToPrimary();
+            });
+            document.addEventListener('keydown', event => {
+                if (event.key !== 'Escape' || !settings.pipRadar || !document.activeElement?.closest('#pipRadarPanel')) return;
+                setPipRadar(false);
+                document.getElementById('pipRadarBtn').focus();
+            });
+            if (settings.pipRadar) setPipRadar(true, { persist: false });
+            else {
+                updatePipRadarLabel();
+                updatePipFollowState();
+            }
         }
 
         function initMobileSheet() {

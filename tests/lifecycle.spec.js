@@ -212,7 +212,7 @@ test('overlay opacity is independent, persisted, and applied to future layer loa
   await expect(page.locator('#overlayOpacityValue')).toHaveText('35%');
   await expect(page.locator('.road-event-marker')).toHaveCSS('opacity', '0.35');
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('stormview_settings')));
-  expect(stored.schemaVersion).toBe(7);
+  expect(stored.schemaVersion).toBe(8);
   expect(stored.settings.layerOpacity.highways).toBe(0.35);
   expect(stored.settings.layerOpacity.alerts).toBe(1);
 
