@@ -37,6 +37,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Two-City Comparison** — Split the map into independently pannable desktop or stacked mobile views that share the active radar frame and warning polygons, with a persistent searchable comparison city
 - **Mini Radar** — Keep a floating, browser-portable radar overview visible while active-alert details scroll, with synchronized frames, warning polygons, primary-map following, and complete teardown when closed
 - **Attributed PNG Snapshots** — Save the visible primary map and current radar frame at bounded 2× resolution with source/product, provider-valid time, and live map/data credits
+- **Iframe Embed Mode** — Publish a deterministic, attributed radar map with URL-configurable view, source, product, overlays, appearance, localization, controls, and playback without changing viewer settings
 
 ### Weather Layers
 - **NWS Alerts** — Real-time watches, warnings, and advisories with hazard-colored borders and warning fills that fade by time since issuance
@@ -95,6 +96,36 @@ python -m http.server 8000
 ```
 
 > **Note:** Direct `file://` use is not supported because weather providers enforce CORS. Use a local HTTP server or the hosted version.
+
+## Embed Mode
+
+Add `embed=1` to load a streamlined iframe-safe map. Embed parameters replace the in-memory presentation for that visit only; they do not read local geofences/API keys into the view or overwrite the viewer's saved settings. Data attribution and the **Open full StormView Radar map** link always remain visible.
+
+```html
+<iframe
+  title="StormView Radar"
+  src="https://sysadmindoc.github.io/StormviewRadar/?embed=1&amp;lat=41.5868&amp;lon=-93.625&amp;zoom=8&amp;source=hrrr&amp;layers=radar,alerts,states&amp;controls=1"
+  width="720"
+  height="480"
+  loading="lazy">
+</iframe>
+```
+
+| Parameter | Values / bounds | Default |
+|-----------|-----------------|---------|
+| `embed` | `1`, `true`, `yes`, or `on` enables embed mode | Off |
+| `lat`, `lon`, `zoom` | Latitude `-90..90`, longitude `-180..180`, zoom `2..18` | `39`, `-96`, `5` |
+| `source` | `hrrr`, `rainviewer`, `mrms`, `nowcoast`, `level2` | `hrrr` |
+| `product` | Source-supported product: `reflectivity`, `velocity`, `echoTops`, `precipAccum`, `differentialReflectivity`, or `correlationCoefficient` | `reflectivity` |
+| `site` | Four-character Level II site such as `KDMX` | Nearest site |
+| `basemap` | `dark`, `light`, `satellite`, `terrain`, `clean` | `dark` |
+| `layers` | Comma-separated credential-free layer IDs, `none`, or up to 16 IDs | `radar,alerts,states,labels` |
+| `theme`, `palette` | Theme: `dark`/`light`; palette: `standard`, `highContrast`, `colorblind` | `dark`, `standard` |
+| `lang`, `units`, `tz` | `en`/`es`, `us`/`metric`, `local`/`utc` | `en`, `us`, `local` |
+| `opacity`, `delay` | Radar opacity `0.1..1`; frame delay `100..3000` ms | `0.85`, `600` |
+| `controls`, `legend`, `autoplay`, `loop` | Boolean `1`/`0`, `true`/`false`, `yes`/`no`, or `on`/`off` | Enabled |
+
+Allowed `layers` IDs are `radar`, `alerts`, `spcOutlook`, `stormReports`, `stormTracks`, `couplets`, `hailMesh`, `lightning`, `satellite`, `riverGauges`, `surfaceObs`, `spcWatches`, `spcMCD`, `spcTornado`, `spcWind`, `spcHail`, `tropical`, `sigmets`, `satelliteIR`, `satelliteWV`, `satelliteGeoColor`, `satelliteSandwich`, `satelliteMesoscale`, `states`, `counties`, `labels`, and `highways`. Local geofences/files and credentialed OpenWeatherMap layers cannot be enabled by an embed URL.
 
 ## Keyboard Shortcuts
 

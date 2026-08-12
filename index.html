@@ -124,6 +124,60 @@
         }
 
         #map { position: absolute; inset: 0; z-index: 1; }
+        .embed-brand {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 1100;
+            display: none;
+            align-items: center;
+            gap: 7px;
+            min-height: 36px;
+            padding: 6px 10px;
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            background: var(--glass-bg);
+            color: var(--text);
+            box-shadow: var(--shadow);
+            font-size: 11px;
+            font-weight: 700;
+            text-decoration: none;
+            backdrop-filter: blur(12px);
+        }
+        .embed-brand img { width: 24px; height: 24px; }
+        .embed-brand:hover, .embed-brand:focus-visible { border-color: var(--accent); color: var(--accent); }
+        body.embed-mode .embed-brand { display: flex; }
+        body.embed-mode .header,
+        body.embed-mode .bookmarks-panel,
+        body.embed-mode .sidebar,
+        body.embed-mode .sidebar-overlay,
+        body.embed-mode .quick-toolbar,
+        body.embed-mode .mobile-fab,
+        body.embed-mode .loc-btn,
+        body.embed-mode .map-forecast-btn,
+        body.embed-mode .data-credit,
+        body.embed-mode .mobile-alert-banner,
+        body.embed-mode .non-map-alerts,
+        body.embed-mode .pip-radar-panel,
+        body.embed-mode .split-map-label,
+        body.embed-mode .compare-map-pane,
+        body.embed-mode .settings-overlay,
+        body.embed-mode .settings-panel,
+        body.embed-mode .sheet-overlay,
+        body.embed-mode .bottom-sheet,
+        body.embed-mode .forecast-overlay,
+        body.embed-mode .forecast-panel { display: none !important; }
+        body.embed-mode .status-bar { top: 12px; }
+        body.embed-mode.embed-controls .playback { bottom: 24px; left: 52px; }
+        body.embed-mode.embed-controls .leaflet-control-zoom { display: block !important; }
+        body.embed-mode:not(.embed-controls) .playback,
+        body.embed-mode:not(.embed-controls) .legend,
+        body.embed-mode:not(.embed-controls) .status-bar,
+        body.embed-mode:not(.embed-controls) .leaflet-control-zoom { display: none !important; }
+        body.embed-mode:not(.embed-legend) .legend { display: none !important; }
+        body.embed-mode:not(.embed-radar) .playback,
+        body.embed-mode:not(.embed-radar) .legend { display: none !important; }
+        body.embed-mode .leaflet-control-attribution { max-width: calc(100vw - 16px); }
         .compare-map-pane {
             position: absolute;
             inset: 0 0 0 50%;
@@ -2272,6 +2326,10 @@
     </div>
 
     <div id="map" role="region" aria-label="Interactive weather map. Use arrow keys to pan, plus and minus to zoom, and F for the forecast at map center." aria-keyshortcuts="F"></div>
+    <a class="embed-brand" id="embedBrand" href="./" target="_blank" rel="noopener" aria-label="Open full StormView Radar map">
+        <img src="logo/StormView-48x48.png" alt="">
+        <span>StormView Radar</span>
+    </a>
     <div class="split-map-label glass" id="primaryMapLabel">Primary view</div>
     <section class="compare-map-pane" id="compareMapPane" aria-label="Comparison city radar" hidden>
         <div id="compareMap" role="region" aria-label="Comparison city weather map"></div>
@@ -3255,11 +3313,14 @@
     import { LOCAL_OVERLAY_LIMITS, parseLocalOverlay } from './src/local-overlay.js';
     import { buildIowa511Query, normalizeIowa511Events } from './src/road-events.js';
     import { captureLeafletSnapshot, snapshotFilename } from './src/map-snapshot.js';
+    import { applyEmbedConfiguration, parseEmbedConfig } from './src/embed-mode.js';
     import { IndexedDbTileCache, isCacheableTileUrl, tileCacheMaxAge } from './src/tile-cache.js';
     import { WebGLTileRenderer } from './src/webgl-tile-renderer.js';
 
     (function() {
         'use strict';
+
+        const embedConfig = parseEmbedConfig(window.location.search);
 
         // ==================== CONFIGURATION ====================
         const OSM_CARTO_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
@@ -3614,6 +3675,7 @@
                 snapshotUnavailable: 'Wait for a radar frame before saving a snapshot',
                 snapshotMapOnly: 'Exit 3D storm tops before saving a radar snapshot',
                 snapshotFailed: 'Map snapshot failed: {message}',
+                embedOpenFullMap: 'Open full StormView Radar map',
                 searchPlaceholder: 'Search location…',
                 searchAria: 'Search for a US location',
                 searchClearAria: 'Clear location search',
@@ -3777,6 +3839,7 @@
                 snapshotUnavailable: 'Espera una imagen de radar antes de guardar una captura',
                 snapshotMapOnly: 'Sal de las cimas de tormenta 3D antes de guardar una captura de radar',
                 snapshotFailed: 'Falló la captura del mapa: {message}',
+                embedOpenFullMap: 'Abrir el mapa completo de StormView Radar',
                 searchPlaceholder: 'Buscar ubicación…',
                 searchAria: 'Buscar una ubicación de Estados Unidos',
                 searchClearAria: 'Borrar búsqueda de ubicación',
@@ -4098,6 +4161,7 @@
                 bookmarksPanel: ['aria-label', 'savedLocationsAria'],
                 themeBtn: ['title', 'toggleThemeAria'],
                 snapshotBtn: ['title', 'snapshotAria'],
+                embedBrand: ['aria-label', 'embedOpenFullMap'],
                 refreshBtn: ['title', 'refreshDataAria'],
                 settingsBtn: ['title', 'settingsAria'],
                 locBtn: ['aria-label', 'myLocationAria'],
@@ -4990,6 +5054,8 @@
         // ==================== INITIALIZATION ====================
         async function init() {
             loadSettings();
+            applyEmbedConfiguration(settings, embedConfig);
+            applyEmbedMode();
             applyTheme();
             applyVisualPalette();
             initMap();
@@ -5007,7 +5073,7 @@
             initBookmarks();
             initAccessibility();
             updatePlaybackVisibility();
-            await loadRadarData();
+            if (settings.layers.radar) await loadRadarData();
             
             Object.keys(settings.layers).forEach(layer => {
                 if (settings.layers[layer] && layer !== 'radar') {
@@ -5023,17 +5089,32 @@
             startAutoRefresh();
             
             // Show keyboard hints on first visit
-            const welcomed = localStorage.getItem(WELCOME_STORAGE_KEY)
-                || LEGACY_WELCOME_KEYS.some(key => localStorage.getItem(key));
-            if (welcomed) {
-                localStorage.setItem(WELCOME_STORAGE_KEY, '1');
-                LEGACY_WELCOME_KEYS.forEach(key => localStorage.removeItem(key));
-            } else {
-                setTimeout(() => {
-                    showToast('Tip: Click anywhere on the map for a 7-day forecast! Space = play/pause, Arrows = step frames', 'info', 6000);
+            if (!embedConfig) {
+                const welcomed = localStorage.getItem(WELCOME_STORAGE_KEY)
+                    || LEGACY_WELCOME_KEYS.some(key => localStorage.getItem(key));
+                if (welcomed) {
                     localStorage.setItem(WELCOME_STORAGE_KEY, '1');
-                }, 2500);
+                    LEGACY_WELCOME_KEYS.forEach(key => localStorage.removeItem(key));
+                } else {
+                    setTimeout(() => {
+                        showToast('Tip: Click anywhere on the map for a 7-day forecast! Space = play/pause, Arrows = step frames', 'info', 6000);
+                        localStorage.setItem(WELCOME_STORAGE_KEY, '1');
+                    }, 2500);
+                }
             }
+        }
+
+        function applyEmbedMode() {
+            if (!embedConfig) return;
+            document.body.classList.add('embed-mode');
+            document.body.classList.toggle('embed-controls', embedConfig.controls);
+            document.body.classList.toggle('embed-legend', embedConfig.controls && embedConfig.legend);
+            document.body.classList.toggle('embed-radar', embedConfig.layers.includes('radar'));
+            document.body.dataset.embedSource = embedConfig.source;
+            document.body.dataset.embedProduct = embedConfig.product;
+            document.body.dataset.embedLayers = embedConfig.layers.join(',');
+            const brand = document.getElementById('embedBrand');
+            if (brand) brand.href = new URL(location.pathname, location.origin).href;
         }
 
         function loadSettings() {
@@ -5057,6 +5138,7 @@
         }
 
         function saveSettings() {
+            if (embedConfig) return true;
             try {
                 localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settingsRecord()));
                 return true;
@@ -5272,13 +5354,13 @@
         // ==================== MAP ====================
         function initMap() {
             map = L.map('map', {
-                center: [39, -96],
-                zoom: 5,
-                zoomControl: true,
+                center: embedConfig ? [embedConfig.latitude, embedConfig.longitude] : [39, -96],
+                zoom: embedConfig?.zoom || 5,
+                zoomControl: embedConfig?.controls !== false,
                 attributionControl: true,
                 preferCanvas: true
             });
-            map.zoomControl.setPosition('bottomleft');
+            map.zoomControl?.setPosition('bottomleft');
             
             map.createPane('satellitePane');
             map.getPane('satellitePane').style.zIndex = 200;
@@ -5311,6 +5393,15 @@
                 roadEventReloadTimeout = setTimeout(loadHighwayEvents, 500);
             });
             map.on('layeradd', scheduleOverlayOpacityApply);
+            const updateViewMetadata = () => {
+                const center = map.getCenter();
+                const container = map.getContainer();
+                container.dataset.latitude = center.lat.toFixed(4);
+                container.dataset.longitude = center.lng.toFixed(4);
+                container.dataset.zoom = String(map.getZoom());
+            };
+            map.on('moveend zoomend', updateViewMetadata);
+            updateViewMetadata();
             updateCoverageStatus();
         }
 
@@ -7138,7 +7229,8 @@
             hideLoadProgress();
             updateLegend();
             // Auto-play if source supports animation
-            if (RADAR_CAPABILITIES[settings.source]?.animation && frames.length > 1) {
+            if (RADAR_CAPABILITIES[settings.source]?.animation && frames.length > 1
+                && (!embedConfig || embedConfig.autoplay)) {
                 play();
             }
         }
@@ -11748,7 +11840,7 @@
             // Main refresh interval
             setInterval(() => {
                 if (settings.autoRefresh && !replayMode && !isPlaying && !document.hidden) {
-                    loadRadarData();
+                    if (settings.layers.radar) loadRadarData();
                     if (settings.layers.alerts) loadAlerts();
                     if (settings.layers.stormTracks) loadStormTracks();
                     else if (stormTop3dMode) loadStormCellsFor3d(true).then(renderStormTop3d);
@@ -11774,7 +11866,7 @@
                     const staleMs = Date.now() - lastRefreshTime;
                     if (staleMs > 3 * 60 * 1000) {
                         showToast('Refreshing stale data...', 'info', 2000);
-                        loadRadarData();
+                        if (settings.layers.radar) loadRadarData();
                         if (settings.layers.alerts) loadAlerts();
                         if (settings.layers.stormTracks) loadStormTracks();
                         else if (stormTop3dMode) loadStormCellsFor3d(true).then(renderStormTop3d);
@@ -11799,7 +11891,7 @@
                     stepFrame(1);
                     break;
                 case 'r':
-                    loadRadarData();
+                    if (settings.layers.radar) loadRadarData();
                     break;
             }
         });

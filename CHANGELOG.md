@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Added deterministic, non-persistent iframe embed mode with bounded URL configuration for map view, radar/source presentation, credential-free overlays, localization, optional controls/legend/autoplay, visible attribution, and a full-map escape link.
 - Added one-click, bounded 2× PNG snapshots of the visible primary map with its composed radar/overlay frame, provider-valid time, source/product identity, and current map/data attribution.
 - Added persistent standard, high-contrast, and color-blind-safe visual palettes across provider radar, native Level II products, alert polygons, MESH hail, storm tracks, 3D threat markers, legends, and core interface colors.
 - Added a persistent floating mini radar with synchronized frames and warning polygons, primary-map follow/recenter controls, responsive collision-free alert scrolling, visible attribution, diagnostics, and full Leaflet/WebGL teardown.

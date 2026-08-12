@@ -39,6 +39,7 @@ const requiredAssets = [
   ['src/split-view.js', 'javascript'],
   ['src/visual-palette.js', 'javascript'],
   ['src/map-snapshot.js', 'javascript'],
+  ['src/embed-mode.js', 'javascript'],
   ['logo/StormView-512x512.png', 'image/png'],
   ['vendor/leaflet/leaflet.css', 'text/css'],
   ['vendor/leaflet/leaflet.js', 'javascript'],
