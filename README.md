@@ -24,7 +24,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Satellite Enhancements** — Layer NOAA/NESDIS GeoColor or a GeoColor + enhanced Band 13 IR sandwich alongside visible, infrared, and water-vapor channels
 - **GOES Mesoscale Sectors** — Fetch both current GOES-East M1 and M2 visible sectors as a single high-frequency severe-weather overlay
 - **Hybrid High-Res Mode** — Automatic MRMS enhancement at high zoom levels (US only)
-- **Smooth Animation** — Play, pause, and step through radar frames with customizable speed (0.5x–3x)
+- **Smooth Animation** — Play, pause, and step through radar frames with customizable speed (0.5x–3x) and a persistent 0–8-frame preload window on each side of the playhead
 - **Model Forecast** — View HRRR reflectivity guidance through 18 hours
 - **RainViewer History** — Animate approximately two hours of past global radar using the provider's Universal Blue palette (native zoom 7)
 - **Historical Event Replay** — Select up to six hours and replay five-minute IEM NEXRAD composites with storm-based warning polygons synchronized to each frame

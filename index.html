@@ -2756,6 +2756,13 @@
                         </div>
                     </div>
                     <div class="setting-row">
+                        <div><div class="setting-label">Preload Window</div><div class="setting-hint">Frames kept ready before and after the playhead</div></div>
+                        <div class="slider-row">
+                            <input type="range" class="slider" id="preloadWindowSlider" min="0" max="8" step="1" value="4" aria-label="Radar preload window">
+                            <span class="slider-value" id="preloadWindowValue">4 frames each side</span>
+                        </div>
+                    </div>
+                    <div class="setting-row">
                         <div><div class="setting-label">Auto-Refresh</div><div class="setting-hint">Update every 5 minutes</div></div>
                         <div class="toggle on" id="autoRefreshToggle"></div>
                     </div>
@@ -2936,6 +2943,7 @@
     <script type="module">
     import { createProviderRegistry, RADAR_CAPABILITIES } from './src/providers/registry.js';
     import { createMessageFormatter } from './src/i18n.js';
+    import { effectivePreloadWindow, frameWindowIndices, normalizePreloadWindow } from './src/frame-preload.js';
     import { applyLayerOpacity, normalizeLayerOpacities } from './src/layer-opacity.js';
     import { LOCAL_OVERLAY_LIMITS, parseLocalOverlay } from './src/local-overlay.js';
     import { buildIowa511Query, normalizeIowa511Events } from './src/road-events.js';
@@ -3146,7 +3154,7 @@
         const layerRequests = new Map();
         const layerRequestGenerations = new Map();
         const MAX_SETTINGS_BYTES = 32768;
-        const SETTINGS_SCHEMA_VERSION = 5;
+        const SETTINGS_SCHEMA_VERSION = 6;
         const SETTINGS_STORAGE_KEY = 'stormview_settings';
         const GEOFENCE_STORAGE_KEY = 'stormview_geofences';
         const MAX_GEOFENCES = 20;
@@ -3196,6 +3204,10 @@
                 noRadarFrame: 'No radar frame',
                 languageUpdated: 'Language updated',
                 unitsUpdated: 'Units updated',
+                preloadFrames_one: '{count} frame each side',
+                preloadFrames_other: '{count} frames each side',
+                preloadReduced: '±{count} cap',
+                preloadReducedAria: '{value} · Reduced Data cap',
                 offlineUnavailable: 'Offline · cached data may be unavailable',
                 offlineCached: 'Offline · cached {resources}',
                 cachedFallback: 'Cached fallback · {resources}',
@@ -3335,6 +3347,10 @@
                 noRadarFrame: 'Sin imagen de radar',
                 languageUpdated: 'Idioma actualizado',
                 unitsUpdated: 'Unidades actualizadas',
+                preloadFrames_one: '{count} fotograma a cada lado',
+                preloadFrames_other: '{count} fotogramas a cada lado',
+                preloadReduced: '±{count} límite',
+                preloadReducedAria: '{value} · límite de Datos reducidos',
                 offlineUnavailable: 'Sin conexión · los datos almacenados podrían no estar disponibles',
                 offlineCached: 'Sin conexión · {resources} en caché',
                 cachedFallback: 'Respaldo en caché · {resources}',
@@ -3497,6 +3513,8 @@
             'High-Res Mode': 'Modo de alta resolución',
             'Animation': 'Animación',
             'Frame Delay': 'Demora de fotogramas',
+            'Preload Window': 'Ventana de precarga',
+            'Frames kept ready before and after the playhead': 'Fotogramas preparados antes y después de la posición actual',
             'Auto-Refresh': 'Actualización automática',
             'Loop Animation': 'Repetir animación',
             'Radar Source': 'Fuente de radar',
@@ -3741,6 +3759,7 @@
             updateTimestamp();
             renderDiagnostics();
             updateOfflineStatus();
+            updatePreloadWindowControl();
         }
 
         function redactedEndpoint(input) {
@@ -3807,6 +3826,11 @@
                     activeLayerRequests: layerRequests.size,
                     performance: { ...diagnosticsState.performance },
                     frameLayerCount: frameLayers.filter(Boolean).length,
+                    preload: {
+                        configured: settings.preloadWindow,
+                        effective: effectivePreloadWindow(settings.preloadWindow, settings.reducedData),
+                        mounted: frameLayers.filter(layer => layer && map.hasLayer(layer)).length
+                    },
                     tileCache: {
                         ...tileCacheState,
                         ...tileCacheMetrics
@@ -3837,7 +3861,7 @@
             const featureTotal = Object.values(report.resources.featureCounts).reduce((sum, value) => sum + value, 0);
             const cacheMegabytes = (report.resources.tileCache.bytes / (1024 * 1024)).toFixed(1);
             document.getElementById('diagResources').textContent =
-                `${report.radar.frames.loaded}/${report.radar.frames.total} frames · ${report.resources.frameLayerCount} layers · ${featureTotal} features · ${report.resources.tileCache.count} cached tiles (${cacheMegabytes} MB) · ${report.resources.tileCache.hits} hits / ${report.resources.tileCache.misses} misses · ${report.resources.activeRequests} requests · first frame ${report.resources.performance.firstUsableFrameMs ?? 'pending'} ms · ${report.resources.performance.droppedFrames} dropped · ${report.resources.performance.transferredBytes} bytes`;
+                `${report.radar.frames.loaded}/${report.radar.frames.total} frames · ${report.resources.frameLayerCount} layers · preload ±${report.resources.preload.effective} (${report.resources.preload.mounted} mounted) · ${featureTotal} features · ${report.resources.tileCache.count} cached tiles (${cacheMegabytes} MB) · ${report.resources.tileCache.hits} hits / ${report.resources.tileCache.misses} misses · ${report.resources.activeRequests} requests · first frame ${report.resources.performance.firstUsableFrameMs ?? 'pending'} ms · ${report.resources.performance.droppedFrames} dropped · ${report.resources.performance.transferredBytes} bytes`;
             const overlayStates = Object.entries(report.resources.overlayStates)
                 .filter(([, value]) => value.state !== 'disabled')
                 .sort(([left], [right]) => left.localeCompare(right));
@@ -4261,6 +4285,7 @@
 
             result.opacity = finiteNumber(candidate.opacity, 0.3, 1, result.opacity);
             result.delay = finiteNumber(candidate.delay, 200, 1200, result.delay);
+            result.preloadWindow = normalizePreloadWindow(candidate.preloadWindow, result.preloadWindow);
             result.stateBorderWidth = finiteNumber(candidate.stateBorderWidth, 0, 8, result.stateBorderWidth);
             result.countyBorderWidth = finiteNumber(candidate.countyBorderWidth, 0, 8, result.countyBorderWidth);
             result.borderOpacity = finiteNumber(candidate.borderOpacity, 0, 1, result.borderOpacity);
@@ -4493,6 +4518,7 @@
             snowColor: 1,
             colorScheme: 2,
             delay: 600,
+            preloadWindow: 4,
             loop: true,
             autoRefresh: true,
             showLegend: true,
@@ -6919,30 +6945,11 @@
                     });
                 }, 320);
             } else {
-                // Memory management: remove distant frames, but keep a wider buffer
-                // so we always have pre-loaded frames ready for smooth playback
-                frameLayers.forEach((layer, i) => {
-                    if (!layer || i === idx || i === prevFrame) return;
-                    const distance = Math.min(
-                        Math.abs(i - currentFrame),
-                        // Wrap-around distance for looping
-                        frameLayers.length - Math.abs(i - currentFrame)
-                    );
-                    if (distance > 4) {
-                        if (map.hasLayer(layer)) {
-                            map.removeLayer(layer);
-                        }
-                    } else if (i !== currentFrame) {
-                        // Keep nearby frames on map but hidden (no transition needed)
-                        const cont = layer.getContainer?.();
-                        if (cont) {
-                            cont.classList.remove('radar-crossfade');
-                            layer.setOpacity(0);
-                        } else {
-                            layer.setOpacity(0);
-                        }
-                    }
-                });
+                applyFramePreloadWindow(idx, { preserve: [prevFrame] });
+                const transitionTarget = idx;
+                setTimeout(() => {
+                    if (currentFrame === transitionTarget) applyFramePreloadWindow(currentFrame);
+                }, 320);
             }
             
             updateTimestamp();
@@ -6968,32 +6975,61 @@
         }
 
         // ==================== ANIMATION ====================
+        function updatePreloadWindowControl() {
+            const slider = document.getElementById('preloadWindowSlider');
+            const value = document.getElementById('preloadWindowValue');
+            if (!slider || !value) return;
+            const configured = normalizePreloadWindow(settings.preloadWindow);
+            const effective = effectivePreloadWindow(configured, settings.reducedData);
+            const frameText = t('preloadFrames', { count: effective });
+            slider.value = String(configured);
+            value.textContent = settings.reducedData && effective !== configured
+                ? t('preloadReduced', { count: effective })
+                : `±${effective}`;
+            slider.setAttribute('aria-valuetext', settings.reducedData && effective !== configured
+                ? t('preloadReducedAria', { value: frameText })
+                : frameText);
+        }
+
         function play() {
             if (isPlaying || !framesReady || frames.length < 2) return;
             isPlaying = true;
             document.getElementById('playIcon').innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
             lastFrameTime = performance.now();
-            // Preload next several frames for smooth cross-fade animation
-            preloadNearbyFrames(currentFrame, settings.reducedData ? 2 : 5);
+            applyFramePreloadWindow(currentFrame);
             animationLoop();
         }
 
-        function preloadNearbyFrames(idx, count) {
+        function applyFramePreloadWindow(idx, { preserve = [] } = {}) {
             if (replayMode) return;
-            // Preload upcoming frames by adding them to map (but hidden)
-            for (let i = 1; i <= count; i++) {
-                const nextIdx = (idx + i) % frameLayers.length;
-                if (frameLayers[nextIdx] && !map.hasLayer(frameLayers[nextIdx])) {
-                    frameLayers[nextIdx].addTo(map);
-                    const cont = frameLayers[nextIdx].getContainer?.();
+            const radius = effectivePreloadWindow(settings.preloadWindow, settings.reducedData);
+            const desired = new Set(frameWindowIndices(
+                frameLayers.length,
+                idx,
+                radius,
+                { loop: settings.loop }
+            ));
+            preserve.forEach(frameIndex => desired.add(frameIndex));
+
+            frameLayers.forEach((layer, frameIndex) => {
+                if (!layer) return;
+                if (desired.has(frameIndex)) {
+                    if (!map.hasLayer(layer)) layer.addTo(map);
+                    if (frameIndex === currentFrame) return;
+                    const cont = layer.getContainer?.();
                     if (cont) {
                         cont.classList.remove('radar-crossfade');
-                        frameLayers[nextIdx].setOpacity(0);
-                    } else {
-                        frameLayers[nextIdx].setOpacity(0);
                     }
+                    layer.setOpacity(0);
+                } else if (map.hasLayer(layer)) {
+                    map.removeLayer(layer);
                 }
-            }
+            });
+            const mapContainer = map.getContainer();
+            mapContainer.dataset.preloadWindow = String(radius);
+            mapContainer.dataset.preloadedFrames = String(
+                frameLayers.filter(layer => layer && map.hasLayer(layer)).length
+            );
         }
 
         function animationLoop() {
@@ -7020,8 +7056,6 @@
                     }
                 }
                 showPreloadedFrame(next);
-                // Preload frames well ahead for smooth cross-fading
-                preloadNearbyFrames(next, settings.reducedData ? 2 : 5);
             }
             
             animationId = requestAnimationFrame(animationLoop);
@@ -9715,6 +9749,7 @@
                 document.getElementById('loopBtn').classList.toggle('active', settings.loop);
                 document.getElementById('loopToggle')?.classList.toggle('on', settings.loop);
                 saveSettings();
+                applyFramePreloadWindow(currentFrame);
             });
             document.getElementById('loopBtn').classList.toggle('active', settings.loop);
 
@@ -10032,6 +10067,7 @@
             reducedDataToggle.classList.toggle('on', settings.reducedData);
             reducedDataToggle.addEventListener('click', () => {
                 settings.reducedData = reducedDataToggle.classList.toggle('on');
+                updatePreloadWindowControl();
                 if (settings.reducedData) {
                     REDUCED_DATA_OPTIONAL_LAYERS.forEach(layer => {
                         if (settings.layers[layer]) handleLayerToggle(layer, false);
@@ -10101,6 +10137,13 @@
                 }
             }, true);
             initSlider('delaySlider', 'delayValue', 'delay', 'ms');
+            initSlider('preloadWindowSlider', 'preloadWindowValue', 'preloadWindow', '', () => {
+                settings.preloadWindow = normalizePreloadWindow(settings.preloadWindow);
+                updatePreloadWindowControl();
+                applyFramePreloadWindow(currentFrame);
+                renderDiagnostics();
+            });
+            updatePreloadWindowControl();
 
             const smoothToggle = document.getElementById('smoothToggle');
             smoothToggle.classList.toggle('on', settings.smooth === 1);
@@ -10140,6 +10183,7 @@
                 settings.loop = loopToggle.classList.toggle('on');
                 document.getElementById('loopBtn').classList.toggle('active', settings.loop);
                 saveSettings();
+                applyFramePreloadWindow(currentFrame);
             });
 
             const replayEndDefault = new Date(Date.now() - 10 * 60 * 1000);
