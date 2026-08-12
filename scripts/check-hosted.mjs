@@ -34,6 +34,7 @@ if (deployed.version !== packageManifest.version) {
 const requiredAssets = [
   ['index.html', 'text/html'],
   ['service-worker.js', 'javascript'],
+  ['manifest.webmanifest', 'application/manifest+json'],
   ['src/frame-preload.js', 'javascript'],
   ['src/picture-in-picture.js', 'javascript'],
   ['src/split-view.js', 'javascript'],
@@ -42,6 +43,7 @@ const requiredAssets = [
   ['src/embed-mode.js', 'javascript'],
   ['src/chasecaster.js', 'javascript'],
   ['src/training-overlays.js', 'javascript'],
+  ['src/pwa-install.js', 'javascript'],
   ['logo/StormView-512x512.png', 'image/png'],
   ['vendor/leaflet/leaflet.css', 'text/css'],
   ['vendor/leaflet/leaflet.js', 'javascript'],

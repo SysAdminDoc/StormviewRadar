@@ -1,8 +1,9 @@
-const CACHE_VERSION = '2026-08-12-9';
+const CACHE_VERSION = '2026-08-12-10';
 const SHELL_CACHE = `stormview-shell-${CACHE_VERSION}`;
 const RADAR_CACHE = `stormview-radar-${CACHE_VERSION}`;
 const RADAR_META_CACHE = `stormview-radar-meta-${CACHE_VERSION}`;
 const ALERT_CACHE = `stormview-alerts-${CACHE_VERSION}`;
+const STATE_CACHE = `stormview-state-${CACHE_VERSION}`;
 const CACHE_LIMITS = new Map([
   [RADAR_CACHE, 256],
   [RADAR_META_CACHE, 16],
@@ -11,11 +12,13 @@ const CACHE_LIMITS = new Map([
 const SHELL_PATHS = [
   './',
   './index.html',
+  './manifest.webmanifest',
   './logo/StormView-16x16.png',
   './logo/StormView-32x32.png',
   './logo/StormView-48x48.png',
   './logo/StormView-96x96.png',
   './logo/StormView-192x192.png',
+  './logo/StormView-512x512.png',
   './vendor/leaflet/leaflet.css',
   './vendor/leaflet/leaflet.js',
   './vendor/topojson/topojson-client.min.js',
@@ -30,6 +33,7 @@ const SHELL_PATHS = [
   './src/embed-mode.js',
   './src/chasecaster.js',
   './src/training-overlays.js',
+  './src/pwa-install.js',
   './src/alert-fill.js',
   './src/alert-series.js',
   './src/layer-opacity.js',
@@ -93,6 +97,54 @@ async function notifyFallback(resource) {
   clients.forEach(client => client.postMessage({ type: 'stormview-offline-fallback', resource }));
 }
 
+function offlineFrameMarkerRequest() {
+  return new Request(new URL('./__stormview_offline_frame__', self.registration.scope));
+}
+
+async function offlineAvailability() {
+  const [shellCache, radarCache, stateCache] = await Promise.all([
+    caches.open(SHELL_CACHE),
+    caches.open(RADAR_CACHE),
+    caches.open(STATE_CACHE)
+  ]);
+  const [shellResponse, radarKeys, frameMarker] = await Promise.all([
+    shellCache.match(new URL('./index.html', self.registration.scope)),
+    radarCache.keys(),
+    stateCache.match(offlineFrameMarkerRequest())
+  ]);
+  return {
+    type: 'stormview-offline-availability',
+    shell: Boolean(shellResponse),
+    radarFrame: Boolean(frameMarker) && radarKeys.length > 0,
+    radarEntries: radarKeys.length
+  };
+}
+
+async function notifyOfflineAvailability(target = null) {
+  const status = await offlineAvailability();
+  if (target?.postMessage) {
+    target.postMessage(status);
+    return;
+  }
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  clients.forEach(client => client.postMessage(status));
+}
+
+async function markOfflineRadarFrame() {
+  const radarCache = await caches.open(RADAR_CACHE);
+  const radarKeys = await radarCache.keys();
+  if (!radarKeys.length) {
+    await notifyOfflineAvailability();
+    return;
+  }
+  const stateCache = await caches.open(STATE_CACHE);
+  await stateCache.put(offlineFrameMarkerRequest(), new Response(JSON.stringify({
+    completedAt: Date.now(),
+    radarEntries: radarKeys.length
+  }), { headers: { 'Content-Type': 'application/json' } }));
+  await notifyOfflineAvailability();
+}
+
 async function networkFirst(request, cacheName, resource) {
   let response;
   try {
@@ -121,13 +173,24 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
-    const active = new Set([SHELL_CACHE, RADAR_CACHE, RADAR_META_CACHE, ALERT_CACHE]);
+    const active = new Set([SHELL_CACHE, RADAR_CACHE, RADAR_META_CACHE, ALERT_CACHE, STATE_CACHE]);
     const names = await caches.keys();
     await Promise.all(names
       .filter(name => name.startsWith('stormview-') && !active.has(name))
       .map(name => caches.delete(name)));
     await self.clients.claim();
+    await notifyOfflineAvailability();
   })());
+});
+
+self.addEventListener('message', event => {
+  if (event.data?.type === 'stormview-mark-offline-radar-frame') {
+    event.waitUntil(markOfflineRadarFrame());
+    return;
+  }
+  if (event.data?.type === 'stormview-offline-availability-request') {
+    event.waitUntil(notifyOfflineAvailability(event.source));
+  }
 });
 
 self.addEventListener('fetch', event => {

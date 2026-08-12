@@ -9,6 +9,8 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://api.open-meteo.com https://api.openweathermap.org https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://services.arcgis.com https://tile.openweathermap.org https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StormView Radar 0.1.0</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     
     <!-- Favicons -->
     <link rel="icon" href="data:image/x-icon;base64,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">
@@ -565,6 +567,34 @@
         .training-annotation-copy span { margin-top: 2px; color: var(--text-muted); font-size: 10px; line-height: 1.35; }
         .training-marker-icon { border: 0; background: transparent; }
         body.training-mode #trainingBtn { border-color: var(--warning); color: var(--warning); }
+        .pwa-install-prompt {
+            position: fixed;
+            right: 16px;
+            bottom: 128px;
+            z-index: 1250;
+            display: grid;
+            grid-template-columns: 42px minmax(0, 1fr);
+            gap: 9px 11px;
+            width: min(360px, calc(100vw - 32px));
+            padding: 12px;
+            border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--glass-border));
+            border-radius: 14px;
+            color: var(--text);
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.48);
+        }
+        .pwa-install-prompt[hidden] { display: none; }
+        .pwa-install-icon {
+            grid-row: 1 / 3;
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+        }
+        .pwa-install-copy strong,
+        .pwa-install-copy span { display: block; }
+        .pwa-install-copy strong { font-size: 13px; }
+        .pwa-install-copy span { margin-top: 3px; color: var(--text-muted); font-size: 10px; line-height: 1.35; }
+        .pwa-install-actions { display: flex; flex-wrap: wrap; gap: 7px; grid-column: 2; }
+        .pwa-install-actions .btn { min-height: 34px; padding: 7px 12px; font-size: 11px; }
         @media (max-width: 768px) {
             .pip-radar-panel {
                 right: 10px;
@@ -581,6 +611,7 @@
                 width: auto;
                 max-height: min(48dvh, 390px);
             }
+            .pwa-install-prompt { right: 10px; bottom: 132px; width: min(350px, calc(100vw - 20px)); }
             body.pip-radar-active .non-map-alerts {
                 right: 10px;
                 bottom: 332px;
@@ -3213,6 +3244,18 @@
         <div class="status-chip show" id="coverageStatus" aria-live="polite"><span class="dot green"></span><span id="coverageStatusText">Coverage loading…</span></div>
     </div>
 
+    <section class="pwa-install-prompt glass" id="pwaInstallPrompt" role="region" aria-label="Install StormView Radar" hidden>
+        <img class="pwa-install-icon" src="logo/StormView-96x96.png" alt="">
+        <div class="pwa-install-copy">
+            <strong id="pwaInstallTitle">Install StormView Radar</strong>
+            <span id="pwaInstallDescription">Offline-ready: the app shell and last radar frame are cached on this device.</span>
+        </div>
+        <div class="pwa-install-actions">
+            <button class="btn btn-primary" id="pwaInstallButton" type="button">Install</button>
+            <button class="btn" id="pwaInstallDismiss" type="button">Not now</button>
+        </div>
+    </section>
+
     <!-- Location Button -->
     <button class="icon-btn loc-btn glass" id="locBtn" type="button" title="My Location" aria-label="My Location" aria-live="polite">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
@@ -3583,6 +3626,7 @@
     import { applyEmbedConfiguration, parseEmbedConfig } from './src/embed-mode.js';
     import { cardinalDirection, normalizeChasePosition, orientationHeading, smoothHeading } from './src/chasecaster.js';
     import { getTrainingScenario, trainingFeatureCollection, trainingScenarioCatalog } from './src/training-overlays.js';
+    import { normalizeOfflineAvailability, shouldOfferInstall } from './src/pwa-install.js';
     import { IndexedDbTileCache, isCacheableTileUrl, tileCacheMaxAge } from './src/tile-cache.js';
     import { WebGLTileRenderer } from './src/webgl-tile-renderer.js';
 
@@ -3728,6 +3772,10 @@
         let trainingLayer = null;
         let trainingReturnView = null;
         let trainingSuspendedViews = null;
+        let deferredInstallPrompt = null;
+        let offlineInstallAvailability = { shell: false, radarFrame: false, radarEntries: 0, ready: false };
+        let offlineFrameMarkPending = false;
+        let initialLoadComplete = false;
         let compareMap = null;
         let compareBaseLayer = null;
         let compareRadarLayer = null;
@@ -3883,6 +3931,14 @@
                 offlineRadar: 'radar',
                 offlineAlerts: 'alerts',
                 offlineShell: 'app shell',
+                pwaInstallAria: 'Install StormView Radar',
+                pwaInstallTitle: 'Install StormView Radar',
+                pwaInstallDescription: 'Offline-ready: the app shell and last radar frame are cached on this device.',
+                pwaInstallButton: 'Install',
+                pwaInstallDismiss: 'Not now',
+                pwaInstallAccepted: 'StormView Radar install request opened',
+                pwaInstalled: 'StormView Radar installed',
+                pwaInstallFailed: 'The install prompt is unavailable. Use your browser menu to install StormView Radar.',
                 providerLoading: '{provider}: loading…',
                 providerCurrent: '{provider}: current',
                 providerFallback: 'MRMS fallback: {provider} failed',
@@ -4076,6 +4132,14 @@
                 offlineRadar: 'radar',
                 offlineAlerts: 'alertas',
                 offlineShell: 'aplicación',
+                pwaInstallAria: 'Instalar StormView Radar',
+                pwaInstallTitle: 'Instalar StormView Radar',
+                pwaInstallDescription: 'Listo sin conexión: la aplicación y la última imagen de radar están almacenadas en este dispositivo.',
+                pwaInstallButton: 'Instalar',
+                pwaInstallDismiss: 'Ahora no',
+                pwaInstallAccepted: 'Se abrió la solicitud de instalación de StormView Radar',
+                pwaInstalled: 'StormView Radar instalado',
+                pwaInstallFailed: 'La solicitud de instalación no está disponible. Usa el menú del navegador para instalar StormView Radar.',
                 providerLoading: '{provider}: cargando…',
                 providerCurrent: '{provider}: actual',
                 providerFallback: 'Respaldo MRMS: falló {provider}',
@@ -4401,6 +4465,109 @@
         }
 
         const offlineFallbackResources = new Set();
+        const PWA_INSTALL_DISMISSAL_KEY = 'stormview_pwa_install_dismissed_at';
+
+        function pwaStandaloneMode() {
+            return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+        }
+
+        function pwaInstallDismissedAt() {
+            try {
+                return localStorage.getItem(PWA_INSTALL_DISMISSAL_KEY);
+            } catch {
+                return null;
+            }
+        }
+
+        function updatePwaInstallLanguage() {
+            const title = document.getElementById('pwaInstallTitle');
+            if (!title) return;
+            title.textContent = t('pwaInstallTitle');
+            document.getElementById('pwaInstallDescription').textContent = t('pwaInstallDescription');
+            document.getElementById('pwaInstallButton').textContent = t('pwaInstallButton');
+            document.getElementById('pwaInstallDismiss').textContent = t('pwaInstallDismiss');
+        }
+
+        function updatePwaInstallPrompt() {
+            const panel = document.getElementById('pwaInstallPrompt');
+            if (!panel) return;
+            const visible = shouldOfferInstall({
+                hasInstallEvent: Boolean(deferredInstallPrompt),
+                offlineReady: offlineInstallAvailability.ready,
+                standalone: pwaStandaloneMode(),
+                embed: Boolean(embedConfig),
+                dismissedAt: pwaInstallDismissedAt()
+            }) && initialLoadComplete;
+            panel.hidden = !visible;
+            panel.dataset.offlineRadarEntries = String(offlineInstallAvailability.radarEntries);
+        }
+
+        async function requestPwaInstall() {
+            const promptEvent = deferredInstallPrompt;
+            if (!promptEvent?.prompt) {
+                showToast(t('pwaInstallFailed'), 'warn', 5000);
+                return;
+            }
+            try {
+                await promptEvent.prompt();
+                const choice = await promptEvent.userChoice;
+                deferredInstallPrompt = null;
+                if (choice?.outcome === 'dismissed') {
+                    try {
+                        localStorage.setItem(PWA_INSTALL_DISMISSAL_KEY, String(Date.now()));
+                    } catch {
+                        // A blocked storage profile still gets a session-scoped browser prompt.
+                    }
+                } else {
+                    showToast(t('pwaInstallAccepted'), 'success', 3000);
+                }
+                updatePwaInstallPrompt();
+            } catch (error) {
+                console.warn('PWA install prompt failed:', error);
+                deferredInstallPrompt = null;
+                updatePwaInstallPrompt();
+                showToast(t('pwaInstallFailed'), 'warn', 5000);
+            }
+        }
+
+        function initPwaInstallPrompt() {
+            window.addEventListener('beforeinstallprompt', event => {
+                event.preventDefault();
+                deferredInstallPrompt = event;
+                updatePwaInstallPrompt();
+            });
+            window.addEventListener('appinstalled', () => {
+                deferredInstallPrompt = null;
+                try {
+                    localStorage.removeItem(PWA_INSTALL_DISMISSAL_KEY);
+                } catch {
+                    // Installation succeeded even if local storage is unavailable.
+                }
+                updatePwaInstallPrompt();
+                showToast(t('pwaInstalled'), 'success', 3500);
+            });
+            document.getElementById('pwaInstallButton').addEventListener('click', requestPwaInstall);
+            document.getElementById('pwaInstallDismiss').addEventListener('click', () => {
+                try {
+                    localStorage.setItem(PWA_INSTALL_DISMISSAL_KEY, String(Date.now()));
+                } catch {
+                    deferredInstallPrompt = null;
+                }
+                updatePwaInstallPrompt();
+            });
+            updatePwaInstallPrompt();
+        }
+
+        function markOfflineRadarFrameReady() {
+            if (offlineFrameMarkPending || !('serviceWorker' in navigator)) return;
+            offlineFrameMarkPending = true;
+            navigator.serviceWorker.ready
+                .then(registration => {
+                    registration.active?.postMessage({ type: 'stormview-mark-offline-radar-frame' });
+                })
+                .catch(() => {})
+                .finally(() => { offlineFrameMarkPending = false; });
+        }
 
         function updateOfflineStatus() {
             const chip = document.getElementById('offlineStatus');
@@ -4418,7 +4585,7 @@
                 : t('offlineUnavailable');
         }
 
-        function initOfflineFallback() {
+        async function initOfflineFallback() {
             window.addEventListener('offline', updateOfflineStatus);
             window.addEventListener('online', () => {
                 offlineFallbackResources.clear();
@@ -4427,12 +4594,29 @@
             updateOfflineStatus();
             if (!('serviceWorker' in navigator)) return;
             navigator.serviceWorker.addEventListener('message', event => {
-                if (event.data?.type !== 'stormview-offline-fallback') return;
-                offlineFallbackResources.add(event.data.resource);
-                updateOfflineStatus();
+                if (event.data?.type === 'stormview-offline-fallback') {
+                    offlineFallbackResources.add(event.data.resource);
+                    updateOfflineStatus();
+                    return;
+                }
+                if (event.data?.type === 'stormview-offline-availability') {
+                    offlineInstallAvailability = normalizeOfflineAvailability(event.data);
+                    updatePwaInstallPrompt();
+                }
             });
-            navigator.serviceWorker.register('./service-worker.js', { scope: './' })
-                .catch(error => console.warn('Offline fallback could not be enabled:', error));
+            try {
+                const registered = await navigator.serviceWorker.register('./service-worker.js', { scope: './' });
+                const registration = registered.active || (!registered.installing && !registered.waiting)
+                    ? registered
+                    : await Promise.race([
+                        navigator.serviceWorker.ready,
+                        new Promise(resolve => setTimeout(() => resolve(null), 3000))
+                    ]);
+                registration?.active?.postMessage({ type: 'stormview-offline-availability-request' });
+                if (framesLoaded > 0) markOfflineRadarFrameReady();
+            } catch (error) {
+                console.warn('Offline fallback could not be enabled:', error);
+            }
         }
 
         function localizedStaticText(value) {
@@ -4502,6 +4686,7 @@
                 trainingBtn: ['title', 'trainingToggle'],
                 trainingPanel: ['aria-label', 'trainingPanel'],
                 trainingClose: ['aria-label', 'trainingClose'],
+                pwaInstallPrompt: ['aria-label', 'pwaInstallAria'],
                 searchInput: ['aria-label', 'searchAria'],
                 searchClear: ['aria-label', 'searchClearAria'],
                 searchResults: ['aria-label', 'searchResultsAria'],
@@ -4534,6 +4719,7 @@
             const compareSearchInput = document.getElementById('compareSearchInput');
             if (compareSearchInput) compareSearchInput.placeholder = t('compareSearchPlaceholder');
             updateTrainingLanguage();
+            updatePwaInstallLanguage();
             if (alertAgeLegendControl && currentAlertFeatures.length) {
                 const referenceTime = replayMode && frames[currentFrame]
                     ? frames[currentFrame].time * 1000
@@ -5415,7 +5601,8 @@
             initRadarSystem();
             initUI();
             applyLanguage();
-            initOfflineFallback();
+            initPwaInstallPrompt();
+            await initOfflineFallback();
             initSidebarDrawer();
             initForecastPanel();
             initQuickToolbar();
@@ -10261,6 +10448,7 @@
 
         function markRadarFrameLoaded() {
             framesLoaded = Math.min(framesTotal, framesLoaded + 1);
+            markOfflineRadarFrameReady();
             if (diagnosticsState.performance.firstUsableFrameMs === null) {
                 diagnosticsState.performance.firstUsableFrameMs = Math.round(performance.now() - diagnosticsState.performance.startupStartedAt);
             }
@@ -10403,6 +10591,10 @@
 
         function hideLoading() {
             document.getElementById('loading').classList.add('hidden');
+            setTimeout(() => {
+                initialLoadComplete = true;
+                updatePwaInstallPrompt();
+            }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 20 : 520);
         }
 
         // ==================== CLICK-TO-FORECAST (Open-Meteo) ====================

@@ -1,0 +1,26 @@
+{
+  "name": "StormView Radar",
+  "short_name": "StormView",
+  "description": "Animated weather radar, official alerts, and storm analysis in a privacy-friendly static web app.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#1e1e2e",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "logo/StormView-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "logo/StormView-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

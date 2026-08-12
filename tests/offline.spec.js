@@ -122,6 +122,20 @@ test('service worker restores the app shell, last radar frame, and alert polygon
   });
   expect(leakedCredential).toBe(false);
 
+  await page.evaluate(() => {
+    const event = new Event('beforeinstallprompt', { cancelable: true });
+    Object.defineProperties(event, {
+      prompt: { value: async () => {} },
+      userChoice: { value: Promise.resolve({ outcome: 'dismissed', platform: 'web' }) }
+    });
+    window.dispatchEvent(event);
+    navigator.serviceWorker.controller.postMessage({ type: 'stormview-mark-offline-radar-frame' });
+  });
+  await expect(page.locator('#pwaInstallPrompt')).toBeVisible();
+  await expect.poll(() => page.locator('#pwaInstallPrompt').getAttribute('data-offline-radar-entries').then(Number)).toBeGreaterThan(0);
+  await page.locator('#pwaInstallDismiss').click();
+  await expect(page.locator('#pwaInstallPrompt')).toBeHidden();
+
   await context.setOffline(true);
   try {
     await page.reload({ waitUntil: 'domcontentloaded' });
