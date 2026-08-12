@@ -41,6 +41,7 @@ const requiredAssets = [
   ['src/map-snapshot.js', 'javascript'],
   ['src/embed-mode.js', 'javascript'],
   ['src/chasecaster.js', 'javascript'],
+  ['src/training-overlays.js', 'javascript'],
   ['logo/StormView-512x512.png', 'image/png'],
   ['vendor/leaflet/leaflet.css', 'text/css'],
   ['vendor/leaflet/leaflet.js', 'javascript'],

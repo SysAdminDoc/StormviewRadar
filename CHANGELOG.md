@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Added three localized archived storm-training scenarios with replay-linked, numbered reflectivity study cues, official-warning separation, persistent not-live disclosure, mobile-safe controls, and deterministic return to live radar.
 - Added a mobile Chasecaster field mode with high-accuracy GPS following, compass-assisted orientation and course fallback, readable speed/accuracy telemetry, explicit safety guidance, and complete sensor/map-layer teardown.
 - Added deterministic, non-persistent iframe embed mode with bounded URL configuration for map view, radar/source presentation, credential-free overlays, localization, optional controls/legend/autoplay, visible attribution, and a full-map escape link.
 - Added one-click, bounded 2× PNG snapshots of the visible primary map with its composed radar/overlay frame, provider-valid time, source/product identity, and current map/data attribution.

@@ -459,6 +459,112 @@
         body.chasecaster-mode .loc-btn,
         body.chasecaster-mode .map-forecast-btn { display: none !important; }
         body.chasecaster-mode .legend { top: 40%; }
+        .training-panel {
+            position: fixed;
+            top: 128px;
+            left: 306px;
+            z-index: 1110;
+            width: min(380px, calc(100vw - 326px));
+            max-height: calc(100dvh - 260px);
+            overflow: auto;
+            padding: 14px;
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            color: var(--text);
+        }
+        .training-panel[hidden] { display: none; }
+        .training-header,
+        .training-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .training-title { font-size: 14px; }
+        .training-close {
+            display: grid;
+            place-items: center;
+            flex: 0 0 34px;
+            width: 34px;
+            height: 34px;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            background: var(--glass-hover);
+            color: var(--text);
+            cursor: pointer;
+            font: inherit;
+            font-size: 18px;
+        }
+        .training-disclosure {
+            margin: 8px 0 10px;
+            padding: 7px 9px;
+            border: 1px solid color-mix(in srgb, var(--warning) 55%, transparent);
+            border-radius: 8px;
+            background: color-mix(in srgb, var(--warning) 12%, transparent);
+            color: var(--warning);
+            font-size: 10px;
+            font-weight: 800;
+            line-height: 1.35;
+            text-transform: uppercase;
+        }
+        .training-select {
+            width: 100%;
+            min-height: 38px;
+            padding: 7px 9px;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            background: var(--glass-heavy);
+            color: var(--text);
+            font: inherit;
+            font-size: 12px;
+        }
+        .training-summary { margin: 8px 0 10px; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
+        .training-actions { justify-content: flex-start; }
+        .training-actions .btn { min-height: 36px; }
+        .training-status { margin-top: 8px; color: var(--text-muted); font-size: 10px; }
+        .training-annotations {
+            display: grid;
+            gap: 7px;
+            margin: 12px 0 0;
+            padding: 0;
+            list-style: none;
+        }
+        .training-annotations[hidden] { display: none; }
+        .training-annotation-button {
+            display: grid;
+            grid-template-columns: 28px minmax(0, 1fr);
+            gap: 8px;
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--glass-border);
+            border-radius: 9px;
+            background: var(--glass-hover);
+            color: var(--text);
+            cursor: pointer;
+            text-align: left;
+        }
+        .training-annotation-button:hover,
+        .training-annotation-button:focus-visible { border-color: var(--accent); }
+        .training-annotation-index,
+        .training-marker {
+            display: grid;
+            place-items: center;
+            width: 26px;
+            height: 26px;
+            border: 2px solid #08111f;
+            border-radius: 50%;
+            background: var(--warning);
+            color: #08111f;
+            font-size: 12px;
+            font-weight: 900;
+            box-shadow: 0 2px 7px rgba(0, 0, 0, 0.55);
+        }
+        .training-annotation-copy strong,
+        .training-annotation-copy span { display: block; }
+        .training-annotation-copy strong { font-size: 11px; }
+        .training-annotation-copy span { margin-top: 2px; color: var(--text-muted); font-size: 10px; line-height: 1.35; }
+        .training-marker-icon { border: 0; background: transparent; }
+        body.training-mode #trainingBtn { border-color: var(--warning); color: var(--warning); }
         @media (max-width: 768px) {
             .pip-radar-panel {
                 right: 10px;
@@ -467,6 +573,14 @@
                 height: 190px;
             }
             .chasecaster-panel { right: 10px; bottom: 132px; }
+            .training-panel {
+                top: auto;
+                right: 10px;
+                bottom: 132px;
+                left: 10px;
+                width: auto;
+                max-height: min(48dvh, 390px);
+            }
             body.pip-radar-active .non-map-alerts {
                 right: 10px;
                 bottom: 332px;
@@ -2923,6 +3037,10 @@
             <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/><path d="M12 1v2M12 21v2M1 12h2M21 12h2"/></svg>
             <span class="qt-label">Chase</span>
         </button>
+        <button class="qt-btn" id="trainingBtn" type="button" title="Open annotated storm training" aria-label="Open annotated storm training" aria-expanded="false" aria-controls="trainingPanel">
+            <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path d="m3 10 9-5 9 5-9 5-9-5Z"/><path d="M7 12.5v4.2c2.7 2 7.3 2 10 0v-4.2M21 10v6"/></svg>
+            <span class="qt-label">Train</span>
+        </button>
         <button class="qt-btn" id="stormTop3dBtn" type="button" title="Toggle 3D storm-top heights" aria-label="Toggle 3D storm-top heights" aria-pressed="false">
             <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path d="m12 2 8 4.5v9L12 20l-8-4.5v-9L12 2Z"/><path d="m4 6.5 8 4.5 8-4.5M12 11v9"/></svg>
             <span class="qt-label">3D Tops</span>
@@ -2947,6 +3065,23 @@
         </div>
         <button class="chasecaster-follow active" id="chasecasterFollow" type="button" aria-pressed="true">Following location</button>
         <p class="chasecaster-safety" id="chasecasterSafety">For situational awareness only. Do not interact with StormView while driving.</p>
+    </section>
+
+    <section class="training-panel glass" id="trainingPanel" role="region" aria-label="Annotated storm training" hidden>
+        <div class="training-header">
+            <strong class="training-title" id="trainingTitle">Storm training</strong>
+            <button class="training-close" id="trainingClose" type="button" aria-label="Close storm training">×</button>
+        </div>
+        <p class="training-disclosure" id="trainingDisclosure">Archived training example · Not live · Not an official warning</p>
+        <label class="sr-only" for="trainingScenarioSelect" id="trainingScenarioLabel">Training example</label>
+        <select class="training-select" id="trainingScenarioSelect" aria-describedby="trainingSummary"></select>
+        <p class="training-summary" id="trainingSummary"></p>
+        <div class="training-actions">
+            <button class="btn btn-primary" id="trainingLoad" type="button">Load example</button>
+            <button class="btn" id="trainingExit" type="button" disabled>Return live</button>
+        </div>
+        <div class="training-status" id="trainingStatus" role="status" aria-live="polite">Choose an archived example to begin.</div>
+        <ol class="training-annotations" id="trainingAnnotations" hidden></ol>
     </section>
 
     <!-- Legend -->
@@ -3447,6 +3582,7 @@
     import { captureLeafletSnapshot, snapshotFilename } from './src/map-snapshot.js';
     import { applyEmbedConfiguration, parseEmbedConfig } from './src/embed-mode.js';
     import { cardinalDirection, normalizeChasePosition, orientationHeading, smoothHeading } from './src/chasecaster.js';
+    import { getTrainingScenario, trainingFeatureCollection, trainingScenarioCatalog } from './src/training-overlays.js';
     import { IndexedDbTileCache, isCacheableTileUrl, tileCacheMaxAge } from './src/tile-cache.js';
     import { WebGLTileRenderer } from './src/webgl-tile-renderer.js';
 
@@ -3588,6 +3724,10 @@
         let chasecasterCompassState = 'waiting';
         let chasecasterCompassTimer = null;
         let chasecasterSuspendedViews = null;
+        let trainingScenario = null;
+        let trainingLayer = null;
+        let trainingReturnView = null;
+        let trainingSuspendedViews = null;
         let compareMap = null;
         let compareBaseLayer = null;
         let compareRadarLayer = null;
@@ -3835,6 +3975,19 @@
                 chasecasterUnavailable: 'Chasecaster requires browser location support',
                 chasecasterDenied: 'Location permission is required for chasecaster mode. Enable it in browser site settings and retry.',
                 chasecasterError: 'Live location is unavailable. Check location services and retry.',
+                trainingToggle: 'Open annotated storm training',
+                trainingPanel: 'Annotated storm training',
+                trainingClose: 'Close storm training',
+                trainingTitle: 'Storm training',
+                trainingDisclosure: 'Archived training example · Not live · Not an official warning',
+                trainingScenario: 'Training example',
+                trainingLoad: 'Load example',
+                trainingExit: 'Return live',
+                trainingChoose: 'Choose an archived example to begin.',
+                trainingLoading: 'Loading archived training radar…',
+                trainingActive: '{count} annotated study cues · Use the radar timeline to inspect change.',
+                trainingFailed: 'Training example failed: {message}',
+                trainingLoaded: 'Archived training example loaded',
                 searchPlaceholder: 'Search location…',
                 searchAria: 'Search for a US location',
                 searchClearAria: 'Clear location search',
@@ -4015,6 +4168,19 @@
                 chasecasterUnavailable: 'Chasecaster requiere compatibilidad con ubicación del navegador',
                 chasecasterDenied: 'Se requiere permiso de ubicación para Chasecaster. Actívalo en la configuración del sitio y vuelve a intentarlo.',
                 chasecasterError: 'La ubicación en vivo no está disponible. Revisa los servicios de ubicación y vuelve a intentarlo.',
+                trainingToggle: 'Abrir entrenamiento de tormentas anotado',
+                trainingPanel: 'Entrenamiento de tormentas anotado',
+                trainingClose: 'Cerrar entrenamiento de tormentas',
+                trainingTitle: 'Entrenamiento de tormentas',
+                trainingDisclosure: 'Ejemplo de entrenamiento archivado · No está en vivo · No es una alerta oficial',
+                trainingScenario: 'Ejemplo de entrenamiento',
+                trainingLoad: 'Cargar ejemplo',
+                trainingExit: 'Volver en vivo',
+                trainingChoose: 'Elige un ejemplo archivado para comenzar.',
+                trainingLoading: 'Cargando radar de entrenamiento archivado…',
+                trainingActive: '{count} indicaciones de estudio anotadas · Usa la línea de tiempo del radar para observar los cambios.',
+                trainingFailed: 'Falló el ejemplo de entrenamiento: {message}',
+                trainingLoaded: 'Ejemplo de entrenamiento archivado cargado',
                 searchPlaceholder: 'Buscar ubicación…',
                 searchAria: 'Buscar una ubicación de Estados Unidos',
                 searchClearAria: 'Borrar búsqueda de ubicación',
@@ -4078,6 +4244,7 @@
             'Comparison view': 'Vista comparativa',
             '2-City': '2 ciudades',
             'Chase': 'Campo',
+            'Train': 'Aprender',
             'Display': 'Pantalla',
             'Status': 'Estado',
             'Appearance': 'Apariencia',
@@ -4332,6 +4499,9 @@
                 chasecasterBtn: ['title', 'chasecasterToggle'],
                 chasecasterPanel: ['aria-label', 'chasecasterPanel'],
                 chasecasterStop: ['aria-label', 'chasecasterStop'],
+                trainingBtn: ['title', 'trainingToggle'],
+                trainingPanel: ['aria-label', 'trainingPanel'],
+                trainingClose: ['aria-label', 'trainingClose'],
                 searchInput: ['aria-label', 'searchAria'],
                 searchClear: ['aria-label', 'searchClearAria'],
                 searchResults: ['aria-label', 'searchResultsAria'],
@@ -4363,6 +4533,7 @@
             if (searchInput) searchInput.placeholder = t('searchPlaceholder');
             const compareSearchInput = document.getElementById('compareSearchInput');
             if (compareSearchInput) compareSearchInput.placeholder = t('compareSearchPlaceholder');
+            updateTrainingLanguage();
             if (alertAgeLegendControl && currentAlertFeatures.length) {
                 const referenceTime = replayMode && frames[currentFrame]
                     ? frames[currentFrame].time * 1000
@@ -5251,6 +5422,7 @@
             initSplitView();
             initPipRadar();
             initChasecaster();
+            initTrainingOverlays();
             initBookmarks();
             initAccessibility();
             updatePlaybackVisibility();
@@ -8571,16 +8743,14 @@
             updateAlertCount(activeWarnings.length);
         }
 
-        async function startHistoricalReplay() {
-            const startInput = document.getElementById('replayStartInput');
-            const endInput = document.getElementById('replayEndInput');
+        async function loadHistoricalReplayRange(startValue, endValue, { announce = true } = {}) {
             setReplayControlState('Loading replay…');
             replayAbortController?.abort(new DOMException('Replay superseded', 'AbortError'));
             const controller = new AbortController();
             replayAbortController = controller;
             try {
                 const tools = await historicalReplayTools();
-                const replayFrames = tools.buildReplayFrames(startInput.value, endInput.value);
+                const replayFrames = tools.buildReplayFrames(startValue, endValue);
                 const start = new Date(replayFrames[0].time * 1000);
                 const end = new Date(replayFrames.at(-1).time * 1000);
                 const warningUrl = new URL(DATA_URLS.iemStormBasedWarnings);
@@ -8627,18 +8797,28 @@
                 updateTimelineUI();
                 setProviderStatus('current', `IEM replay: ${frames.length} frames`);
                 setReplayControlState(`${frames.length} frames · ${warnings.length} warning polygons`);
-                showToast(`Historical replay loaded: ${frames.length} frames`, 'success', 3500);
+                if (announce) showToast(`Historical replay loaded: ${frames.length} frames`, 'success', 3500);
+                return { ok: true, frameCount: frames.length, warningCount: warnings.length };
             } catch (error) {
-                if (error?.name === 'AbortError') return;
+                if (error?.name === 'AbortError') return { ok: false, aborted: true };
                 console.error('Historical replay error:', error);
                 setReplayControlState(`Replay failed: ${safeText(error.message, 120)}`);
-                showToast(`Replay failed: ${safeText(error.message, 120)}`, 'error', 5000);
+                if (announce) showToast(`Replay failed: ${safeText(error.message, 120)}`, 'error', 5000);
+                return { ok: false, error: safeText(error.message, 120) };
             } finally {
                 if (replayAbortController === controller) replayAbortController = null;
             }
         }
 
-        function exitHistoricalReplay() {
+        async function startHistoricalReplay() {
+            if (trainingScenario) resetTrainingMode();
+            const startInput = document.getElementById('replayStartInput');
+            const endInput = document.getElementById('replayEndInput');
+            return loadHistoricalReplayRange(startInput.value, endInput.value);
+        }
+
+        function exitHistoricalReplay({ restoreTrainingView = true, announce = true } = {}) {
+            if (trainingScenario) resetTrainingMode({ restoreView: restoreTrainingView });
             replayAbortController?.abort(new DOMException('Replay exited', 'AbortError'));
             replayAbortController = null;
             pause();
@@ -8650,7 +8830,7 @@
             updatePlaybackVisibility();
             loadRadarData();
             if (settings.layers.alerts) loadAlerts();
-            showToast('Returned to live data', 'info', 2500);
+            if (announce) showToast('Returned to live data', 'info', 2500);
         }
 
         async function playAlertTone(urgency = 'standard') {
@@ -11416,7 +11596,7 @@
             document.getElementById('replayStartInput').value = localDateTimeInputValue(replayStartDefault);
             document.getElementById('replayEndInput').value = localDateTimeInputValue(replayEndDefault);
             document.getElementById('startReplayBtn').addEventListener('click', startHistoricalReplay);
-            document.getElementById('exitReplayBtn').addEventListener('click', exitHistoricalReplay);
+            document.getElementById('exitReplayBtn').addEventListener('click', () => exitHistoricalReplay());
             setReplayControlState(localizedStaticText('Live mode'));
 
             // Visual palettes
@@ -12236,6 +12416,255 @@
             });
             window.addEventListener('pagehide', () => stopChasecaster({ restore: false }));
             updateChasecasterLanguage();
+        }
+
+        function selectedTrainingScenario() {
+            const select = document.getElementById('trainingScenarioSelect');
+            return getTrainingScenario(select?.value, settings.language)
+                || trainingScenarioCatalog(settings.language)[0]
+                || null;
+        }
+
+        function trainingOverlayColors() {
+            const styles = getComputedStyle(document.body);
+            return {
+                warning: styles.getPropertyValue('--warning').trim() || '#fbbf24',
+                accent: styles.getPropertyValue('--accent').trim() || '#38bdf8'
+            };
+        }
+
+        function focusTrainingAnnotation(index) {
+            if (!trainingLayer) return;
+            let target = null;
+            trainingLayer.eachLayer(layer => {
+                if (layer.feature?.properties?.trainingIndex === index) target = layer;
+            });
+            if (!target) return;
+            if (typeof target.getBounds === 'function' && target.getBounds().isValid()) {
+                map.fitBounds(target.getBounds(), {
+                    padding: [56, 56],
+                    maxZoom: 9,
+                    animate: !matchMedia('(prefers-reduced-motion: reduce)').matches
+                });
+            } else if (typeof target.getLatLng === 'function') {
+                map.setView(target.getLatLng(), Math.max(map.getZoom(), 9), {
+                    animate: !matchMedia('(prefers-reduced-motion: reduce)').matches
+                });
+            }
+            target.openPopup?.();
+        }
+
+        function renderTrainingAnnotations(scenario) {
+            if (trainingLayer) map.removeLayer(trainingLayer);
+            trainingLayer = null;
+            const list = document.getElementById('trainingAnnotations');
+            list.replaceChildren();
+            if (!scenario) {
+                list.hidden = true;
+                return;
+            }
+            const colors = trainingOverlayColors();
+            trainingLayer = L.geoJSON(trainingFeatureCollection(scenario), {
+                pane: 'markerPane',
+                style: feature => ({
+                    color: feature.properties.kind === 'area' ? colors.warning : colors.accent,
+                    fillColor: colors.warning,
+                    fillOpacity: feature.properties.kind === 'area' ? 0.06 : 0,
+                    weight: 3,
+                    opacity: 0.95,
+                    dashArray: feature.properties.kind === 'area' ? '8 7' : '10 6'
+                }),
+                pointToLayer: (feature, latlng) => L.marker(latlng, {
+                    keyboard: true,
+                    zIndexOffset: 1300,
+                    icon: L.divIcon({
+                        className: 'training-marker-icon',
+                        html: `<span class="training-marker">${feature.properties.trainingIndex}</span>`,
+                        iconSize: [26, 26],
+                        iconAnchor: [13, 13]
+                    })
+                }),
+                onEachFeature: (feature, layer) => {
+                    const properties = feature.properties;
+                    layer.bindPopup(`
+                        <div class="popup-content">
+                            <h4>${properties.trainingIndex}. ${escapeHTML(properties.title, 160)}</h4>
+                            <p>${escapeHTML(properties.detail, 500)}</p>
+                            <div class="meta">${escapeHTML(t('trainingDisclosure'), 180)}</div>
+                        </div>
+                    `);
+                    layer.on('click', () => focusTrainingAnnotation(properties.trainingIndex));
+                }
+            }).addTo(map);
+
+            scenario.annotations.forEach(annotation => {
+                const item = document.createElement('li');
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'training-annotation-button';
+                button.dataset.trainingIndex = String(annotation.index);
+                const number = document.createElement('span');
+                number.className = 'training-annotation-index';
+                number.textContent = String(annotation.index);
+                const copy = document.createElement('span');
+                copy.className = 'training-annotation-copy';
+                const title = document.createElement('strong');
+                title.textContent = annotation.title;
+                const detail = document.createElement('span');
+                detail.textContent = annotation.detail;
+                copy.append(title, detail);
+                button.append(number, copy);
+                button.addEventListener('click', () => focusTrainingAnnotation(annotation.index));
+                item.appendChild(button);
+                list.appendChild(item);
+            });
+            list.hidden = false;
+        }
+
+        function populateTrainingScenarios(selectedId) {
+            const select = document.getElementById('trainingScenarioSelect');
+            const catalog = trainingScenarioCatalog(settings.language);
+            const desiredId = selectedId || select.value || catalog[0]?.id;
+            select.replaceChildren();
+            catalog.forEach(scenario => {
+                const option = document.createElement('option');
+                option.value = scenario.id;
+                option.textContent = scenario.title;
+                select.appendChild(option);
+            });
+            if (catalog.some(scenario => scenario.id === desiredId)) select.value = desiredId;
+            const selected = selectedTrainingScenario();
+            document.getElementById('trainingSummary').textContent = selected?.summary || '';
+        }
+
+        function updateTrainingLanguage() {
+            const panel = document.getElementById('trainingPanel');
+            if (!panel) return;
+            const selectedId = trainingScenario?.id || document.getElementById('trainingScenarioSelect')?.value;
+            document.getElementById('trainingTitle').textContent = t('trainingTitle');
+            document.getElementById('trainingDisclosure').textContent = t('trainingDisclosure');
+            document.getElementById('trainingScenarioLabel').textContent = t('trainingScenario');
+            document.getElementById('trainingLoad').textContent = t('trainingLoad');
+            document.getElementById('trainingExit').textContent = t('trainingExit');
+            populateTrainingScenarios(selectedId);
+            if (trainingScenario) {
+                trainingScenario = getTrainingScenario(trainingScenario.id, settings.language);
+                renderTrainingAnnotations(trainingScenario);
+                document.getElementById('trainingStatus').textContent = t('trainingActive', {
+                    count: trainingScenario.annotations.length
+                });
+            } else {
+                document.getElementById('trainingStatus').textContent = t('trainingChoose');
+            }
+        }
+
+        function setTrainingPanelOpen(open) {
+            const panel = document.getElementById('trainingPanel');
+            const button = document.getElementById('trainingBtn');
+            panel.hidden = !open;
+            button.setAttribute('aria-expanded', String(open));
+            if (open) document.getElementById('trainingScenarioSelect').focus({ preventScroll: true });
+        }
+
+        function suspendTrainingViews() {
+            if (trainingSuspendedViews) return;
+            trainingSuspendedViews = {
+                splitView: settings.splitView,
+                pipRadar: settings.pipRadar
+            };
+            if (settings.splitView) setSplitView(false, { persist: false });
+            if (settings.pipRadar) setPipRadar(false, { persist: false });
+        }
+
+        function restoreTrainingViews() {
+            const suspended = trainingSuspendedViews;
+            trainingSuspendedViews = null;
+            if (!suspended) return;
+            if (suspended.splitView) setSplitView(true, { persist: false });
+            if (suspended.pipRadar) setPipRadar(true, { persist: false });
+        }
+
+        function resetTrainingMode({ restoreView = true } = {}) {
+            if (trainingLayer) map.removeLayer(trainingLayer);
+            trainingLayer = null;
+            trainingScenario = null;
+            document.body.classList.remove('training-mode');
+            document.getElementById('trainingBtn')?.classList.remove('active');
+            document.getElementById('trainingExit').disabled = true;
+            document.getElementById('trainingAnnotations').replaceChildren();
+            document.getElementById('trainingAnnotations').hidden = true;
+            document.getElementById('trainingStatus').textContent = t('trainingChoose');
+            const returnView = trainingReturnView;
+            trainingReturnView = null;
+            if (restoreView && returnView) {
+                map.setView(returnView.center, returnView.zoom, { animate: false });
+            }
+            restoreTrainingViews();
+        }
+
+        async function startTrainingScenario() {
+            const scenario = selectedTrainingScenario();
+            if (!scenario) return;
+            const wasTraining = Boolean(trainingScenario);
+            if (!trainingReturnView) {
+                trainingReturnView = { center: map.getCenter(), zoom: map.getZoom() };
+            }
+            if (chasecasterActive) stopChasecaster();
+            if (stormTop3dMode) exitStormTop3d();
+            suspendTrainingViews();
+            const loadButton = document.getElementById('trainingLoad');
+            const status = document.getElementById('trainingStatus');
+            loadButton.disabled = true;
+            status.textContent = t('trainingLoading');
+            const result = await loadHistoricalReplayRange(scenario.start, scenario.end, { announce: false });
+            loadButton.disabled = false;
+            if (!result?.ok) {
+                if (!wasTraining) {
+                    resetTrainingMode();
+                    setTrainingPanelOpen(true);
+                }
+                if (!result?.aborted) {
+                    status.textContent = t('trainingFailed', { message: result?.error || 'Unavailable' });
+                    showToast(status.textContent, 'error', 5000);
+                }
+                return;
+            }
+            trainingScenario = scenario;
+            document.body.classList.add('training-mode');
+            document.getElementById('trainingBtn').classList.add('active');
+            document.getElementById('trainingExit').disabled = false;
+            renderTrainingAnnotations(scenario);
+            map.setView(scenario.center, scenario.zoom, { animate: false });
+            status.textContent = t('trainingActive', { count: scenario.annotations.length });
+            setProviderStatus('current', `${scenario.title} · archived training · not live`);
+            showToast(t('trainingLoaded'), 'success', 3200);
+        }
+
+        function exitTrainingScenario({ closePanel = false } = {}) {
+            if (replayMode) exitHistoricalReplay({ restoreTrainingView: true, announce: true });
+            else resetTrainingMode();
+            if (closePanel) setTrainingPanelOpen(false);
+        }
+
+        function initTrainingOverlays() {
+            populateTrainingScenarios();
+            document.getElementById('trainingBtn').addEventListener('click', () => {
+                if (trainingScenario) {
+                    setTrainingPanelOpen(true);
+                    return;
+                }
+                setTrainingPanelOpen(document.getElementById('trainingPanel').hidden);
+            });
+            document.getElementById('trainingClose').addEventListener('click', () => {
+                if (trainingScenario) exitTrainingScenario({ closePanel: true });
+                else setTrainingPanelOpen(false);
+            });
+            document.getElementById('trainingScenarioSelect').addEventListener('change', event => {
+                const scenario = getTrainingScenario(event.target.value, settings.language);
+                document.getElementById('trainingSummary').textContent = scenario?.summary || '';
+            });
+            document.getElementById('trainingLoad').addEventListener('click', startTrainingScenario);
+            document.getElementById('trainingExit').addEventListener('click', () => exitTrainingScenario());
         }
 
         let locationPermissionBlocked = false;

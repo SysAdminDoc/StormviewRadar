@@ -28,6 +28,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Model Forecast** — View HRRR reflectivity guidance through 18 hours
 - **RainViewer History** — Animate approximately two hours of past global radar using the provider's Universal Blue palette (native zoom 7)
 - **Historical Event Replay** — Select up to six hours and replay five-minute IEM NEXRAD composites with storm-based warning polygons synchronized to each frame
+- **Annotated Storm Training** — Study three localized archived supercell, bow-echo, and tropical-eyewall examples with numbered map cues, timeline playback, official-warning separation, and persistent not-live labeling
 - **Provider-Time Timeline** — Show model initialization, valid time, forecast lead, data age, timezone, and source coverage without substituting the client clock
 - **Accessible Controls** — Keyboard-operable layers and timeline, labeled search suggestions, focus-managed dialogs, and reduced-motion/forced-colors support
 - **Accessible Visual Palettes** — Persist standard, high-contrast, or color-blind-safe styling across provider/native radar, alerts, hail analysis, storm tracks, 3D markers, legends, and interface colors
