@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#1e1e2e">
     <meta charset="UTF-8">
     <meta name="application-version" content="0.1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.open-meteo.com https://api.openweathermap.org https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://services.arcgis.com https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://api.open-meteo.com https://api.openweathermap.org https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://services.arcgis.com https://tile.openweathermap.org https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StormView Radar 0.1.0</title>
     
@@ -2936,6 +2936,7 @@
     import { applyLayerOpacity, normalizeLayerOpacities } from './src/layer-opacity.js';
     import { LOCAL_OVERLAY_LIMITS, parseLocalOverlay } from './src/local-overlay.js';
     import { buildIowa511Query, normalizeIowa511Events } from './src/road-events.js';
+    import { IndexedDbTileCache, isCacheableTileUrl, tileCacheMaxAge } from './src/tile-cache.js';
 
     (function() {
         'use strict';
@@ -3754,6 +3755,10 @@
                     activeLayerRequests: layerRequests.size,
                     performance: { ...diagnosticsState.performance },
                     frameLayerCount: frameLayers.filter(Boolean).length,
+                    tileCache: {
+                        ...tileCacheState,
+                        ...tileCacheMetrics
+                    },
                     featureCounts: { ...diagnosticsState.layerCounts },
                     overlayStates: Object.fromEntries(Object.entries(diagnosticsState.layerStates).map(([name, value]) => [
                         name,
@@ -3778,8 +3783,9 @@
                 : report.radar.age;
             document.getElementById('diagCoverage').textContent = report.radar.coverage;
             const featureTotal = Object.values(report.resources.featureCounts).reduce((sum, value) => sum + value, 0);
+            const cacheMegabytes = (report.resources.tileCache.bytes / (1024 * 1024)).toFixed(1);
             document.getElementById('diagResources').textContent =
-                `${report.radar.frames.loaded}/${report.radar.frames.total} frames · ${report.resources.frameLayerCount} layers · ${featureTotal} features · ${report.resources.activeRequests} requests · first frame ${report.resources.performance.firstUsableFrameMs ?? 'pending'} ms · ${report.resources.performance.droppedFrames} dropped · ${report.resources.performance.transferredBytes} bytes`;
+                `${report.radar.frames.loaded}/${report.radar.frames.total} frames · ${report.resources.frameLayerCount} layers · ${featureTotal} features · ${report.resources.tileCache.count} cached tiles (${cacheMegabytes} MB) · ${report.resources.tileCache.hits} hits / ${report.resources.tileCache.misses} misses · ${report.resources.activeRequests} requests · first frame ${report.resources.performance.firstUsableFrameMs ?? 'pending'} ms · ${report.resources.performance.droppedFrames} dropped · ${report.resources.performance.transferredBytes} bytes`;
             const overlayStates = Object.entries(report.resources.overlayStates)
                 .filter(([, value]) => value.state !== 'disabled')
                 .sort(([left], [right]) => left.localeCompare(right));
@@ -4783,6 +4789,29 @@
         }
 
         const cachedTileLayers = new Set();
+        const tileCacheMetrics = { hits: 0, misses: 0 };
+        const tileCacheState = { state: 'initializing', count: 0, bytes: 0 };
+        const persistentTileCache = new IndexedDbTileCache({
+            maxEntries: 1200,
+            maxBytes: 96 * 1024 * 1024,
+            maxTileBytes: 2 * 1024 * 1024,
+            onStatus: status => {
+                tileCacheState.state = safeText(status.state, 24);
+                if (Number.isFinite(status.count)) tileCacheState.count = status.count;
+                if (Number.isFinite(status.bytes)) tileCacheState.bytes = status.bytes;
+                const element = document.getElementById('tileStatus');
+                if (element) element.dataset.cacheState = tileCacheState.state;
+            }
+        });
+
+        function recordTileCacheResult(hit) {
+            tileCacheMetrics[hit ? 'hits' : 'misses'] += 1;
+            const element = document.getElementById('tileStatus');
+            if (!element) return;
+            element.dataset.cacheHits = String(tileCacheMetrics.hits);
+            element.dataset.cacheMisses = String(tileCacheMetrics.misses);
+        }
+
         const rateLimiter = (() => {
             const states = new Map();
             const baseBackoffMs = 3000;
@@ -4916,6 +4945,18 @@
                 cachedTileLayers.delete(this);
                 L.TileLayer.prototype.onRemove.call(this, mapInstance);
             },
+
+            _removeTile: function(key) {
+                const tile = this._tiles[key]?.el;
+                if (tile) {
+                    tile._stormviewCancelled = true;
+                    if (tile._stormviewObjectUrl) {
+                        URL.revokeObjectURL(tile._stormviewObjectUrl);
+                        tile._stormviewObjectUrl = '';
+                    }
+                }
+                L.TileLayer.prototype._removeTile.call(this, key);
+            },
             
             // Prevent pruning during zoom for visual stability
             _pruneTiles: function() {
@@ -4945,27 +4986,90 @@
                     return tile;
                 }
                 
-                let loaded = false;
+                let settled = false;
                 const self = this;
-                
-                tile.onload = function() {
-                    if (loaded) return;
-                    loaded = true;
+
+                const revokeObjectUrl = () => {
+                    if (!tile._stormviewObjectUrl) return;
+                    URL.revokeObjectURL(tile._stormviewObjectUrl);
+                    tile._stormviewObjectUrl = '';
+                };
+
+                const complete = () => {
+                    if (settled || tile._stormviewCancelled) return;
+                    settled = true;
+                    revokeObjectUrl();
                     rateLimiter.recordSuccess(self._stormviewBackoffKey);
                     tile.style.opacity = '1';
                     done(null, tile);
                 };
-                
-                tile.onerror = function() {
-                    if (loaded) return;
-                    loaded = true;
+
+                const fail = () => {
+                    if (settled || tile._stormviewCancelled) return;
+                    settled = true;
+                    revokeObjectUrl();
                     rateLimiter.recordError(self._stormviewBackoffKey);
+                    tile.onload = null;
+                    tile.onerror = null;
                     tile.src = self.options.errorTileUrl;
                     tile.style.opacity = '0';
                     done(null, tile);
                 };
-                
-                tile.src = this.getTileUrl(coords);
+
+                const loadSource = source => {
+                    if (settled || tile._stormviewCancelled) return;
+                    tile.onload = complete;
+                    tile.onerror = fail;
+                    tile.src = source;
+                };
+
+                const loadBlob = blob => {
+                    if (settled || tile._stormviewCancelled) return;
+                    tile._stormviewObjectUrl = URL.createObjectURL(blob);
+                    loadSource(tile._stormviewObjectUrl);
+                };
+
+                const url = this.getTileUrl(coords);
+                if (!isCacheableTileUrl(url)) {
+                    loadSource(url);
+                    return tile;
+                }
+
+                (async () => {
+                    const cached = await persistentTileCache.get(url, tileCacheMaxAge(url));
+                    if (cached) {
+                        recordTileCacheResult(true);
+                        loadBlob(cached);
+                        return;
+                    }
+
+                    recordTileCacheResult(false);
+                    try {
+                        const response = await fetch(url, {
+                            mode: 'cors',
+                            credentials: 'omit',
+                            cache: 'no-store'
+                        });
+                        if (!response.ok) {
+                            const error = new Error(`Tile request failed with HTTP ${response.status}`);
+                            error.tileHttpFailure = true;
+                            throw error;
+                        }
+                        const blob = await response.blob();
+                        if ((!blob.type || blob.type.startsWith('image/'))
+                            && blob.size > 0 && blob.size <= persistentTileCache.maxTileBytes) {
+                            loadBlob(blob);
+                            persistentTileCache.put(url, blob).catch(() => {});
+                            return;
+                        }
+                        const error = new Error('Tile response was not a supported image');
+                        error.tileHttpFailure = true;
+                        throw error;
+                    } catch (error) {
+                        if (error?.tileHttpFailure) fail();
+                        else loadSource(url);
+                    }
+                })();
                 return tile;
             }
         });
@@ -8076,6 +8180,7 @@
                 
                 layerRefs.lightning = L.tileLayer.cached('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/q2-ltg/{z}/{x}/{y}.png', {
                     opacity: 0.8,
+                    className: 'lightning-layer',
                     pane: 'radarPane',
                     maxNativeZoom: 8,
                     maxZoom: 18,

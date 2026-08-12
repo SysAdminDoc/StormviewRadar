@@ -53,7 +53,7 @@ test.beforeEach(async ({ page }) => {
 test('repeated lightning toggles retain exactly one tile resource set', async ({ page }) => {
   await page.goto('/');
   const toggle = page.locator('[data-layer="lightning"]').first();
-  const lightningLayers = page.locator('.leaflet-layer:has(img[src*="q2-ltg"])');
+  const lightningLayers = page.locator('.leaflet-layer.lightning-layer');
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await toggle.evaluate(element => element.click());
