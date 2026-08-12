@@ -55,6 +55,46 @@
             --accent-glow: rgba(2, 132, 199, 0.3);
         }
 
+        body[data-visual-palette="highContrast"] {
+            --glass-bg: rgba(0, 0, 0, 0.96);
+            --glass-border: rgba(255, 255, 255, 0.72);
+            --glass-hover: rgba(255, 255, 255, 0.18);
+            --panel-bg: #000;
+            --text: #fff;
+            --text-dim: #e5e7eb;
+            --text-muted: #d1d5db;
+            --accent: #00e5ff;
+            --success: #00ff80;
+            --warning: #ffe600;
+            --danger: #ff1744;
+            --purple: #d28aff;
+            --pink: #ff4db8;
+            --orange: #ff9d00;
+        }
+        body[data-visual-palette="colorblind"] {
+            --accent: #56b4e9;
+            --accent-glow: rgba(86, 180, 233, 0.4);
+            --success: #009e73;
+            --warning: #f0e442;
+            --danger: #d55e00;
+            --purple: #cc79a7;
+            --pink: #cc79a7;
+            --orange: #e69f00;
+        }
+        body[data-visual-palette="highContrast"] .radar-layer:not(.palette-native-radar) {
+            filter: url(#radar-high-contrast-filter);
+        }
+        body[data-visual-palette="colorblind"] .radar-layer:not(.palette-native-radar) {
+            filter: url(#radar-cividis-filter);
+        }
+        body[data-visual-palette="highContrast"] .legend-gradient {
+            background: linear-gradient(to bottom, #fff 0%, #ff1744 18%, #ff9100 34%, #ffe600 48%, #00ff80 65%, #00e5ff 82%, #0014ff 100%);
+        }
+        body[data-visual-palette="colorblind"] .legend-gradient {
+            background: linear-gradient(to bottom, #fdea45 0%, #cbb778 18%, #a59c8f 34%, #7f8996 48%, #5c6f94 65%, #193b6a 82%, #00204c 100%);
+        }
+        .palette-filter-defs { position: fixed; width: 0; height: 0; pointer-events: none; }
+
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         button,
@@ -1159,7 +1199,7 @@
 
         .color-scheme-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 8px;
         }
         .color-scheme-btn {
@@ -1169,11 +1209,28 @@
             cursor: pointer;
             transition: all 0.15s;
             overflow: hidden;
+            position: relative;
+            padding: 0;
+            background: transparent;
         }
         .color-scheme-btn:hover { border-color: var(--text-muted); }
         .color-scheme-btn.active { border-color: var(--accent); }
         .color-scheme-btn .gradient {
             width: 100%; height: 100%;
+        }
+        .color-scheme-btn .palette-name {
+            position: absolute;
+            inset: auto 4px 4px;
+            overflow: hidden;
+            padding: 3px 5px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.82);
+            color: #fff;
+            font-size: 9px;
+            font-weight: 700;
+            line-height: 1.15;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .api-input {
@@ -1343,6 +1400,7 @@
             }
             .active, .toggle.on { outline: 2px solid Highlight; }
             .dot { forced-color-adjust: none; }
+            .radar-layer { filter: none !important; }
         }
 
         @keyframes pulse {
@@ -2183,6 +2241,21 @@
                 <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="4" seed="3" result="noise"/>
                 <feDisplacementMap in="sharpened" in2="noise" scale="1.5" xChannelSelector="R" yChannelSelector="G"/>
             </filter>
+            <filter id="radar-high-contrast-filter" color-interpolation-filters="sRGB">
+                <feComponentTransfer>
+                    <feFuncR type="linear" slope="1.45" intercept="-0.22"/>
+                    <feFuncG type="linear" slope="1.45" intercept="-0.22"/>
+                    <feFuncB type="linear" slope="1.45" intercept="-0.22"/>
+                </feComponentTransfer>
+            </filter>
+            <filter id="radar-cividis-filter" color-interpolation-filters="sRGB">
+                <feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0"/>
+                <feComponentTransfer>
+                    <feFuncR type="table" tableValues="0 .098 .231 .361 .498 .647 .796 .992"/>
+                    <feFuncG type="table" tableValues=".125 .231 .337 .435 .537 .612 .718 .918"/>
+                    <feFuncB type="table" tableValues=".298 .416 .529 .580 .588 .561 .471 .271"/>
+                </feComponentTransfer>
+            </filter>
         </defs>
     </svg>
     <div class="loading-overlay" id="loading" role="status" aria-live="polite">
@@ -2216,10 +2289,10 @@
             <div class="storm-3d-info-status" id="storm3dStatus" role="status" aria-live="polite">Loading storm cells…</div>
             <div class="storm-3d-info-note"><span id="storm3dScale">Display height scale: 20×.</span> Labels show measured IEM NEXRAD echo-top estimates. Footprint width is symbolic, not storm size. Automated guidance, not an official warning.</div>
             <div class="storm-3d-legend" aria-label="Threat colors">
-                <span><i style="background:#ef4444"></i>TVS</span>
-                <span><i style="background:#a855f7"></i>Mesocyclone</span>
-                <span><i style="background:#f97316"></i>Hail</span>
-                <span><i style="background:#22d3ee"></i>Other</span>
+                <span><i data-storm-threat="tornado" style="background:#ef4444"></i>TVS</span>
+                <span><i data-storm-threat="rotation" style="background:#a855f7"></i>Mesocyclone</span>
+                <span><i data-storm-threat="hail" style="background:#f97316"></i>Hail</span>
+                <span><i data-storm-threat="general" style="background:#22d3ee"></i>Other</span>
             </div>
         </div>
     </section>
@@ -2963,9 +3036,11 @@
                 <div class="settings-section">
                     <div class="settings-section-title">Color Scheme</div>
                     <div class="color-scheme-grid" id="colorSchemes">
-                        <div class="color-scheme-btn active" data-scheme="2" aria-disabled="true" title="RainViewer Universal Blue (provider fixed)"><div class="gradient" style="background:linear-gradient(90deg,#000,#004,#00f,#0ff,#ff0,#f00)"></div></div>
+                        <button class="color-scheme-btn active" data-visual-palette="standard" type="button" aria-pressed="true"><span class="gradient" style="background:linear-gradient(90deg,#000096,#0064ff,#00b4ff,#00c800,#ffff00,#ff6600,#ff0000,#ff00ff)"></span><span class="palette-name">Standard</span></button>
+                        <button class="color-scheme-btn" data-visual-palette="highContrast" type="button" aria-pressed="false"><span class="gradient" style="background:linear-gradient(90deg,#0014ff,#00e5ff,#00ff80,#ffe600,#ff9100,#ff1744,#fff)"></span><span class="palette-name">High contrast</span></button>
+                        <button class="color-scheme-btn" data-visual-palette="colorblind" type="button" aria-pressed="false"><span class="gradient" style="background:linear-gradient(90deg,#00204c,#193b6a,#3b5687,#5c6f94,#7f8996,#a59c8f,#cbb778,#fdea45)"></span><span class="palette-name">Color-blind safe</span></button>
                     </div>
-                    <div class="setting-hint">RainViewer's public API currently provides the Universal Blue palette only.</div>
+                    <div class="setting-hint">Applies a display transform to provider tiles and native colors to Level II, alerts, hail, and storm analysis. It does not change the source data.</div>
                 </div>
                 <div class="settings-section">
                     <div class="settings-section-title">Animation</div>
@@ -3167,6 +3242,7 @@
     import { effectivePreloadWindow, frameWindowIndices, normalizePreloadWindow } from './src/frame-preload.js';
     import { overviewFromMapView } from './src/picture-in-picture.js';
     import { DEFAULT_COMPARISON_LOCATION, normalizeComparisonLocation, normalizeLocationResults, shortLocationName } from './src/split-view.js';
+    import { alertPaletteDash, meshPaletteStops, normalizeVisualPalette, stormPaletteColor, visualPaletteLabel } from './src/visual-palette.js';
     import { applyLayerOpacity, normalizeLayerOpacities } from './src/layer-opacity.js';
     import { LOCAL_OVERLAY_LIMITS, parseLocalOverlay } from './src/local-overlay.js';
     import { buildIowa511Query, normalizeIowa511Events } from './src/road-events.js';
@@ -3394,7 +3470,7 @@
         const layerRequests = new Map();
         const layerRequestGenerations = new Map();
         const MAX_SETTINGS_BYTES = 32768;
-        const SETTINGS_SCHEMA_VERSION = 8;
+        const SETTINGS_SCHEMA_VERSION = 9;
         const SETTINGS_STORAGE_KEY = 'stormview_settings';
         const GEOFENCE_STORAGE_KEY = 'stormview_geofences';
         const MAX_GEOFENCES = 20;
@@ -3522,6 +3598,7 @@
                 pipCloseAria: 'Close mini radar',
                 pipRecenterAria: 'Follow primary map',
                 pipCurrentView: 'Current view',
+                visualPaletteUpdated: '{name} visual palette enabled',
                 searchPlaceholder: 'Search location…',
                 searchAria: 'Search for a US location',
                 searchClearAria: 'Clear location search',
@@ -3678,6 +3755,7 @@
                 pipCloseAria: 'Cerrar radar miniatura',
                 pipRecenterAria: 'Seguir el mapa principal',
                 pipCurrentView: 'Vista actual',
+                visualPaletteUpdated: 'Paleta visual {name} activada',
                 searchPlaceholder: 'Buscar ubicación…',
                 searchAria: 'Buscar una ubicación de Estados Unidos',
                 searchClearAria: 'Borrar búsqueda de ubicación',
@@ -3802,6 +3880,11 @@
             'Map Overlays': 'Capas del mapa',
             'Model Data': 'Datos del modelo',
             'Base Map': 'Mapa base',
+            'Color Scheme': 'Esquema de color',
+            'Standard': 'Estándar',
+            'High contrast': 'Alto contraste',
+            'Color-blind safe': 'Apta para daltonismo',
+            'Applies a display transform to provider tiles and native colors to Level II, alerts, hail, and storm analysis. It does not change the source data.': 'Aplica una transformación visual a las teselas del proveedor y colores nativos a Level II, alertas, granizo y análisis de tormentas. No cambia los datos de origen.',
             'Alerts': 'Alertas',
             'Audio Notifications': 'Notificaciones de audio',
             'Alert Sounds': 'Sonidos de alerta',
@@ -4043,6 +4126,7 @@
             updatePreloadWindowControl();
             updateSplitViewLabels();
             updatePipRadarLabel();
+            syncVisualPaletteControls();
             const splitViewButton = document.getElementById('splitViewBtn');
             if (splitViewButton) {
                 splitViewButton.title = t('splitViewAria');
@@ -4570,13 +4654,14 @@
                 layers: { ...settings.layers },
                 layerOpacity: { ...settings.layerOpacity },
                 compareLocation: { ...settings.compareLocation },
-                colorScheme: 2
+                visualPalette: settings.visualPalette
             };
             const enumFields = {
                 source: Object.keys(RADAR_CAPABILITIES),
                 radarProduct: ['reflectivity', 'velocity', 'echoTops', 'precipAccum', 'differentialReflectivity', 'correlationCoefficient'],
                 basemap: ['dark', 'light', 'satellite', 'terrain', 'clean'],
                 theme: ['dark', 'light'],
+                visualPalette: ['standard', 'highContrast', 'colorblind'],
                 language: ['en', 'es'],
                 units: ['us', 'metric'],
                 alertAudioSeverity: ['extreme', 'severe', 'moderate', 'minor', 'unknown'],
@@ -4822,13 +4907,13 @@
             radarProduct: 'reflectivity', // reflectivity, velocity, echoTops, precipAccum
             basemap: 'satellite',
             theme: 'dark',
+            visualPalette: 'standard',
             language: 'en',
             units: 'us',
             level2Site: '',
             opacity: 0.85,
             smooth: 1,
             snowColor: 1,
-            colorScheme: 2,
             delay: 600,
             preloadWindow: 4,
             splitView: false,
@@ -4884,6 +4969,7 @@
         async function init() {
             loadSettings();
             applyTheme();
+            applyVisualPalette();
             initMap();
             loadStoredGeofences();
             setupZoomHandler();
@@ -5102,6 +5188,63 @@
 
         function applyTheme() {
             document.body.classList.toggle('light-theme', settings.theme === 'light');
+        }
+
+        function syncVisualPaletteControls() {
+            document.querySelectorAll('#colorSchemes [data-visual-palette]').forEach(button => {
+                const active = button.dataset.visualPalette === settings.visualPalette;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-pressed', String(active));
+                const label = button.querySelector('.palette-name')?.textContent?.trim();
+                if (label) button.setAttribute('aria-label', label);
+            });
+            const threatSamples = {
+                tornado: { tvs: 'TVS' },
+                rotation: { meso: 'MESO' },
+                hail: { posh: 70 },
+                general: {}
+            };
+            document.querySelectorAll('[data-storm-threat]').forEach(swatch => {
+                swatch.style.background = stormPaletteColor(
+                    threatSamples[swatch.dataset.stormThreat],
+                    settings.visualPalette
+                );
+            });
+            const legendGradients = {
+                standard: 'linear-gradient(to bottom, #ff00ff 0%, #ff0000 15%, #ff6600 25%, #ffc800 35%, #ffff00 45%, #7fff00 55%, #00c800 65%, #00b4ff 75%, #0064ff 85%, #000096 100%)',
+                highContrast: 'linear-gradient(to bottom, #fff 0%, #ff1744 18%, #ff9100 34%, #ffe600 48%, #00ff80 65%, #00e5ff 82%, #0014ff 100%)',
+                colorblind: 'linear-gradient(to bottom, #fdea45 0%, #cbb778 18%, #a59c8f 34%, #7f8996 48%, #5c6f94 65%, #193b6a 82%, #00204c 100%)'
+            };
+            const legend = document.querySelector('.legend-gradient');
+            if (legend) legend.style.background = legendGradients[settings.visualPalette];
+        }
+
+        function applyVisualPalette() {
+            settings.visualPalette = normalizeVisualPalette(settings.visualPalette);
+            document.body.dataset.visualPalette = settings.visualPalette;
+            syncVisualPaletteControls();
+        }
+
+        async function refreshVisualPaletteLayers() {
+            applyVisualPalette();
+            const referenceTime = replayMode && frames[currentFrame]
+                ? frames[currentFrame].time * 1000
+                : Date.now();
+            if (layerRefs.alerts) {
+                const tools = await alertFillTools();
+                layerRefs.alerts.setStyle(feature => alertPolygonPresentation(feature, tools, referenceTime).style);
+                showAlertAgeLegend(currentAlertFeatures, tools, referenceTime);
+            }
+            refreshComparisonAlerts();
+            refreshPipAlerts();
+            if (settings.layers.hailMesh) loadHailMesh();
+            if (settings.layers.stormTracks && currentStormCells.length) {
+                const tools = await stormTrackTools();
+                renderStormTracks(currentStormCells, tools);
+            }
+            if (stormTop3dMode) renderStormTop3d();
+            if (settings.source === 'level2' && settings.layers.radar) loadRadarData();
+            renderDiagnostics();
         }
 
         // ==================== MAP ====================
@@ -6243,7 +6386,7 @@
                 }, 45000);
                 meshWorkerRequests.set(id, { resolve, reject, timeoutId, signal, abort });
                 signal?.addEventListener('abort', abort, { once: true });
-                worker.postMessage({ id, type: 'render', buffer }, [buffer]);
+                worker.postMessage({ id, type: 'render', buffer, palette: settings.visualPalette }, [buffer]);
             });
         }
 
@@ -6293,14 +6436,7 @@
 
         function showMeshLegend() {
             if (meshLegendControl) map.removeControl(meshLegendControl);
-            const breaks = [
-                [6.35, '#22d3ee'],
-                [12.7, '#3b82f6'],
-                [25.4, '#22c55e'],
-                [44.45, '#facc15'],
-                [63.5, '#f97316'],
-                [101.6, '#ef4444']
-            ];
+            const breaks = meshPaletteStops(settings.visualPalette);
             meshLegendControl = L.control({ position: 'bottomright' });
             meshLegendControl.onAdd = () => {
                 const container = L.DomUtil.create('div', 'mesh-legend');
@@ -6312,7 +6448,7 @@
                     row.className = 'mesh-legend-row';
                     const swatch = document.createElement('span');
                     swatch.className = 'mesh-legend-swatch';
-                    swatch.style.background = color;
+                    swatch.style.background = `rgb(${color.slice(0, 3).join(' ')})`;
                     const label = document.createElement('span');
                     label.textContent = `${formatHailSize(millimeters)}+`;
                     row.append(swatch, label);
@@ -6647,7 +6783,10 @@
                 level2LoadedKey = object.key;
             }
             updateLoadProgress(75);
-            const rendered = await requestLevel2Worker('render', { product: settings.radarProduct }, [], signal);
+            const rendered = await requestLevel2Worker('render', {
+                product: settings.radarProduct,
+                palette: settings.visualPalette
+            }, [], signal);
             ensureCurrentRadarLoad(generation, signal);
             const imageUrl = await imageBitmapToUrl(rendered.bitmap);
             let layer;
@@ -6664,7 +6803,7 @@
                 layer = L.imageOverlay(imageUrl, bounds, {
                     opacity: settings.opacity,
                     pane: 'radarPane',
-                    className: 'radar-layer level2-radar',
+                    className: 'radar-layer palette-native-radar level2-radar',
                     alt: `${rendered.site} ${settings.radarProduct} Level II radar`
                 });
                 layer.getAttribution = () => 'NEXRAD Level II: NOAA / NSF Unidata';
@@ -8039,9 +8178,8 @@
         }
 
         function alertPolygonPresentation(feature, tools, referenceTime) {
-            const event = safeText(feature.properties?.event || feature.properties?.ps, 120).toLowerCase();
             const profile = tools.alertIssuanceProfile(feature, referenceTime);
-            const color = tools.alertHazardColor(feature);
+            const color = tools.alertHazardColor(feature, settings.visualPalette);
             return {
                 profile,
                 style: {
@@ -8049,7 +8187,7 @@
                     weight: profile.lineWeight,
                     fillColor: color,
                     fillOpacity: profile.fillOpacity,
-                    dashArray: event.includes('watch') ? '5, 5' : null
+                    dashArray: alertPaletteDash(feature, settings.visualPalette)
                 }
             };
         }
@@ -8738,11 +8876,12 @@
         }
 
         function renderStormTracks(cells, tools) {
+            removeLayer('stormTracks');
             const group = L.layerGroup();
             const renderer = L.svg({ padding: 0.5 });
             group.addLayer(renderer);
             for (const cell of cells) {
-                const color = tools.stormTrackColor(cell);
+                const color = tools.stormTrackColor(cell, settings.visualPalette);
                 const history = stormTrackHistory.get(tools.stormCellKey(cell)) || [];
                 if (history.length > 1) {
                     group.addLayer(L.polyline(
@@ -8820,7 +8959,7 @@
             if (!stormTop3dMode || !cesiumViewer) return [];
             const Cesium = window.Cesium;
             const tools = await stormTop3dTools();
-            const columns = tools.buildStormTopColumns(currentStormCells, 200);
+            const columns = tools.buildStormTopColumns(currentStormCells, 200, settings.visualPalette);
             const displayScale = tools.stormTopDisplayScale(map.getZoom());
             const radiusScale = Math.min(4, Math.sqrt(displayScale));
             cesiumViewer.entities.removeAll();
@@ -10914,13 +11053,20 @@
             document.getElementById('exitReplayBtn').addEventListener('click', exitHistoricalReplay);
             setReplayControlState(localizedStaticText('Live mode'));
 
-            // Color schemes
-            document.querySelectorAll('[data-scheme]').forEach(el => {
-                el.classList.toggle('active', parseInt(el.dataset.scheme) === settings.colorScheme);
-                el.addEventListener('click', () => {
-                    showToast('RainViewer currently provides the Universal Blue palette only', 'info');
+            // Visual palettes
+            document.querySelectorAll('#colorSchemes [data-visual-palette]').forEach(button => {
+                button.addEventListener('click', async () => {
+                    const nextPalette = normalizeVisualPalette(button.dataset.visualPalette, settings.visualPalette);
+                    if (nextPalette === settings.visualPalette) return;
+                    settings.visualPalette = nextPalette;
+                    saveSettings();
+                    await refreshVisualPaletteLayers();
+                    showToast(t('visualPaletteUpdated', {
+                        name: localizedStaticText(visualPaletteLabel(nextPalette))
+                    }), 'success', 2600);
                 });
             });
+            syncVisualPaletteControls();
 
             // Alert audio
             const alertAudioToggle = document.getElementById('alertAudioToggle');

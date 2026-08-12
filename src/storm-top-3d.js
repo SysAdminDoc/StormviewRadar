@@ -1,3 +1,5 @@
+import { stormPaletteColor } from './visual-palette.js';
+
 const FEET_PER_KILOFOOT = 1000;
 const METERS_PER_FOOT = 0.3048;
 
@@ -16,11 +18,8 @@ function threatScore(cell) {
         + Math.max(0, finite(cell?.maxDbz));
 }
 
-function columnColor(cell) {
-    if (cell.tvs && cell.tvs !== 'NONE') return '#ef4444';
-    if (cell.meso && cell.meso !== 'NONE' && cell.meso !== '0') return '#a855f7';
-    if (finite(cell.posh) >= 50 || finite(cell.maxHailInches) >= 1) return '#f97316';
-    return '#22d3ee';
+function columnColor(cell, palette) {
+    return stormPaletteColor(cell, palette);
 }
 
 export function stormTopHeightMeters(cell) {
@@ -39,7 +38,7 @@ export function stormTopDisplayScale(zoom) {
     return 2;
 }
 
-export function buildStormTopColumns(cells, limit = 200) {
+export function buildStormTopColumns(cells, limit = 200, palette = 'standard') {
     const boundedLimit = Math.max(1, Math.min(300, Math.floor(finite(limit, 200))));
     return (Array.isArray(cells) ? cells : [])
         .map(cell => {
@@ -53,7 +52,7 @@ export function buildStormTopColumns(cells, limit = 200) {
                 longitude,
                 heightMeters,
                 radiusMeters: Math.max(3500, Math.min(9000, 3500 + Math.max(0, finite(cell.maxDbz) - 35) * 180)),
-                color: columnColor(cell),
+                color: columnColor(cell, palette),
                 maxDbz: finite(cell.maxDbz),
                 topKft: finite(cell.topKft),
                 posh: finite(cell.posh),

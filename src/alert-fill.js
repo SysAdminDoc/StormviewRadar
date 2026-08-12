@@ -1,3 +1,5 @@
+import { alertPaletteColor } from './visual-palette.js';
+
 const WARNING_PHENOMENA = new Set(['TO', 'SV', 'FF', 'MA', 'DS', 'SQ']);
 const MAX_GRADIENT_AGE_MINUTES = 180;
 const NEW_WARNING_OPACITY = 0.42;
@@ -37,18 +39,8 @@ export function alertIssuedAt(feature) {
     return null;
 }
 
-export function alertHazardColor(feature) {
-    const properties = propertiesOf(feature);
-    const event = String(properties.event || properties.ps || '').toLowerCase();
-    const phenomena = String(properties.phenomena || '').toUpperCase();
-    if (event.includes('tornado') || phenomena === 'TO') return '#ff0000';
-    if (event.includes('severe thunderstorm') || phenomena === 'SV') return '#ff6600';
-    if (event.includes('flash flood') || phenomena === 'FF') return '#00ff00';
-    if (event.includes('flood')) return '#00aa00';
-    if (event.includes('winter') || event.includes('blizzard')) return '#ff69b4';
-    if (event.includes('warning')) return '#ff6600';
-    if (event.includes('watch')) return '#ffcc00';
-    return '#6699ff';
+export function alertHazardColor(feature, palette = 'standard') {
+    return alertPaletteColor(feature, palette);
 }
 
 export function alertIssuanceProfile(feature, referenceTime = Date.now()) {

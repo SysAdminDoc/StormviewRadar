@@ -94,7 +94,7 @@ test('two-city view mirrors radar and alerts with a persistent searchable compar
       name: stored.settings.compareLocation.name,
       latitude: Math.round(stored.settings.compareLocation.latitude * 100) / 100
     };
-  })).toEqual({ schemaVersion: 8, enabled: true, name: 'Oklahoma City, Oklahoma', latitude: 35.47 });
+  })).toEqual({ schemaVersion: 9, enabled: true, name: 'Oklahoma City, Oklahoma', latitude: 35.47 });
   const desktopControls = await page.evaluate(() => ({
     top: document.querySelector('.compare-map-controls').getBoundingClientRect().top,
     toolbarBottom: document.getElementById('quickToolbar').getBoundingClientRect().bottom

@@ -47,14 +47,20 @@ test('bundled Level II and module MESH workers decode deterministic fixtures', a
       { id: 1, type: 'load', buffer: level2Buffer },
       [level2Buffer]
     );
-    const rendered = await request(level2Worker, { id: 2, type: 'render', product: 'reflectivity' });
+    const rendered = await request(level2Worker, {
+      id: 2,
+      type: 'render',
+      product: 'reflectivity',
+      palette: 'colorblind'
+    });
     const level2 = {
       loadedType: loaded.type,
       renderedType: rendered.type,
       site: rendered.site,
       width: rendered.bitmap.width,
       height: rendered.bitmap.height,
-      maxRangeKm: rendered.maxRangeKm
+      maxRangeKm: rendered.maxRangeKm,
+      palette: rendered.palette
     };
     rendered.bitmap.close();
     level2Worker.terminate();
@@ -63,7 +69,7 @@ test('bundled Level II and module MESH workers decode deterministic fixtures', a
     const meshBuffer = Uint8Array.from(meshFixture).buffer;
     const meshRendered = await request(
       meshWorker,
-      { id: 3, type: 'render', buffer: meshBuffer },
+      { id: 3, type: 'render', buffer: meshBuffer, palette: 'highContrast' },
       [meshBuffer]
     );
     const mesh = {
@@ -71,7 +77,8 @@ test('bundled Level II and module MESH workers decode deterministic fixtures', a
       blobType: meshRendered.blob.type,
       width: meshRendered.bounds?.length,
       hailPixels: meshRendered.hailPixels,
-      maximumMm: meshRendered.maximumMm
+      maximumMm: meshRendered.maximumMm,
+      palette: meshRendered.palette
     };
     meshWorker.terminate();
     return { level2, mesh };
@@ -83,13 +90,15 @@ test('bundled Level II and module MESH workers decode deterministic fixtures', a
     site: 'KTWX',
     width: 900,
     height: 900,
-    maxRangeKm: 4
+    maxRangeKm: 4,
+    palette: 'colorblind'
   });
   expect(result.mesh).toEqual({
     type: 'rendered',
     blobType: 'image/png',
     width: 2,
     hailPixels: 2,
-    maximumMm: 63.5
+    maximumMm: 63.5,
+    palette: 'highContrast'
   });
 });

@@ -37,6 +37,7 @@ const requiredAssets = [
   ['src/frame-preload.js', 'javascript'],
   ['src/picture-in-picture.js', 'javascript'],
   ['src/split-view.js', 'javascript'],
+  ['src/visual-palette.js', 'javascript'],
   ['logo/StormView-512x512.png', 'image/png'],
   ['vendor/leaflet/leaflet.css', 'text/css'],
   ['vendor/leaflet/leaflet.js', 'javascript'],

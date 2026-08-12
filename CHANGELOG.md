@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Added persistent standard, high-contrast, and color-blind-safe visual palettes across provider radar, native Level II products, alert polygons, MESH hail, storm tracks, 3D threat markers, legends, and core interface colors.
 - Added a persistent floating mini radar with synchronized frames and warning polygons, primary-map follow/recenter controls, responsive collision-free alert scrolling, visible attribution, diagnostics, and full Leaflet/WebGL teardown.
 - Added a persistent two-city comparison mode with independent map navigation, shared radar frames and warning polygons, searchable comparison locations, responsive desktop/mobile layouts, and explicit second-map resource cleanup.
 - Added a persistent, bounded radar preload window around the playhead with immediate resource reconciliation, Reduced Data capping, localized controls, and mounted-frame diagnostics.

@@ -95,7 +95,7 @@ test('mini radar mirrors live layers, persists, and stays fixed while alerts scr
   await expect.poll(() => page.evaluate(() => {
     const stored = JSON.parse(localStorage.getItem('stormview_settings'));
     return { schemaVersion: stored.schemaVersion, enabled: stored.settings.pipRadar };
-  })).toEqual({ schemaVersion: 8, enabled: true });
+  })).toEqual({ schemaVersion: 9, enabled: true });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();

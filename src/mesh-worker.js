@@ -1,4 +1,5 @@
 import { meshColor, parseMeshGrib, parsePngChunks } from './mesh-analysis.js';
+import { meshPaletteStops, normalizeVisualPalette } from './visual-palette.js';
 
 function paethPredictor(left, up, upperLeft) {
     const prediction = left + up - upperLeft;
@@ -17,7 +18,8 @@ async function decompress(buffer, format) {
     return new Response(stream).arrayBuffer();
 }
 
-async function renderMesh(compressedBuffer) {
+async function renderMesh(compressedBuffer, requestedPalette = 'standard') {
+    const palette = normalizeVisualPalette(requestedPalette);
     const gribBuffer = await decompress(compressedBuffer, 'gzip');
     const parsed = parseMeshGrib(gribBuffer);
     const { header, compressed } = parsePngChunks(parsed.png);
@@ -41,6 +43,7 @@ async function renderMesh(compressedBuffer) {
     let maximumMm = 0;
     const binaryMultiplier = 2 ** parsed.representation.binaryScale;
     const decimalDivisor = 10 ** parsed.representation.decimalScale;
+    const colorStops = meshPaletteStops(palette);
 
     for (let y = 0; y < header.height; y += 1) {
         const filter = raw[rawOffset++];
@@ -61,7 +64,7 @@ async function renderMesh(compressedBuffer) {
             for (let x = 0; x < header.width; x += sampleStep) {
                 const packedValue = (current[x * 2] << 8) | current[x * 2 + 1];
                 const valueMm = (parsed.representation.referenceValue + packedValue * binaryMultiplier) / decimalDivisor;
-                const color = meshColor(valueMm);
+                const color = meshColor(valueMm, palette, colorStops);
                 rgba.set(color, outputOffset);
                 outputOffset += 4;
                 if (color[3]) {
@@ -85,15 +88,16 @@ async function renderMesh(compressedBuffer) {
         ],
         hailPixels,
         maximumMm: Math.round(maximumMm * 10) / 10,
-        sampleStep
+        sampleStep,
+        palette
     };
 }
 
 self.addEventListener('message', async event => {
-    const { id, type, buffer } = event.data || {};
+    const { id, type, buffer, palette } = event.data || {};
     if (!id || type !== 'render' || !(buffer instanceof ArrayBuffer)) return;
     try {
-        const result = await renderMesh(buffer);
+        const result = await renderMesh(buffer, palette);
         self.postMessage({ id, type: 'rendered', ...result });
     } catch (error) {
         self.postMessage({ id, type: 'error', message: error?.message || String(error) });

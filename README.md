@@ -30,6 +30,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Historical Event Replay** — Select up to six hours and replay five-minute IEM NEXRAD composites with storm-based warning polygons synchronized to each frame
 - **Provider-Time Timeline** — Show model initialization, valid time, forecast lead, data age, timezone, and source coverage without substituting the client clock
 - **Accessible Controls** — Keyboard-operable layers and timeline, labeled search suggestions, focus-managed dialogs, and reduced-motion/forced-colors support
+- **Accessible Visual Palettes** — Persist standard, high-contrast, or color-blind-safe styling across provider/native radar, alerts, hail analysis, storm tracks, 3D markers, legends, and interface colors
 - **Adjustable Opacity** — Fine-tune radar transparency for optimal map visibility
 - **Smart Tile Caching** — Optimized loading with rate limit protection
 - **Offline Last View** — A service worker retains the app shell, recent credential-free radar frames, and NWS alert polygons for an explicitly labeled cached fallback

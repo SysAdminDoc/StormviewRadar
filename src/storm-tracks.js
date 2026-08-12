@@ -1,3 +1,5 @@
+import { stormPaletteColor } from './visual-palette.js';
+
 export const STORM_HISTORY_WINDOW_MS = 60 * 60 * 1000;
 export const STORM_HISTORY_LIMIT = 12;
 
@@ -56,11 +58,8 @@ export function stormThreatScore(cell) {
         + Math.max(0, cell.maxDbz);
 }
 
-export function stormTrackColor(cell) {
-    if (cell.tvs && cell.tvs !== 'NONE') return '#ef4444';
-    if (cell.meso && cell.meso !== 'NONE' && cell.meso !== '0') return '#a855f7';
-    if (cell.posh >= 50 || cell.maxHailInches >= 1) return '#f97316';
-    return '#22d3ee';
+export function stormTrackColor(cell, palette = 'standard') {
+    return stormPaletteColor(cell, palette);
 }
 
 export function mergeStormHistory(histories, cells, referenceTime = Date.now()) {

@@ -1,4 +1,4 @@
-const CACHE_VERSION = '2026-08-12-4';
+const CACHE_VERSION = '2026-08-12-5';
 const SHELL_CACHE = `stormview-shell-${CACHE_VERSION}`;
 const RADAR_CACHE = `stormview-radar-${CACHE_VERSION}`;
 const RADAR_META_CACHE = `stormview-radar-meta-${CACHE_VERSION}`;
@@ -25,6 +25,7 @@ const SHELL_PATHS = [
   './src/frame-preload.js',
   './src/picture-in-picture.js',
   './src/split-view.js',
+  './src/visual-palette.js',
   './src/alert-fill.js',
   './src/alert-series.js',
   './src/layer-opacity.js',

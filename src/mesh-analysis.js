@@ -1,3 +1,5 @@
+import { meshPaletteStops } from './visual-palette.js';
+
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 
 function signedInt16(view, offset) {
@@ -12,14 +14,12 @@ function normalizeLongitude(longitude) {
     return longitude > 180 ? longitude - 360 : longitude;
 }
 
-export function meshColor(valueMm) {
+export function meshColor(valueMm, palette = 'standard', stops = meshPaletteStops(palette)) {
     if (!Number.isFinite(valueMm) || valueMm < 6.35) return [0, 0, 0, 0];
-    if (valueMm < 12.7) return [34, 211, 238, 90];
-    if (valueMm < 25.4) return [59, 130, 246, 125];
-    if (valueMm < 44.45) return [34, 197, 94, 165];
-    if (valueMm < 63.5) return [250, 204, 21, 190];
-    if (valueMm < 101.6) return [249, 115, 22, 210];
-    return [239, 68, 68, 230];
+    for (let index = 1; index < stops.length; index += 1) {
+        if (valueMm < stops[index][0]) return stops[index - 1][1];
+    }
+    return stops.at(-1)[1];
 }
 
 export function parseMeshGrib(buffer) {
