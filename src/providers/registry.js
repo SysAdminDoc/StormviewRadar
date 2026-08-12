@@ -31,6 +31,14 @@ const RADAR_DEFINITIONS = Object.freeze({
     coverage: { label: 'CONUS', bounds: [-125, 24, -66, 50] },
     attribution: 'NOAA nowCOAST'
   },
+  eccc: {
+    label: 'ECCC GeoMet',
+    products: ['precipRate'],
+    note: 'Three hours of six-minute North American radar rain rate at 1 km resolution.',
+    animation: true,
+    coverage: { label: 'North America', bounds: [-170.32, 16.93, -50, 67.19] },
+    attribution: 'Environment and Climate Change Canada / Meteorological Service of Canada'
+  },
   level2: {
     label: 'NEXRAD Level II',
     products: ['reflectivity', 'velocity', 'differentialReflectivity', 'correlationCoefficient'],

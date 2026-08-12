@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Added Environment and Climate Change Canada's official 1 km North American radar rain-rate source with a three-hour six-minute GeoMet WMS timeline, on-demand single-frame retrieval, Reduced Data capping, truthful mm/h legend, cross-border coverage, and licence-linked attribution.
 - Added a six-hour, five-minute MRMS reflectivity timeline backed by immutable IEM archive frames, bounded playhead-window prefetching, decoded-image release, persistent LRU reuse, one-hour Reduced Data capping, and current-tile freshness limits.
 - Added bounded attributed radar-animation export with a built-in looping GIF encoder, runtime-gated MP4 canvas recording, 24-frame sampling, configurable timing, progress/cancellation, and deterministic playhead restoration.
 - Added a standards-based PWA manifest and a localized install offer gated on browser install eligibility plus service-worker verification that both the offline shell and a completed last radar frame are cached, with standalone/embed suppression and bounded dismissal.

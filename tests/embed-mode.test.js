@@ -46,6 +46,12 @@ test('embed parsing rejects unsupported products and bounds hostile values', () 
   assert.deepEqual(config.layers, DEFAULT_EMBED_LAYERS);
 });
 
+test('embed parsing exposes the credential-free ECCC rain-rate product', () => {
+  const config = parseEmbedConfig('?embed=1&source=eccc&product=precipRate');
+  assert.equal(config.source, 'eccc');
+  assert.equal(config.product, 'precipRate');
+});
+
 test('embed configuration replaces persisted presentation without enabling local or credentialed layers', () => {
   const settings = {
     source: 'rainviewer',

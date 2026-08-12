@@ -13,6 +13,7 @@ const SOURCE_PRODUCTS = Object.freeze({
   rainviewer: ['reflectivity'],
   mrms: ['reflectivity', 'velocity', 'echoTops', 'precipAccum'],
   nowcoast: ['reflectivity'],
+  eccc: ['precipRate'],
   level2: ['reflectivity', 'velocity', 'differentialReflectivity', 'correlationCoefficient']
 });
 const BASEMAPS = Object.freeze(['dark', 'light', 'satellite', 'terrain', 'clean']);

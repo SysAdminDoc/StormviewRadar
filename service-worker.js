@@ -1,4 +1,4 @@
-const CACHE_VERSION = '2026-08-12-12';
+const CACHE_VERSION = '2026-08-12-13';
 const SHELL_CACHE = `stormview-shell-${CACHE_VERSION}`;
 const RADAR_CACHE = `stormview-radar-${CACHE_VERSION}`;
 const RADAR_META_CACHE = `stormview-radar-meta-${CACHE_VERSION}`;
@@ -36,6 +36,7 @@ const SHELL_PATHS = [
   './src/pwa-install.js',
   './src/animation-export.js',
   './src/radar-history.js',
+  './src/geomet-radar.js',
   './src/alert-fill.js',
   './src/alert-series.js',
   './src/layer-opacity.js',
@@ -57,6 +58,10 @@ function hasSensitiveHeaders(request) {
 
 function isRadarImage(request, url) {
   if (url.hostname.endsWith('rainviewer.com')) return true;
+  if (url.hostname === 'geo.weather.gc.ca') {
+    return request.destination === 'image'
+      || url.searchParams.get('request')?.toLowerCase() === 'getmap';
+  }
   if (url.hostname === 'mesonet.agron.iastate.edu') {
     return url.pathname.includes('/cache/tile.py/') || request.destination === 'image';
   }
@@ -69,6 +74,8 @@ function isRadarImage(request, url) {
 
 function isRadarMetadata(url) {
   return (url.hostname === 'api.rainviewer.com' && url.pathname.endsWith('/public/weather-maps.json'))
+    || (url.hostname === 'geo.weather.gc.ca'
+      && url.searchParams.get('request')?.toLowerCase() === 'getcapabilities')
     || (url.hostname === 'mesonet.agron.iastate.edu' && url.pathname.endsWith('.json'))
     || (url.hostname === 'nowcoast.noaa.gov'
       && url.pathname.includes('/weather_radar/')

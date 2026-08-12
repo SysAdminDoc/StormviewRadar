@@ -17,7 +17,8 @@ A modern, feature-rich weather radar visualization application built with vanill
 ## Features
 
 ### Radar & Animation
-- **Five Radar Sources** — Switch between HRRR forecast guidance, RainViewer global history, MRMS US products, NOAA nowCOAST, and native NEXRAD Level II
+- **Six Radar Sources** — Switch between HRRR forecast guidance, RainViewer global history, MRMS US products, NOAA nowCOAST, ECCC GeoMet cross-border rain rate, and native NEXRAD Level II
+- **Canadian Cross-Border Radar** — Animate ECCC's official 1 km North American rain-rate composite across three hours of six-minute frames with source-native units, attribution, and on-demand WMS requests
 - **Six-Hour Radar History** — Scrub five-minute MRMS reflectivity frames with a bounded playhead cache; Reduced Data automatically limits history to one hour
 - **NEXRAD Level II** — Select the nearest or a named CONUS site and render current 0.5° reflectivity, velocity, ZDR, or correlation coefficient directly from the NOAA/Unidata AWS archive
 - **Rotation Candidates** — Overlay up to 20 clustered, reflectivity-backed velocity couplets with explicit automated-heuristic and not-a-warning labeling
@@ -120,8 +121,8 @@ Add `embed=1` to load a streamlined iframe-safe map. Embed parameters replace th
 |-----------|-----------------|---------|
 | `embed` | `1`, `true`, `yes`, or `on` enables embed mode | Off |
 | `lat`, `lon`, `zoom` | Latitude `-90..90`, longitude `-180..180`, zoom `2..18` | `39`, `-96`, `5` |
-| `source` | `hrrr`, `rainviewer`, `mrms`, `nowcoast`, `level2` | `hrrr` |
-| `product` | Source-supported product: `reflectivity`, `velocity`, `echoTops`, `precipAccum`, `differentialReflectivity`, or `correlationCoefficient` | `reflectivity` |
+| `source` | `hrrr`, `rainviewer`, `mrms`, `nowcoast`, `eccc`, `level2` | `hrrr` |
+| `product` | Source-supported product: `reflectivity`, `velocity`, `echoTops`, `precipAccum`, `precipRate`, `differentialReflectivity`, or `correlationCoefficient` | `reflectivity` |
 | `site` | Four-character Level II site such as `KDMX` | Nearest site |
 | `basemap` | `dark`, `light`, `satellite`, `terrain`, `clean` | `dark` |
 | `layers` | Comma-separated credential-free layer IDs, `none`, or up to 16 IDs | `radar,alerts,states,labels` |
@@ -164,6 +165,7 @@ API keys are stored unencrypted in the current browser profile and sent directly
 | MRMS | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/) | ~2 minutes |
 | MRMS MESH | [NOAA Open Data on AWS](https://registry.opendata.aws/noaa-mrms-pds/) | ~2 minutes |
 | NOAA radar mosaic | [nowCOAST](https://nowcoast.noaa.gov/) | Provider dependent |
+| North American radar rain rate | [ECCC MSC GeoMet](https://eccc-msc.github.io/open-data/msc-data/obs_radar/readme_radar_geomet_en/) | 6-minute frames |
 | NEXRAD Level II | [NOAA / NSF Unidata on AWS](https://registry.opendata.aws/noaa-nexrad/) | Per volume scan |
 | Historical radar and warnings | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/GIS/rasters.php?rid=2) | 5-minute frames |
 | Alerts | [NWS API](https://www.weather.gov/documentation/services-web-api) | Real-time |

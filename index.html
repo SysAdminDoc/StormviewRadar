@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#1e1e2e">
     <meta charset="UTF-8">
     <meta name="application-version" content="0.1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://api.open-meteo.com https://api.openweathermap.org https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://services.arcgis.com https://tile.openweathermap.org https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://api.open-meteo.com https://api.openweathermap.org https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://geo.weather.gc.ca https://idpgis.ncep.noaa.gov https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://services.arcgis.com https://tile.openweathermap.org https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.nhc.noaa.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://geo.weather.gc.ca https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StormView Radar 0.1.0</title>
     <link rel="manifest" href="manifest.webmanifest">
@@ -2769,6 +2769,7 @@
                 <button class="source-tab" data-source="rainviewer" title="Past radar only; approximately 2 hours; native zoom 7">RainViewer</button>
                 <button class="source-tab" data-source="mrms">MRMS</button>
                 <button class="source-tab" data-source="nowcoast" title="NOAA 1km WMS">NOAA</button>
+                <button class="source-tab" data-source="eccc" title="ECCC 1 km North American radar rain rate">ECCC</button>
                 <button class="source-tab" data-source="level2" title="Latest single-site NEXRAD base data">Level II</button>
             </div>
             <label class="level2-site-row">
@@ -2806,6 +2807,10 @@
                     <div class="layer-chip" data-product="precipAccum">
                         <span class="dot" style="background: var(--accent)"></span>
                         <span class="layer-name">Precip</span>
+                    </div>
+                    <div class="layer-chip" data-product="precipRate">
+                        <span class="dot" style="background: #00c853"></span>
+                        <span class="layer-name">Rain Rate</span>
                     </div>
                     <div class="layer-chip" data-product="differentialReflectivity">
                         <span class="dot" style="background: var(--warning)"></span>
@@ -3696,6 +3701,7 @@
         <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>,
         <a href="https://www.spc.noaa.gov/" target="_blank" rel="noopener">SPC</a>,
         <a href="https://mesonet.agron.iastate.edu/" target="_blank" rel="noopener">IEM</a>,
+        <a href="https://eccc-msc.github.io/open-data/licence/readme_en/" target="_blank" rel="noopener">ECCC</a>,
         <a href="https://www.usgs.gov/" target="_blank" rel="noopener">USGS</a>,
         <a href="https://www.nhc.noaa.gov/" target="_blank" rel="noopener">NHC</a>,
         <a href="https://www.noaa.gov/" target="_blank" rel="noopener">NOAA/GOES</a>,
@@ -3722,6 +3728,7 @@
     import { normalizeOfflineAvailability, shouldOfferInstall } from './src/pwa-install.js';
     import { animationDimensions, animationFilename, encodeAnimatedGif, recordCanvasMp4, rgbaToGifIndices, sampledFrameIndices, supportedMp4MimeType } from './src/animation-export.js';
     import { buildRadarHistoryFrames, radarHistoryHours, radarHistoryTickIndices } from './src/radar-history.js';
+    import { buildGeometRadarFrames, GEOMET_RADAR_ENDPOINT, GEOMET_RADAR_LAYER, GEOMET_RADAR_STYLE, geometCapabilitiesUrl } from './src/geomet-radar.js';
     import { IndexedDbTileCache, isCacheableTileUrl, tileCacheMaxAge } from './src/tile-cache.js';
     import { WebGLTileRenderer } from './src/webgl-tile-renderer.js';
 
@@ -3806,6 +3813,7 @@
             hrrrLatest: 'https://mesonet.agron.iastate.edu/data/gis/images/4326/hrrr/refd_1080.json',
             mrmsLatest: 'https://mesonet.agron.iastate.edu/data/gis/images/4326/USCOMP/n0q_0.json',
             nowcoastCapabilities: 'https://nowcoast.noaa.gov/geoserver/observations/weather_radar/ows?service=WMS&version=1.3.0&request=GetCapabilities',
+            geometCapabilities: geometCapabilitiesUrl('en'),
             nexradSites: 'https://mesonet.agron.iastate.edu/geojson/network/NEXRAD.geojson',
             
             // Browser-safe aviation hazards. AviationWeather PIREPs forbid CORS.
@@ -4497,6 +4505,7 @@
             'Nearest to map center': 'Más cercano al centro del mapa',
             'Reflectivity': 'Reflectividad',
             'Velocity': 'Velocidad',
+            'Rain Rate': 'Tasa de lluvia',
             'Correlation': 'Correlación',
             'Rotation Candidates': 'Candidatos de rotación',
             'Hail Size': 'Tamaño del granizo',
@@ -5421,7 +5430,7 @@
             };
             const enumFields = {
                 source: Object.keys(RADAR_CAPABILITIES),
-                radarProduct: ['reflectivity', 'velocity', 'echoTops', 'precipAccum', 'differentialReflectivity', 'correlationCoefficient'],
+                radarProduct: ['reflectivity', 'velocity', 'echoTops', 'precipAccum', 'precipRate', 'differentialReflectivity', 'correlationCoefficient'],
                 basemap: ['dark', 'light', 'satellite', 'terrain', 'clean'],
                 theme: ['dark', 'light'],
                 visualPalette: ['standard', 'highContrast', 'colorblind'],
@@ -5469,7 +5478,7 @@
             }
 
             if (!RADAR_CAPABILITIES[result.source].products.includes(result.radarProduct)) {
-                result.radarProduct = 'reflectivity';
+                result.radarProduct = RADAR_CAPABILITIES[result.source].products[0];
             }
             return result;
         }
@@ -8169,6 +8178,86 @@
             hideLoadProgress();
             showToast('NOAA 1km WMS radar loaded', 'success');
         }
+
+        function createGeometRadarLayer(frame) {
+            const layer = L.tileLayer.wms(GEOMET_RADAR_ENDPOINT, {
+                layers: GEOMET_RADAR_LAYER,
+                styles: GEOMET_RADAR_STYLE,
+                format: 'image/png',
+                transparent: true,
+                version: '1.3.0',
+                time: frame.path,
+                crs: L.CRS.EPSG3857,
+                opacity: 0,
+                pane: 'radarPane',
+                className: 'radar-layer radar-cached eccc-radar-frame',
+                maxZoom: 18,
+                keepBuffer: 1,
+                updateWhenZooming: false,
+                updateWhenIdle: true,
+                attribution: '<a href="https://eccc-msc.github.io/open-data/licence/readme_en/">Environment and Climate Change Canada</a>'
+            });
+            layer._stormviewOnDemandFrame = true;
+            layer._stormviewFrameReady = false;
+            layer._stormviewFrameCounted = false;
+            layer.on('loading', () => {
+                layer._stormviewFrameReady = false;
+            });
+            layer.on('load', () => {
+                layer._stormviewFrameReady = true;
+                if (!layer._stormviewFrameCounted) {
+                    layer._stormviewFrameCounted = true;
+                    markRadarFrameLoaded();
+                }
+            });
+            layer.on('remove', () => {
+                layer._stormviewFrameReady = false;
+            });
+            return layer;
+        }
+
+        async function loadGeometRadar(signal, generation) {
+            showLoadProgress();
+            loadAborted = false;
+            const response = await fetchWithTimeout(DATA_URLS.geometCapabilities, { signal });
+            const capabilities = new DOMParser().parseFromString(await response.text(), 'application/xml');
+            const parserError = capabilities.querySelector('parsererror');
+            if (parserError) throw new Error('GeoMet returned invalid WMS capabilities');
+            const radarLayer = [...capabilities.querySelectorAll('Layer')].find(layer =>
+                layer.querySelector(':scope > Name')?.textContent?.trim() === GEOMET_RADAR_LAYER
+            );
+            const timeDimension = [...(radarLayer?.children || [])].find(element =>
+                element.localName === 'Dimension' && element.getAttribute('name') === 'time'
+            );
+            if (!timeDimension) throw new Error('GeoMet radar times are unavailable');
+            ensureCurrentRadarLoad(generation, signal);
+
+            frames = buildGeometRadarFrames(
+                timeDimension.textContent,
+                timeDimension.getAttribute('default'),
+                { reducedData: settings.reducedData }
+            );
+            frameLayers = frames.map(createGeometRadarLayer);
+            framesTotal = frames.length;
+            framesLoaded = 0;
+            currentFrame = frames.length - 1;
+            lastPastFrame = Math.max(0, currentFrame - 1);
+            framesReady = true;
+            lastRefreshTime = Date.now();
+            map.getContainer().dataset.radarHistoryHours = settings.reducedData ? '1' : '3';
+
+            const currentLayer = frameLayers[currentFrame];
+            currentLayer.once('load', () => {
+                if (settings.source === 'eccc' && framesReady && (!embedConfig || embedConfig.autoplay)) play();
+            });
+            currentLayer.addTo(map);
+            currentLayer.setOpacity(settings.opacity);
+            ensureCurrentRadarLoad(generation, signal);
+            updateTimestamp();
+            updateTimelineUI();
+            updatePlaybackVisibility();
+            hideLoadProgress();
+        }
         
         // ==================== HRRR FORECAST RADAR ====================
         async function loadHRRR(signal, generation) {
@@ -8707,10 +8796,75 @@
             }
         }
 
+        function waitForOnDemandFrame(layer) {
+            if (layer?._stormviewFrameReady) return Promise.resolve(true);
+            return new Promise((resolve, reject) => {
+                let settled = false;
+                const finish = error => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeoutId);
+                    layer?.off?.('load', onLoad);
+                    if (error) reject(error);
+                    else resolve(true);
+                };
+                const onLoad = () => finish();
+                const timeoutId = setTimeout(
+                    () => finish(new Error('GeoMet radar frame timed out')),
+                    12000
+                );
+                layer?.once?.('load', onLoad);
+            });
+        }
+
+        async function showOnDemandFrame(idx) {
+            const transitionGeneration = ++frameTransitionGeneration;
+            const previousFrame = currentFrame;
+            const nextLayer = frameLayers[idx];
+            currentFrame = idx;
+            frameTransitionPending = true;
+            diagnosticsState.performance.renderedFrames += 1;
+            const ready = waitForOnDemandFrame(nextLayer);
+            if (!map.hasLayer(nextLayer)) nextLayer.addTo(map);
+            nextLayer.setOpacity(0);
+            applyFramePreloadWindow(idx, { preserve: [previousFrame] });
+
+            try {
+                await ready;
+                if (transitionGeneration !== frameTransitionGeneration || currentFrame !== idx) return;
+                nextLayer.setOpacity(settings.opacity);
+                nextLayer.bringToFront?.();
+                if (previousFrame !== idx && frameLayers[previousFrame]) {
+                    frameLayers[previousFrame].setOpacity(0);
+                }
+                updateTimestamp();
+                updateTimelineFill();
+                setTimeout(() => {
+                    if (currentFrame === idx) applyFramePreloadWindow(idx);
+                }, 320);
+            } catch (error) {
+                if (transitionGeneration !== frameTransitionGeneration) return;
+                currentFrame = previousFrame;
+                const previousLayer = frameLayers[previousFrame];
+                if (previousLayer && !map.hasLayer(previousLayer)) previousLayer.addTo(map);
+                previousLayer?.setOpacity(settings.opacity);
+                applyFramePreloadWindow(previousFrame);
+                updateTimestamp();
+                updateTimelineFill();
+                showToast(`GeoMet frame unavailable: ${safeText(error.message, 100)}`, 'warn', 3500);
+            } finally {
+                if (transitionGeneration === frameTransitionGeneration) frameTransitionPending = false;
+            }
+        }
+
         function showPreloadedFrame(idx) {
             if (!frameLayers.length || idx < 0 || idx >= frameLayers.length) return;
             if (frameLayers[idx]?._stormviewFrameAware) {
                 void showFrameAwareFrame(idx);
+                return;
+            }
+            if (frameLayers[idx]?._stormviewOnDemandFrame) {
+                void showOnDemandFrame(idx);
                 return;
             }
             frameTransitionGeneration += 1;
@@ -8852,6 +9006,12 @@
 
             frameLayers.forEach((layer, frameIndex) => {
                 if (!layer) return;
+                if (layer._stormviewOnDemandFrame) {
+                    const shouldMount = frameIndex === currentFrame || preserve.includes(frameIndex);
+                    if (shouldMount && !map.hasLayer(layer)) layer.addTo(map);
+                    else if (!shouldMount && map.hasLayer(layer)) map.removeLayer(layer);
+                    return;
+                }
                 if (layer._stormviewFrameAware) {
                     if (desired.has(frameIndex)) layer.preloadFrame?.();
                     const shouldMount = frameIndex === currentFrame || preserve.includes(frameIndex);
@@ -8986,6 +9146,7 @@
                 rainviewer: radarProviderAdapter(loadRainViewerPreloaded),
                 mrms: radarProviderAdapter(loadMRMS),
                 nowcoast: radarProviderAdapter(loadNowCOAST),
+                eccc: radarProviderAdapter(loadGeometRadar),
                 level2: {
                     ...radarProviderAdapter(loadLevel2),
                     cancel: () => disposeLevel2Worker(new DOMException('Level II provider cancelled', 'AbortError'))
@@ -10950,6 +11111,9 @@
                 labels.innerHTML = settings.units === 'metric'
                     ? '<span>152+ mm</span><span>102</span><span>76</span><span>51</span><span>25</span><span>13</span><span>3</span><span>Trace</span>'
                     : '<span>6.0"+</span><span>4.0"</span><span>3.0"</span><span>2.0"</span><span>1.0"</span><span>0.5"</span><span>0.1"</span><span>Trace</span>';
+            } else if (settings.radarProduct === 'precipRate' && settings.source === 'eccc') {
+                gradient.style.background = 'linear-gradient(to bottom, #2d004b 0%, #c400bc 20%, #ff003b 32%, #ff7600 45%, #ffe600 58%, #008000 70%, #00d84c 82%, #00b6ef 92%, #b9dcff 100%)';
+                labels.innerHTML = '<span>200+ mm/h</span><span>100</span><span>50</span><span>24</span><span>12</span><span>4</span><span>1</span><span>0.1 mm/h</span>';
             } else {
                 // Default reflectivity
                 gradient.style.background = 'linear-gradient(to bottom, #ff00ff 0%, #ff0000 15%, #ff6600 25%, #ffc800 35%, #ffff00 45%, #7fff00 55%, #00c800 65%, #00b4ff 75%, #0064ff 85%, #000096 100%)';
@@ -11857,7 +12021,7 @@
         function syncRadarCapabilities() {
             const capability = RADAR_CAPABILITIES[settings.source] || RADAR_CAPABILITIES.mrms;
             if (!capability.products.includes(settings.radarProduct)) {
-                settings.radarProduct = 'reflectivity';
+                settings.radarProduct = capability.products[0];
                 saveSettings();
             }
 

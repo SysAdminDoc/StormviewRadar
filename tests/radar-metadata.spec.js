@@ -177,3 +177,57 @@ test('nowCOAST reads the default valid time from WMS capabilities', async ({ pag
   await expect(page.locator('#timestampBox')).toHaveAttribute('data-kind', 'latest');
   await expect(page.locator('#playback')).toBeHidden();
 });
+
+test('ECCC GeoMet exposes the official cross-border rain-rate timeline on demand', async ({ page }) => {
+  await setSource(page, 'eccc');
+  const requestedTimes = new Set();
+  const cacheDirectives = [];
+  await page.route('https://geo.weather.gc.ca/geomet?**', route => {
+    const url = new URL(route.request().url());
+    const request = url.searchParams.get('request')?.toLowerCase();
+    if (request === 'getcapabilities') {
+      return route.fulfill({
+        contentType: 'application/xml',
+        headers: { 'access-control-allow-origin': '*' },
+        body: `<?xml version="1.0"?>
+          <WMS_Capabilities xmlns="http://www.opengis.net/wms">
+            <Capability><Layer><Layer>
+              <Name>RADAR_1KM_RRAI</Name>
+              <Title>Radar precipitation rate for rain [mm/h]</Title>
+              <EX_GeographicBoundingBox>
+                <westBoundLongitude>-170.32</westBoundLongitude><eastBoundLongitude>-50</eastBoundLongitude>
+                <southBoundLatitude>16.93</southBoundLatitude><northBoundLatitude>67.19</northBoundLatitude>
+              </EX_GeographicBoundingBox>
+              <Dimension name="time" units="ISO8601" default="2026-07-25T20:54:00Z">2026-07-25T20:36:00Z/2026-07-25T20:54:00Z/PT6M</Dimension>
+            </Layer></Layer></Capability>
+          </WMS_Capabilities>`
+      });
+    }
+    requestedTimes.add(url.searchParams.get('time'));
+    cacheDirectives.push(route.request().headers()['cache-control'] || '');
+    return route.fulfill({
+      status: 200,
+      headers: { 'access-control-allow-origin': '*' },
+      contentType: 'image/png',
+      body: transparentPng
+    });
+  });
+
+  await page.goto('/');
+  await expect(page.locator('#dataStatusText')).toHaveText('ECCC GeoMet: current');
+  await expect(page.locator('#timestampBox')).toHaveAttribute('data-provider-time', '2026-07-25T20:54:00.000Z');
+  await expect(page.locator('#timestampBox')).toHaveAttribute('data-source', 'eccc');
+  await expect(page.locator('#timeline')).toHaveAttribute('aria-valuemax', '4');
+  await expect(page.locator('#coverageStatusText')).toContainText('North America coverage');
+  await expect(page.locator('.sidebar [data-product="precipRate"]')).toHaveClass(/active/);
+  await expect(page.locator('.leaflet-control-attribution')).toContainText('Environment and Climate Change Canada');
+  await expect.poll(() => requestedTimes.has('2026-07-25T20:54:00.000Z')).toBe(true);
+  if (await page.locator('#playIcon rect').count()) await page.locator('#playBtn').click();
+
+  await page.locator('#timeline').focus();
+  await page.locator('#timeline').press('Home');
+  await expect(page.locator('#timestampBox')).toHaveAttribute('data-provider-time', '2026-07-25T20:36:00.000Z');
+  await expect.poll(() => requestedTimes.has('2026-07-25T20:36:00.000Z')).toBe(true);
+  await expect(page.locator('.eccc-radar-frame')).toHaveCount(1);
+  expect(cacheDirectives.every(value => !/no-cache/i.test(value))).toBe(true);
+});

@@ -46,6 +46,7 @@ const requiredAssets = [
   ['src/pwa-install.js', 'javascript'],
   ['src/animation-export.js', 'javascript'],
   ['src/radar-history.js', 'javascript'],
+  ['src/geomet-radar.js', 'javascript'],
   ['logo/StormView-512x512.png', 'image/png'],
   ['vendor/leaflet/leaflet.css', 'text/css'],
   ['vendor/leaflet/leaflet.js', 'javascript'],

@@ -44,6 +44,7 @@ test('active map providers and bundled identity assets remain visible', async ({
   await expect(attribution).toContainText('Iowa Environmental Mesonet');
   await expect(page.locator('.data-credit a[href="https://www.rainviewer.com/"]')).toBeVisible();
   await expect(page.locator('.data-credit a[href="https://www.weather.gov/"]')).toBeVisible();
+  await expect(page.locator('.data-credit a[href*="eccc-msc.github.io/open-data/licence"]')).toHaveText('ECCC');
   await expect(page.locator('img[src*="raw.githubusercontent.com"]')).toHaveCount(0);
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', 'logo/StormView-512x512.png');
   await expect(page.locator('meta[name="application-version"]')).toHaveAttribute('content', '0.1.0');
