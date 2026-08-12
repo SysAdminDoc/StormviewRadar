@@ -94,7 +94,7 @@ await Promise.all([
 run('npm', ['run', 'release:check'], {
   failure: 'Release gate failed; inspect and revert the synchronized version edits'
 });
-run('git', ['add', 'package.json', 'package-lock.json', 'index.html', 'README.md', 'CLAUDE.md', 'CHANGELOG.md']);
+run('git', ['add', 'package.json', 'package-lock.json', 'index.html', 'README.md', 'CHANGELOG.md']);
 run('git', ['commit', '-m', `chore(release): v${nextVersion}`]);
 run('git', ['tag', '-a', `v${nextVersion}`, '-m', `StormView Radar v${nextVersion}`]);
 console.log(`Created release commit and tag v${nextVersion}. Push with: git push origin main --follow-tags`);
