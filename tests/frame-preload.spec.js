@@ -59,7 +59,7 @@ test('preload window persists, mounts both sides, and honors Reduced Data', asyn
   await expect(page.locator('#preloadWindowSlider')).toHaveAttribute('aria-valuetext', '2 frames each side · Reduced Data cap');
 
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('stormview_settings')));
-  expect(stored.schemaVersion).toBe(6);
+  expect(stored.schemaVersion).toBe(7);
   expect(stored.settings.preloadWindow).toBe(3);
   expect(stored.settings.reducedData).toBe(true);
 });

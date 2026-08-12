@@ -84,6 +84,127 @@
         }
 
         #map { position: absolute; inset: 0; z-index: 1; }
+        .compare-map-pane {
+            position: absolute;
+            inset: 0 0 0 50%;
+            z-index: 2;
+            display: none;
+            border-left: 2px solid var(--accent);
+            background: #0f172a;
+        }
+        .compare-map-pane[hidden] { display: none; }
+        body.split-view #map { right: 50%; }
+        body.split-view .compare-map-pane { display: block; }
+        body.split-view .loc-btn,
+        body.split-view .map-forecast-btn { right: calc(50% + 12px); }
+        #compareMap { position: absolute; inset: 0; }
+        .split-map-label,
+        .compare-map-controls {
+            position: absolute;
+            top: 80px;
+            z-index: 850;
+            border-radius: 10px;
+        }
+        .split-map-label {
+            left: 12px;
+            display: none;
+            max-width: calc(50% - 24px);
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        body.split-view .split-map-label { display: block; }
+        .compare-map-controls {
+            left: 12px;
+            right: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+        }
+        .compare-map-title {
+            flex: 0 1 auto;
+            max-width: 34%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .compare-search-wrap { position: relative; flex: 1; min-width: 90px; }
+        .compare-search-input {
+            width: 100%;
+            border: 1px solid var(--glass-border);
+            border-radius: 7px;
+            background: var(--panel-bg);
+            color: var(--text);
+            padding: 7px 9px;
+            font: inherit;
+            font-size: 12px;
+        }
+        .compare-search-results {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            display: none;
+            max-height: 220px;
+            overflow-y: auto;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            background: var(--panel-bg);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+        }
+        .compare-search-results.open { display: block; }
+        .compare-search-result {
+            width: 100%;
+            border: 0;
+            border-bottom: 1px solid var(--glass-border);
+            background: transparent;
+            color: var(--text);
+            padding: 9px 10px;
+            text-align: left;
+            font: inherit;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .compare-search-result:last-child { border-bottom: 0; }
+        .compare-search-result:hover,
+        .compare-search-result:focus-visible,
+        .compare-search-result[aria-selected="true"] { background: var(--glass-hover); }
+        .compare-map-close {
+            flex: 0 0 32px;
+            width: 32px;
+            height: 32px;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            background: var(--glass-hover);
+            color: var(--text);
+            font-size: 18px;
+            cursor: pointer;
+        }
+        @media (max-width: 700px) {
+            body.split-view #map { right: 0; bottom: 50%; }
+            body.split-view .compare-map-pane { inset: 50% 0 0; border-left: 0; border-top: 2px solid var(--accent); }
+            body.split-view .split-map-label { top: 68px; max-width: calc(100% - 24px); }
+            .compare-map-controls {
+                top: 8px;
+                display: grid;
+                grid-template-columns: minmax(72px, 0.55fr) minmax(140px, 1.45fr) 32px;
+            }
+            .compare-map-title { max-width: none; }
+            body.split-view .legend {
+                top: auto;
+                bottom: calc(50% + 8px);
+                transform: none;
+            }
+            body.split-view .loc-btn,
+            body.split-view .map-forecast-btn { display: none; }
+        }
+        @media (min-width: 701px) {
+            .compare-map-controls { top: 124px; }
+        }
         .storm-3d-view {
             position: absolute;
             inset: 0;
@@ -2010,6 +2131,18 @@
     </div>
 
     <div id="map" role="region" aria-label="Interactive weather map. Use arrow keys to pan, plus and minus to zoom, and F for the forecast at map center." aria-keyshortcuts="F"></div>
+    <div class="split-map-label glass" id="primaryMapLabel">Primary view</div>
+    <section class="compare-map-pane" id="compareMapPane" aria-label="Comparison city radar" hidden>
+        <div id="compareMap" role="region" aria-label="Comparison city weather map"></div>
+        <div class="compare-map-controls glass">
+            <strong class="compare-map-title" id="compareMapTitle">Comparison view</strong>
+            <div class="compare-search-wrap">
+                <input class="compare-search-input" id="compareSearchInput" type="search" placeholder="Search comparison city…" aria-label="Search comparison city" role="combobox" aria-autocomplete="list" aria-controls="compareSearchResults" aria-expanded="false">
+                <div class="compare-search-results" id="compareSearchResults" role="listbox" aria-label="Comparison city suggestions"></div>
+            </div>
+            <button class="compare-map-close" id="compareMapClose" type="button" aria-label="Close two-city view">×</button>
+        </div>
+    </section>
     <section class="storm-3d-view" id="cesiumView" aria-label="Three-dimensional storm-top view" aria-hidden="true" hidden>
         <div id="cesiumContainer"></div>
         <div class="storm-3d-info glass">
@@ -2464,6 +2597,10 @@
         <button class="qt-btn" data-qt="stormReports">
             <span class="qt-dot" style="background: var(--purple)"></span>
             <span class="qt-label">Reports</span>
+        </button>
+        <button class="qt-btn" id="splitViewBtn" type="button" title="Toggle two-city view" aria-label="Toggle two-city view" aria-pressed="false">
+            <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>
+            <span class="qt-label">2-City</span>
         </button>
         <button class="qt-btn" id="stormTop3dBtn" type="button" title="Toggle 3D storm-top heights" aria-label="Toggle 3D storm-top heights" aria-pressed="false">
             <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path d="m12 2 8 4.5v9L12 20l-8-4.5v-9L12 2Z"/><path d="m4 6.5 8 4.5 8-4.5M12 11v9"/></svg>
@@ -2944,6 +3081,7 @@
     import { createProviderRegistry, RADAR_CAPABILITIES } from './src/providers/registry.js';
     import { createMessageFormatter } from './src/i18n.js';
     import { effectivePreloadWindow, frameWindowIndices, normalizePreloadWindow } from './src/frame-preload.js';
+    import { DEFAULT_COMPARISON_LOCATION, normalizeComparisonLocation, normalizeLocationResults, shortLocationName } from './src/split-view.js';
     import { applyLayerOpacity, normalizeLayerOpacities } from './src/layer-opacity.js';
     import { LOCAL_OVERLAY_LIMITS, parseLocalOverlay } from './src/local-overlay.js';
     import { buildIowa511Query, normalizeIowa511Events } from './src/road-events.js';
@@ -3076,6 +3214,15 @@
 
         // ==================== STATE ====================
         let map, baseLayer, locationMarker;
+        let compareMap = null;
+        let compareBaseLayer = null;
+        let compareRadarLayer = null;
+        let compareAlertLayer = null;
+        let compareRadarSignature = '';
+        let compareSearchTimeout = null;
+        let compareSearchAbortController = null;
+        let compareAlertGeneration = 0;
+        let primaryLocationName = '';
         let rainviewerData = null;
         let frameLayers = [];
         let framesLoaded = 0;
@@ -3154,7 +3301,7 @@
         const layerRequests = new Map();
         const layerRequestGenerations = new Map();
         const MAX_SETTINGS_BYTES = 32768;
-        const SETTINGS_SCHEMA_VERSION = 6;
+        const SETTINGS_SCHEMA_VERSION = 7;
         const SETTINGS_STORAGE_KEY = 'stormview_settings';
         const GEOFENCE_STORAGE_KEY = 'stormview_geofences';
         const MAX_GEOFENCES = 20;
@@ -3269,6 +3416,13 @@
                 stormTopsViewLabel: 'Three-dimensional storm-top view',
                 stormTopsThreatColors: 'Storm-top threat colors',
                 mapAria: 'Interactive weather map. Use arrow keys to pan, plus and minus to zoom, and F for the forecast at map center.',
+                compareMapAria: 'Comparison city weather map',
+                compareSearchPlaceholder: 'Search comparison city…',
+                compareSearchAria: 'Search comparison city',
+                compareResultsAria: 'Comparison city suggestions',
+                splitViewAria: 'Toggle two-city view',
+                closeSplitViewAria: 'Close two-city view',
+                compareSearchEmpty: 'No comparison cities found',
                 searchPlaceholder: 'Search location…',
                 searchAria: 'Search for a US location',
                 searchClearAria: 'Clear location search',
@@ -3412,6 +3566,13 @@
                 stormTopsViewLabel: 'Vista tridimensional de cimas de tormenta',
                 stormTopsThreatColors: 'Colores de amenaza de las cimas',
                 mapAria: 'Mapa meteorológico interactivo. Usa las flechas para desplazar, más y menos para acercar, y F para el pronóstico en el centro.',
+                compareMapAria: 'Mapa meteorológico de la ciudad comparada',
+                compareSearchPlaceholder: 'Buscar ciudad para comparar…',
+                compareSearchAria: 'Buscar ciudad para comparar',
+                compareResultsAria: 'Sugerencias de ciudades para comparar',
+                splitViewAria: 'Alternar vista de dos ciudades',
+                closeSplitViewAria: 'Cerrar vista de dos ciudades',
+                compareSearchEmpty: 'No se encontraron ciudades para comparar',
                 searchPlaceholder: 'Buscar ubicación…',
                 searchAria: 'Buscar una ubicación de Estados Unidos',
                 searchClearAria: 'Borrar búsqueda de ubicación',
@@ -3471,6 +3632,9 @@
         };
         const STATIC_MESSAGE_TRANSLATIONS = {
             'Settings': 'Configuración',
+            'Primary view': 'Vista principal',
+            'Comparison view': 'Vista comparativa',
+            '2-City': '2 ciudades',
             'Display': 'Pantalla',
             'Status': 'Estado',
             'Appearance': 'Apariencia',
@@ -3707,6 +3871,11 @@
             localizeTextTree();
             const localizedAttributes = {
                 map: ['aria-label', 'mapAria'],
+                compareMap: ['aria-label', 'compareMapAria'],
+                compareSearchInput: ['aria-label', 'compareSearchAria'],
+                compareSearchResults: ['aria-label', 'compareResultsAria'],
+                splitViewBtn: ['title', 'splitViewAria'],
+                compareMapClose: ['aria-label', 'closeSplitViewAria'],
                 searchInput: ['aria-label', 'searchAria'],
                 searchClear: ['aria-label', 'searchClearAria'],
                 searchResults: ['aria-label', 'searchResultsAria'],
@@ -3734,6 +3903,8 @@
             });
             const searchInput = document.getElementById('searchInput');
             if (searchInput) searchInput.placeholder = t('searchPlaceholder');
+            const compareSearchInput = document.getElementById('compareSearchInput');
+            if (compareSearchInput) compareSearchInput.placeholder = t('compareSearchPlaceholder');
             if (alertAgeLegendControl && currentAlertFeatures.length) {
                 const referenceTime = replayMode && frames[currentFrame]
                     ? frames[currentFrame].time * 1000
@@ -3760,6 +3931,12 @@
             renderDiagnostics();
             updateOfflineStatus();
             updatePreloadWindowControl();
+            updateSplitViewLabels();
+            const splitViewButton = document.getElementById('splitViewBtn');
+            if (splitViewButton) {
+                splitViewButton.title = t('splitViewAria');
+                splitViewButton.setAttribute('aria-label', t('splitViewAria'));
+            }
         }
 
         function redactedEndpoint(input) {
@@ -3830,6 +4007,12 @@
                         configured: settings.preloadWindow,
                         effective: effectivePreloadWindow(settings.preloadWindow, settings.reducedData),
                         mounted: frameLayers.filter(layer => layer && map.hasLayer(layer)).length
+                    },
+                    splitView: {
+                        active: settings.splitView,
+                        comparison: comparisonLocation().name || 'custom view',
+                        radarLayer: Boolean(compareRadarLayer),
+                        alertFeatures: compareAlertLayer?.getLayers?.().length || 0
                     },
                     tileCache: {
                         ...tileCacheState,
@@ -4259,6 +4442,7 @@
                 ...settings,
                 layers: { ...settings.layers },
                 layerOpacity: { ...settings.layerOpacity },
+                compareLocation: { ...settings.compareLocation },
                 colorScheme: 2
             };
             const enumFields = {
@@ -4276,7 +4460,7 @@
                 if (typeof candidate[key] === 'string' && allowed.includes(candidate[key])) result[key] = candidate[key];
             });
 
-            ['loop', 'autoRefresh', 'showLegend', 'highResMode', 'useLocalTime', 'alertAudioEnabled', 'reducedData'].forEach(key => {
+            ['loop', 'autoRefresh', 'showLegend', 'highResMode', 'useLocalTime', 'alertAudioEnabled', 'reducedData', 'splitView'].forEach(key => {
                 if (typeof candidate[key] === 'boolean') result[key] = candidate[key];
             });
             ['smooth', 'snowColor'].forEach(key => {
@@ -4286,6 +4470,7 @@
             result.opacity = finiteNumber(candidate.opacity, 0.3, 1, result.opacity);
             result.delay = finiteNumber(candidate.delay, 200, 1200, result.delay);
             result.preloadWindow = normalizePreloadWindow(candidate.preloadWindow, result.preloadWindow);
+            result.compareLocation = normalizeComparisonLocation(candidate.compareLocation, result.compareLocation);
             result.stateBorderWidth = finiteNumber(candidate.stateBorderWidth, 0, 8, result.stateBorderWidth);
             result.countyBorderWidth = finiteNumber(candidate.countyBorderWidth, 0, 8, result.countyBorderWidth);
             result.borderOpacity = finiteNumber(candidate.borderOpacity, 0, 1, result.borderOpacity);
@@ -4519,6 +4704,8 @@
             colorScheme: 2,
             delay: 600,
             preloadWindow: 4,
+            splitView: false,
+            compareLocation: { ...DEFAULT_COMPARISON_LOCATION },
             loop: true,
             autoRefresh: true,
             showLegend: true,
@@ -4579,6 +4766,7 @@
             initSidebarDrawer();
             initForecastPanel();
             initQuickToolbar();
+            initSplitView();
             initBookmarks();
             initAccessibility();
             updatePlaybackVisibility();
@@ -4851,6 +5039,205 @@
             });
             saveSettings();
             syncAccessibleControlStates();
+            refreshComparisonBasemap();
+        }
+
+        function comparisonLocation() {
+            return normalizeComparisonLocation(settings.compareLocation, DEFAULT_COMPARISON_LOCATION);
+        }
+
+        function updateSplitViewLabels() {
+            const primary = document.getElementById('primaryMapLabel');
+            const comparison = document.getElementById('compareMapTitle');
+            if (primary) primary.textContent = primaryLocationName || localizedStaticText('Primary view');
+            if (comparison) comparison.textContent = comparisonLocation().name || localizedStaticText('Comparison view');
+            const pane = document.getElementById('compareMapPane');
+            if (pane) pane.dataset.location = comparisonLocation().name || 'custom view';
+        }
+
+        function refreshComparisonBasemap() {
+            if (!compareMap || !settings.splitView) return;
+            if (compareBaseLayer && compareMap.hasLayer(compareBaseLayer)) compareMap.removeLayer(compareBaseLayer);
+            const basemap = BASEMAPS[settings.basemap] || BASEMAPS.dark;
+            compareBaseLayer = L.tileLayer.cached(basemap.url, {
+                attribution: basemap.attribution,
+                subdomains: basemap.subdomains || [],
+                maxZoom: 19,
+                errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+            }).addTo(compareMap);
+            compareBaseLayer.setZIndex(0);
+        }
+
+        function removeComparisonRadarLayer() {
+            if (compareRadarLayer && compareMap?.hasLayer(compareRadarLayer)) compareMap.removeLayer(compareRadarLayer);
+            compareRadarLayer?.off?.();
+            compareRadarLayer = null;
+            compareRadarSignature = '';
+            const container = compareMap?.getContainer?.();
+            if (container) {
+                container.dataset.radarFrame = '';
+                container.dataset.radarSource = '';
+            }
+        }
+
+        function currentRadarLayerSignature(layer) {
+            if (!layer) return '';
+            const bounds = layer.getBounds?.();
+            return JSON.stringify([
+                settings.source,
+                settings.radarProduct,
+                currentFrame,
+                layer._url || '',
+                layer.wmsParams?.time || '',
+                bounds?.isValid?.() ? bounds.toBBoxString() : ''
+            ]);
+        }
+
+        function cloneRadarLayerForComparison(sourceLayer) {
+            const className = `${sourceLayer.options?.className || 'radar-layer'} compare-radar-layer`.trim();
+            const options = {
+                ...sourceLayer.options,
+                opacity: settings.opacity,
+                pane: 'radarPane',
+                className
+            };
+            if (typeof L.TileLayer.WMS === 'function' && sourceLayer instanceof L.TileLayer.WMS) {
+                return L.tileLayer.wms(sourceLayer._url, { ...options, ...sourceLayer.wmsParams });
+            }
+            if (sourceLayer instanceof L.TileLayer) {
+                return L.tileLayer.cached(sourceLayer._url, options);
+            }
+            const bounds = sourceLayer.getBounds?.();
+            if (sourceLayer instanceof L.ImageOverlay && bounds?.isValid?.()) {
+                return L.imageOverlay(sourceLayer._url, bounds, options);
+            }
+            return null;
+        }
+
+        function refreshComparisonRadar() {
+            if (!compareMap || !settings.splitView || !settings.layers.radar) {
+                removeComparisonRadarLayer();
+                return;
+            }
+            const sourceLayer = frameLayers[currentFrame];
+            const signature = currentRadarLayerSignature(sourceLayer);
+            if (!signature) {
+                removeComparisonRadarLayer();
+                return;
+            }
+            if (signature === compareRadarSignature && compareRadarLayer) {
+                compareRadarLayer.setOpacity?.(settings.opacity);
+                return;
+            }
+            removeComparisonRadarLayer();
+            compareRadarLayer = cloneRadarLayerForComparison(sourceLayer);
+            if (!compareRadarLayer) return;
+            compareRadarSignature = signature;
+            compareRadarLayer.addTo(compareMap);
+            compareRadarLayer.setOpacity?.(settings.opacity);
+            compareMap.getContainer().dataset.radarFrame = String(currentFrame);
+            compareMap.getContainer().dataset.radarSource = settings.source;
+        }
+
+        async function refreshComparisonAlerts() {
+            const generation = ++compareAlertGeneration;
+            if (compareAlertLayer && compareMap?.hasLayer(compareAlertLayer)) compareMap.removeLayer(compareAlertLayer);
+            compareAlertLayer?.off?.();
+            compareAlertLayer = null;
+            if (!compareMap || !settings.splitView || !settings.layers.alerts || !currentAlertFeatures.length) return;
+            try {
+                const tools = await alertFillTools();
+                if (generation !== compareAlertGeneration || !settings.splitView) return;
+                const referenceTime = replayMode && frames[currentFrame]
+                    ? frames[currentFrame].time * 1000
+                    : Date.now();
+                compareAlertLayer = L.geoJSON(currentAlertFeatures, {
+                    pane: 'alertPane',
+                    style: feature => alertPolygonPresentation(feature, tools, referenceTime).style,
+                    onEachFeature: (feature, layer) => {
+                        layer.bindTooltip(safeText(feature.properties?.event || feature.properties?.ps || 'Weather alert', 120));
+                    }
+                }).addTo(compareMap);
+            } catch (error) {
+                console.warn('Comparison alerts unavailable:', error);
+            }
+        }
+
+        function disposeComparisonLayers() {
+            removeComparisonRadarLayer();
+            compareAlertGeneration += 1;
+            if (compareAlertLayer && compareMap?.hasLayer(compareAlertLayer)) compareMap.removeLayer(compareAlertLayer);
+            compareAlertLayer?.off?.();
+            compareAlertLayer = null;
+            if (compareBaseLayer && compareMap?.hasLayer(compareBaseLayer)) compareMap.removeLayer(compareBaseLayer);
+            compareBaseLayer = null;
+        }
+
+        function ensureComparisonMap() {
+            if (compareMap) return;
+            const location = comparisonLocation();
+            const initialCenter = location.name
+                ? [location.latitude, location.longitude]
+                : [map.getCenter().lat, map.getCenter().lng];
+            const initialZoom = location.name ? location.zoom : map.getZoom();
+            compareMap = L.map('compareMap', {
+                center: initialCenter,
+                zoom: initialZoom,
+                zoomControl: true,
+                attributionControl: true,
+                preferCanvas: true
+            });
+            compareMap.createPane('radarPane');
+            compareMap.getPane('radarPane').style.zIndex = 250;
+            compareMap.createPane('alertPane');
+            compareMap.getPane('alertPane').style.zIndex = 450;
+            compareMap.on('moveend', () => {
+                if (!settings.splitView) return;
+                const center = compareMap.getCenter();
+                compareMap.getContainer().dataset.latitude = center.lat.toFixed(4);
+                compareMap.getContainer().dataset.longitude = center.lng.toFixed(4);
+                settings.compareLocation = normalizeComparisonLocation({
+                    ...settings.compareLocation,
+                    latitude: center.lat,
+                    longitude: center.lng,
+                    zoom: compareMap.getZoom()
+                });
+                saveSettings();
+            });
+            L.DomEvent.disableClickPropagation(document.querySelector('.compare-map-controls'));
+        }
+
+        function setSplitView(enabled, { persist = true } = {}) {
+            const active = Boolean(enabled);
+            const pane = document.getElementById('compareMapPane');
+            const button = document.getElementById('splitViewBtn');
+            const wasActive = document.body.classList.contains('split-view');
+            settings.splitView = active;
+            document.body.classList.toggle('split-view', active);
+            pane.hidden = !active;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-pressed', String(active));
+            if (active) {
+                if (stormTop3dMode) exitStormTop3d();
+                ensureComparisonMap();
+                refreshComparisonBasemap();
+                refreshComparisonRadar();
+                refreshComparisonAlerts();
+                updateSplitViewLabels();
+                setTimeout(() => {
+                    map.invalidateSize();
+                    compareMap.invalidateSize();
+                    if (!comparisonLocation().name) {
+                        const center = map.getCenter();
+                        compareMap.setView([center.lat, center.lng], map.getZoom(), { animate: false });
+                        document.getElementById('compareSearchInput').focus();
+                    }
+                }, 0);
+            } else {
+                disposeComparisonLayers();
+                if (wasActive) setTimeout(() => map.invalidateSize(), 0);
+            }
+            if (persist) saveSettings();
         }
 
         // ==================== RATE LIMIT HANDLING ====================
@@ -6959,6 +7346,7 @@
 
         function clearAllFrameLayers({ dispose = true } = {}) {
             loadAborted = true;
+            removeComparisonRadarLayer();
             frameLayers.forEach(layer => {
                 if (map.hasLayer(layer)) map.removeLayer(layer);
                 if (dispose) revokeLayerObjectUrl(layer);
@@ -7105,6 +7493,7 @@
             renderNonMapAlerts([]);
             updateAlertCount(0);
             updateMobileAlertBanner([]);
+            refreshComparisonAlerts();
         }
 
         function loadAlertsLayer() {
@@ -7395,6 +7784,7 @@
             currentAlertFeatures = activeWarnings;
             renderNonMapAlerts(activeWarnings);
             updateMobileAlertBanner(settings.layers.alerts ? activeWarnings : []);
+            refreshComparisonAlerts();
             if (!settings.layers.alerts) return;
             layerRefs.alerts = L.geoJSON({ type: 'FeatureCollection', features: activeWarnings }, {
                 pane: 'alertPane',
@@ -7678,6 +8068,7 @@
             currentAlertFeatures = [];
             renderNonMapAlerts([]);
             updateMobileAlertBanner([]);
+            refreshComparisonAlerts();
             const controller = beginLayerRequest('alerts');
             try {
                 const [resp, tools, seriesTools] = await Promise.all([
@@ -7742,6 +8133,7 @@
                 renderNonMapAlerts(features);
                 updateMobileAlertBanner(features);
                 await processAlertAudio(features);
+                refreshComparisonAlerts();
             } catch(e) {
                 if (e?.name === 'AbortError') return;
                 console.error('Alerts error:', e);
@@ -8178,6 +8570,7 @@
         async function enterStormTop3d() {
             const button = document.getElementById('stormTop3dBtn');
             const view = document.getElementById('cesiumView');
+            if (settings.splitView) setSplitView(false);
             button.disabled = true;
             view.hidden = false;
             view.setAttribute('aria-hidden', 'false');
@@ -8755,6 +9148,7 @@
             
             // Update mobile timestamp
             updateMobileTimestamp(timeStr, isForecast, frameKind);
+            refreshComparisonRadar();
         }
         
         function formatProviderAge(frame) {
@@ -10135,6 +10529,7 @@
                 if (radarSystem.mrmsBase) {
                     radarSystem.mrmsBase.setOpacity(settings.opacity);
                 }
+                compareRadarLayer?.setOpacity?.(settings.opacity);
             }, true);
             initSlider('delaySlider', 'delayValue', 'delay', 'ms');
             initSlider('preloadWindowSlider', 'preloadWindowValue', 'preloadWindow', '', () => {
@@ -10451,6 +10846,11 @@
                                 const lat = parseFloat(item.dataset.lat);
                                 const lon = parseFloat(item.dataset.lon);
                                 map.flyTo([lat, lon], 10);
+                                primaryLocationName = shortLocationName(
+                                    `${item.querySelector('.search-item-name')?.textContent || ''}, ${item.querySelector('.search-item-detail')?.textContent || ''}`,
+                                    localizedStaticText('Primary view')
+                                );
+                                updateSplitViewLabels();
                                 setSearchOpen(false);
                                 input.value = '';
                                 clear.classList.remove('show');
@@ -10496,6 +10896,132 @@
                     setSearchOpen(false);
                 }
             });
+        }
+
+        function initComparisonSearch() {
+            const input = document.getElementById('compareSearchInput');
+            const results = document.getElementById('compareSearchResults');
+            let activeResultIndex = -1;
+
+            const setOpen = open => {
+                results.classList.toggle('open', open);
+                input.setAttribute('aria-expanded', String(open));
+                if (!open) {
+                    activeResultIndex = -1;
+                    input.removeAttribute('aria-activedescendant');
+                }
+            };
+            const focusResult = index => {
+                const items = [...results.querySelectorAll('.compare-search-result')];
+                if (!items.length) return;
+                activeResultIndex = (index + items.length) % items.length;
+                items.forEach((item, itemIndex) => item.setAttribute('aria-selected', String(itemIndex === activeResultIndex)));
+                input.setAttribute('aria-activedescendant', items[activeResultIndex].id);
+                items[activeResultIndex].focus();
+            };
+            const chooseResult = result => {
+                const name = shortLocationName(result.displayName);
+                settings.compareLocation = normalizeComparisonLocation({
+                    latitude: result.latitude,
+                    longitude: result.longitude,
+                    zoom: 10,
+                    name
+                });
+                compareMap.flyTo([result.latitude, result.longitude], 10);
+                input.value = '';
+                setOpen(false);
+                updateSplitViewLabels();
+                saveSettings();
+            };
+
+            input.addEventListener('input', () => {
+                const query = input.value.trim();
+                clearTimeout(compareSearchTimeout);
+                compareSearchAbortController?.abort(new DOMException('Comparison search superseded', 'AbortError'));
+                compareSearchAbortController = null;
+                if (query.length < 2) {
+                    setOpen(false);
+                    return;
+                }
+                compareSearchTimeout = setTimeout(async () => {
+                    const controller = new AbortController();
+                    compareSearchAbortController = controller;
+                    try {
+                        const response = await searchNominatim(query, controller.signal);
+                        const payload = await response.json();
+                        if (controller.signal.aborted || input.value.trim() !== query) return;
+                        const locations = normalizeLocationResults(payload);
+                        results.replaceChildren();
+                        if (!locations.length) {
+                            const empty = document.createElement('div');
+                            empty.className = 'compare-search-result';
+                            empty.setAttribute('role', 'option');
+                            empty.setAttribute('aria-disabled', 'true');
+                            empty.textContent = t('compareSearchEmpty');
+                            results.append(empty);
+                        } else {
+                            locations.forEach((location, index) => {
+                                const button = document.createElement('button');
+                                button.type = 'button';
+                                button.className = 'compare-search-result';
+                                button.id = `compare-search-option-${index}`;
+                                button.setAttribute('role', 'option');
+                                button.setAttribute('aria-selected', 'false');
+                                button.textContent = location.displayName;
+                                button.addEventListener('click', () => chooseResult(location));
+                                results.append(button);
+                            });
+                        }
+                        setOpen(true);
+                    } catch (error) {
+                        if (error?.name !== 'AbortError') console.error('Comparison search error:', error);
+                    } finally {
+                        if (compareSearchAbortController === controller) compareSearchAbortController = null;
+                    }
+                }, 300);
+            });
+            input.addEventListener('keydown', event => {
+                const count = results.querySelectorAll('.compare-search-result:not([aria-disabled="true"])').length;
+                if (event.key === 'ArrowDown' && count) {
+                    event.preventDefault();
+                    focusResult(activeResultIndex + 1);
+                } else if (event.key === 'ArrowUp' && count) {
+                    event.preventDefault();
+                    focusResult(activeResultIndex - 1);
+                } else if (event.key === 'Escape') {
+                    setOpen(false);
+                }
+            });
+            results.addEventListener('keydown', event => {
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    focusResult(activeResultIndex + (event.key === 'ArrowDown' ? 1 : -1));
+                } else if (event.key === 'Escape') {
+                    input.focus();
+                    setOpen(false);
+                }
+            });
+            document.addEventListener('click', event => {
+                if (!event.target.closest('.compare-search-wrap')) setOpen(false);
+            });
+        }
+
+        function initSplitView() {
+            document.getElementById('splitViewBtn').addEventListener('click', () => setSplitView(!settings.splitView));
+            document.getElementById('compareMapClose').addEventListener('click', () => setSplitView(false));
+            initComparisonSearch();
+            window.addEventListener('resize', () => {
+                if (!settings.splitView) return;
+                map.invalidateSize();
+                compareMap?.invalidateSize();
+            });
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && settings.splitView && document.activeElement?.closest('#compareMapPane')) {
+                    setSplitView(false);
+                    document.getElementById('splitViewBtn').focus();
+                }
+            });
+            setSplitView(settings.splitView, { persist: false });
         }
 
         function initMobileSheet() {

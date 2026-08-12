@@ -33,6 +33,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Adjustable Opacity** — Fine-tune radar transparency for optimal map visibility
 - **Smart Tile Caching** — Optimized loading with rate limit protection
 - **Offline Last View** — A service worker retains the app shell, recent credential-free radar frames, and NWS alert polygons for an explicitly labeled cached fallback
+- **Two-City Comparison** — Split the map into independently pannable desktop or stacked mobile views that share the active radar frame and warning polygons, with a persistent searchable comparison city
 
 ### Weather Layers
 - **NWS Alerts** — Real-time watches, warnings, and advisories with hazard-colored borders and warning fills that fade by time since issuance
