@@ -7,7 +7,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 ### ⛈️ [**Launch StormView Radar**](https://sysadmindoc.github.io/StormviewRadar/) ⛈️
 
 [![Live Demo](https://img.shields.io/badge/🔴_LIVE-View_Demo-blue?style=for-the-badge&logoColor=white)](https://sysadmindoc.github.io/StormviewRadar/)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/SysAdminDoc/StormviewRadar/releases)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue)](https://github.com/SysAdminDoc/StormviewRadar/releases)
 
 </div>
 
