@@ -1,0 +1,24 @@
+*.bak
+.env
+*.log
+CLAUDE.md
+
+# Markdown files local-only (except README)
+*.md
+!README.md
+!vendor/cesium/LICENSE.md
+
+# AI config
+CODEX_CHANGELOG.md
+AGENTS.md
+.claude/
+.codex/
+.ai/
+PROJECT_CONTEXT.md
+CONTINUATION_PROMPT.md
+
+# Local test artifacts
+node_modules/
+test-results/
+playwright-report/
+deployment.json
