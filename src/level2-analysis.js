@@ -129,8 +129,9 @@ export function detectVelocityCoupletsFromSweep(records) {
 // which cuts exist changes between volumes and between products.
 export function chooseSweepIndex(candidates, requestedElevation) {
   if (!Array.isArray(candidates) || !candidates.length) return -1;
-  const requested = Number(requestedElevation);
-  if (!Number.isInteger(requested)) return 0;
-  const index = candidates.findIndex(candidate => Number(candidate?.elevation) === requested);
+  // Number(null) is 0 and Number.isInteger(0) is true, so coercing first lets
+  // "no request" match a real elevation 0 cut. Only an actual integer counts.
+  if (typeof requestedElevation !== 'number' || !Number.isInteger(requestedElevation)) return 0;
+  const index = candidates.findIndex(candidate => Number(candidate?.elevation) === requestedElevation);
   return index === -1 ? 0 : index;
 }

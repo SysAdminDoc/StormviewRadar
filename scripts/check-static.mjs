@@ -84,24 +84,42 @@ function unguardedText(argument) {
   return result.replace(/\.\s*[A-Za-z_$][\w$]*/g, '');
 }
 
+
+function callIndexOf(source, method, line) {
+  const lines = source.split('\n');
+  const offset = lines.slice(0, line - 1).join('\n').length + (line > 1 ? 1 : 0);
+  const at = source.indexOf(method + '(', offset);
+  return at === -1 ? offset : at;
+}
 const boundaries = leafletContentArguments(app);
-if (!boundaries.length) throw new Error('No Leaflet content boundaries found; the escaping gate is not running');
+// A dropped or truncated boundary would make this gate quietly stop working,
+// so the count is asserted rather than merely reported.
+const EXPECTED_BOUNDARIES = 25;
+if (boundaries.length !== EXPECTED_BOUNDARIES) {
+  throw new Error(`Expected ${EXPECTED_BOUNDARIES} Leaflet content boundaries, found ${boundaries.length}. Update EXPECTED_BOUNDARIES deliberately when adding or removing one.`);
+}
 
 const unescapedBindings = [];
 for (const { method, line, argument, before } of boundaries) {
-  if (/\bsafeText\s*\(/.test(argument)) {
-    unescapedBindings.push(`${method} at src/app.js:${line} passes safeText output straight to Leaflet`);
+  const report = reason => unescapedBindings.push(`${method} at src/app.js:${line} ${reason}`);
+
+  // The argument scanner tracks quotes and parentheses but not comments,
+  // regex literals or nested template literals, so a stray ")" can end it
+  // early and hide what follows. This coarse window cannot be steered that
+  // way: anything within reach of the call is inspected regardless of shape.
+  const window = app.slice(callIndexOf(app, method, line), callIndexOf(app, method, line) + 600);
+  if (/\bsafeText\s*\(/.test(window)) {
+    report('has safeText within reach of the call');
     continue;
   }
-  // The same defect one step removed: a variable built by safeText.
+
   for (const identifier of new Set(unguardedText(argument).match(/[A-Za-z_$][\w$]*/g) || [])) {
-    if (new RegExp(`\\b(?:const|let|var)\\s+${identifier}\\s*=\\s*safeText\\s*\\(`).test(before)) {
-      unescapedBindings.push(`${method} at src/app.js:${line} passes ${identifier}, which safeText produced`);
-    }
+    // Match any binding form, including destructuring and later assignment.
+    const assigned = new RegExp(`(?:\\b(?:const|let|var)\\s+[^;\\n]*\\b${identifier}\\b[^;\\n]*|\\b${identifier}\\s*)=\\s*[^;\\n]{0,120}?safeText\\s*\\(`);
+    if (assigned.test(before)) report(`passes ${identifier}, which safeText produced`);
   }
 }
 if (unescapedBindings.length) {
   throw new Error('Unescaped Leaflet content:\n  ' + unescapedBindings.join('\n  '));
 }
-
 console.log(`Static checks passed (no inline script, ${boundaries.length} Leaflet content boundaries).`);

@@ -550,12 +550,30 @@ test('the tilt picker lists the volume elevations and renders the chosen cut', a
   await expect(page.locator('#fiFrame')).toContainText('2.4°');
   await expect(tilt).toHaveValue('5');
 
+  // The mobile sheet is a cloneNode copy of the sidebar. A data-* marker
+  // survives cloning but the listener does not, so the sheet copy has to be
+  // driven directly; below 768px the sidebar is hidden and this is the only
+  // control the user can reach.
+  const sheetTilt = page.locator('#bottomSheet .level2-tilt-select');
+  await expect(sheetTilt).toHaveCount(1);
+  // The sheet is closed at this viewport, so the value is set directly and a
+  // real change event dispatched: the point is whether a listener is attached.
+  await sheetTilt.evaluate(select => {
+    select.value = '3';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect.poll(() => page.evaluate(() => window.__level2Renders.at(-1))).toBe(3);
+  await expect(page.locator('#fiFrame')).toContainText('1.5°');
+  // Both copies stay in step so the two controls cannot disagree.
+  await expect(tilt).toHaveValue('3');
+
   // The choice persists across a reload and is asked for on the next render.
+  // 3 is the last committed choice, made through the sheet copy above.
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('stormview_settings')).settings.level2Tilt);
-  expect(stored).toBe(5);
+  expect(stored).toBe(3);
   await page.reload();
-  await expect.poll(() => page.evaluate(() => window.__level2Renders.at(-1))).toBe(5);
-  await expect(page.locator('.level2-tilt-select').first()).toHaveValue('5');
+  await expect.poll(() => page.evaluate(() => window.__level2Renders.at(-1))).toBe(3);
+  await expect(page.locator('.level2-tilt-select').first()).toHaveValue('3');
 });
 
 test('an embedded tilt renders that cut without touching stored settings', async ({ page }) => {

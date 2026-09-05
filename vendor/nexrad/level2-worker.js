@@ -3938,9 +3938,8 @@
   }
   function chooseSweepIndex(candidates, requestedElevation) {
     if (!Array.isArray(candidates) || !candidates.length) return -1;
-    const requested = Number(requestedElevation);
-    if (!Number.isInteger(requested)) return 0;
-    const index = candidates.findIndex((candidate) => Number(candidate?.elevation) === requested);
+    if (typeof requestedElevation !== "number" || !Number.isInteger(requestedElevation)) return 0;
+    const index = candidates.findIndex((candidate) => Number(candidate?.elevation) === requestedElevation);
     return index === -1 ? 0 : index;
   }
 

@@ -4,6 +4,9 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Fixed the radar site and tilt pickers in the mobile sheet, which did nothing when used. The sheet is a copy of the sidebar, and the copy carried the marker that says "already wired" without carrying the listener, so on a phone, where the sidebar is hidden, neither control worked.
+- Choosing a tilt that the next scan does not carry now says so and moves the picker to the cut that actually rendered, instead of leaving the control blank and the stored choice disagreeing with the screen.
+- The Status tab now names the product alongside the Level II cut count, because a split-cut scan carries more reflectivity cuts than velocity cuts, and it clears that reading when a decode fails rather than showing the previous volume as current.
 - The content security policy no longer allows inline script. The application moved out of a 10,300-line inline block in index.html into src/app.js, so `script-src` is now `'self'` and an injected inline script is refused by the browser rather than executed.
 - The "volume decoded with missing radials" warning no longer fires on every Level II render. It was triggered by a decoder flag that is set for any volume containing a message 31, which is every modern volume, so the warning carried no information and trained itself away. It now appears only when the volume was genuinely truncated.
 - The Status tab reports Level II decode integrity: the site, how many sweeps came back, and whether the volume was truncated.

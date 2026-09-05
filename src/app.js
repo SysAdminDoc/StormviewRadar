@@ -227,6 +227,9 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
         let level2SiteHealth = new Map();
         let level2Tilts = [];
         let level2Integrity = null;
+        // The mobile sheet is built with cloneNode, which copies a data-* marker
+        // but not the listener, so wiring has to be tracked per element object.
+        const wiredSelects = new WeakSet();
         let level2Couplets = [];
         let meshWorker = null;
         let meshWorkerSequence = 0;
@@ -1376,7 +1379,7 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             const integrityElement = document.getElementById('diagLevel2Integrity');
             integrityElement.dataset.state = integrity ? (integrity.truncated ? 'truncated' : 'complete') : 'unused';
             integrityElement.textContent = integrity
-                ? `${integrity.site}: ${integrity.sweeps} sweep(s), ${integrity.truncated ? 'volume truncated during decode' : 'volume complete'}`
+                ? `${integrity.site}: ${integrity.productCuts} ${integrity.product} cut(s), ${integrity.truncated ? 'volume truncated during decode' : 'volume complete'}`
                 : t('diagnosticLevel2Unused');
 
             const requestList = document.getElementById('diagRequests');
@@ -3908,8 +3911,8 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
                     select.add(option);
                 });
                 select.value = previousValue;
-                if (select.dataset.wired === 'true') return;
-                select.dataset.wired = 'true';
+                if (wiredSelects.has(select)) return;
+                wiredSelects.add(select);
                 select.addEventListener('change', () => {
                     settings.level2Site = select.value;
                     document.querySelectorAll('.level2-site-select').forEach(other => {
@@ -3933,8 +3936,8 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
                     select.add(new Option(`${tilt.angle.toFixed(1)}°`, String(tilt.elevation)));
                 });
                 select.value = activeElevation === null || activeElevation === undefined ? '' : String(activeElevation);
-                if (select.dataset.wired === 'true') return;
-                select.dataset.wired = 'true';
+                if (wiredSelects.has(select)) return;
+                wiredSelects.add(select);
                 select.addEventListener('change', () => {
                     const value = select.value;
                     settings.level2Tilt = value === '' ? null : Number(value);
@@ -4127,6 +4130,9 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
         async function loadLevel2(signal, generation) {
             showLoadProgress();
             updateLoadProgress(5);
+            // Cleared up front so a failed decode cannot leave the Status tab
+            // reporting the previous volume as if it were current.
+            level2Integrity = null;
             await loadLevel2Sites(signal);
             ensureCurrentRadarLoad(generation, signal);
             const site = selectedLevel2Site();
@@ -4186,9 +4192,23 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             level2Tilts = Array.isArray(rendered.tilts) ? rendered.tilts : [];
             level2Integrity = {
                 site: rendered.site,
+                product: settings.radarProduct,
                 truncated: rendered.isTruncated === true,
-                sweeps: level2Tilts.length
+                // Cuts carrying THIS product, not the volume total: split-cut VCPs
+                // give reflectivity more cuts than velocity from one scan.
+                productCuts: level2Tilts.length
             };
+            // Products do not all carry the same cuts, so a stored elevation can
+            // be absent from this volume. Adopt what actually rendered rather than
+            // leaving the setting pointing at a cut the picker cannot show.
+            if (Number.isInteger(rendered.elevation) && settings.level2Tilt !== rendered.elevation) {
+                const requested = settings.level2Tilt;
+                settings.level2Tilt = rendered.elevation;
+                if (!embedConfig) saveSettings();
+                if (Number.isInteger(requested)) {
+                    showDataStatus(`${rendered.site}: tilt unavailable in this scan, showing ${rendered.elevationAngle.toFixed(1)}°`);
+                }
+            }
             syncLevel2TiltControls(rendered.elevation);
             level2Couplets = Array.isArray(rendered.couplets) ? rendered.couplets : [];
             renderLevel2Couplets();
@@ -4219,7 +4239,7 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             updateCoverageStatus();
             if (!map.getBounds().intersects(bounds)) map.fitBounds(bounds, { maxZoom: 7 });
             if (rendered.isTruncated) {
-                showToast(`${rendered.site} volume decoded with missing radials`, 'warn', 5000);
+                showToast(`${rendered.site} volume truncated during decode`, 'warn', 5000);
             }
             hideLoadProgress();
         }
