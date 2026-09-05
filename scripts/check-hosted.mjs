@@ -18,15 +18,15 @@ if (deployed?.commit !== expectedCommit) {
   throw new Error(`Hosted commit mismatch: expected ${expectedCommit}, received ${deployed?.commit || 'none'}`);
 }
 
-const [packageResponse, indexResponse] = await Promise.all([
+const [packageResponse, appResponse] = await Promise.all([
   fetch(new URL(`package.json?${cacheBust}`, baseUrl), { cache: 'no-store' }),
-  fetch(new URL(`index.html?${cacheBust}`, baseUrl), { cache: 'no-store' })
+  fetch(new URL(`src/app.js?${cacheBust}`, baseUrl), { cache: 'no-store' })
 ]);
-if (!packageResponse.ok || !indexResponse.ok) {
-  throw new Error(`Hosted manifests unavailable: package ${packageResponse.status}, index ${indexResponse.status}`);
+if (!packageResponse.ok || !appResponse.ok) {
+  throw new Error(`Hosted manifests unavailable: package ${packageResponse.status}, app ${appResponse.status}`);
 }
 const packageManifest = JSON.parse(await packageResponse.text());
-const indexHtml = await indexResponse.text();
+const appSource = await appResponse.text();
 if (deployed.version !== packageManifest.version) {
   throw new Error(`Hosted version mismatch: deployment ${deployed.version}, package ${packageManifest.version}`);
 }
@@ -60,8 +60,16 @@ const requiredAssets = [
   ['vendor/cesium/Workers/createGeometry.js', 'javascript'],
   ['vendor/cesium/Assets/Textures/NaturalEarthII/0/0/0.jpg', 'image/jpeg']
 ];
-const dynamicImports = [...indexHtml.matchAll(/import\(['"]\.\/([^'"]+)['"]\)/g)]
-  .map(match => match[1]);
+// The lazily imported modules are named inside src/app.js, and their
+// specifiers are relative to it, so they live under src/. This used to scan
+// index.html, which held the application until it moved out into a module;
+// after the move the scan matched nothing and silently verified no lazy
+// module at all, so an empty result is now a failure rather than a pass.
+const dynamicImports = [...appSource.matchAll(/import\(['"]\.\/([^'"]+\.js)['"]\)/g)]
+  .map(match => `src/${match[1]}`);
+if (!dynamicImports.length) {
+  throw new Error('No lazy module imports found in hosted src/app.js; the scan has lost its target');
+}
 for (const path of dynamicImports) requiredAssets.push([path, 'javascript']);
 
 const uniqueAssets = new Map(requiredAssets.map(asset => [asset[0], asset[1]]));
@@ -73,4 +81,4 @@ for (const [path, expectedType] of uniqueAssets) {
   }
 }
 
-console.log(`Hosted commit ${expectedCommit.slice(0, 12)} and ${uniqueAssets.size} runtime assets verified at ${baseUrl}`);
+console.log(`Hosted commit ${expectedCommit.slice(0, 12)} and ${uniqueAssets.size} runtime assets, including ${dynamicImports.length} lazy modules, verified at ${baseUrl}`);
