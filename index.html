@@ -1274,16 +1274,21 @@
             position: absolute; right: 12px; top: 50%;
             transform: translateY(-50%);
             padding: 10px; z-index: 900;
+            /* A row lets the panel size to its labels. Absolutely positioning
+               them against a shrink-to-fit parent left them 18px wide, so
+               "75+ dBZ" wrapped one character per line. */
+            display: flex; flex-direction: row-reverse;
+            align-items: center; gap: 8px;
         }
         .legend-gradient {
             width: 12px; height: 140px; border-radius: 3px;
+            flex-shrink: 0;
             background: linear-gradient(to bottom,
                 #ff00ff 0%, #ff0000 15%, #ff6600 25%, #ffc800 35%,
                 #ffff00 45%, #7fff00 55%, #00c800 65%, #00b4ff 75%, #0064ff 85%, #000096 100%
             );
         }
         .legend-labels {
-            position: absolute; right: 28px; top: 10px;
             height: 140px; display: flex; flex-direction: column;
             justify-content: space-between;
             font-size: 10px; color: var(--text-muted);
@@ -12516,7 +12521,8 @@
             legendToggle.classList.toggle('on', settings.showLegend);
             legendToggle.addEventListener('click', () => {
                 settings.showLegend = legendToggle.classList.toggle('on');
-                document.getElementById('legend').style.display = settings.showLegend ? 'block' : 'none';
+                // Empty string drops the inline declaration so the stylesheet's flex layout applies.
+                document.getElementById('legend').style.display = settings.showLegend ? '' : 'none';
                 saveSettings();
             });
 
@@ -12534,7 +12540,8 @@
                 saveSettings();
                 loadRadarData();
             });
-            document.getElementById('legend').style.display = settings.showLegend ? 'block' : 'none';
+            // Empty string drops the inline declaration so the stylesheet's flex layout applies.
+                document.getElementById('legend').style.display = settings.showLegend ? '' : 'none';
 
             const languageSelect = document.getElementById('languageSelect');
             languageSelect.value = settings.language;
