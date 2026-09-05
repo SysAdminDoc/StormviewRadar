@@ -210,7 +210,8 @@ makes no third-party CDN request at runtime.
 The Cesium engine is tree-shaken into a lazy, CSP-safe bundle and uses its local
 Natural Earth imagery. Level II bzip decoding and polar image rendering run off
 the main thread. A Content Security Policy blocks unapproved executable, style,
-and network origins. Development and release checks require Node.js 22 or newer:
+and network origins, and refuses inline script outright because the application
+is served as an external module. Development and release checks require Node.js 22 or newer:
 
 ```bash
 npm ci
@@ -288,7 +289,7 @@ Access the settings panel (⚙️) to customize:
 
 ```
 StormviewRadar/
-├── index.html          # Single-file application
+├── index.html          # Application shell and markup
 ├── package.json        # Locked test and vendored-runtime dependencies
 ├── scripts/            # Builds, release automation, and static/hosted checks
 ├── src/                # Provider registry, analysis modules, workers, and browser shims

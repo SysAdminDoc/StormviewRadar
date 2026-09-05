@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- The content security policy no longer allows inline script. The application moved out of a 10,300-line inline block in index.html into src/app.js, so `script-src` is now `'self'` and an injected inline script is refused by the browser rather than executed.
 - The "volume decoded with missing radials" warning no longer fires on every Level II render. It was triggered by a decoder flag that is set for any volume containing a message 31, which is every modern volume, so the warning carried no information and trained itself away. It now appears only when the volume was genuinely truncated.
 - The Status tab reports Level II decode integrity: the site, how many sweeps came back, and whether the volume was truncated.
 - Map tooltips now escape the text they are given. Leaflet renders tooltip content as HTML and has no fix for CVE-2025-69993, and four tooltips passed alert names, storm cell identifiers, and saved geofence names through without escaping them. The release gate now refuses any Leaflet popup or tooltip fed by the truncate-only helper.

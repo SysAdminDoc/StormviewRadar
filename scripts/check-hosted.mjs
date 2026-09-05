@@ -35,6 +35,7 @@ const requiredAssets = [
   ['index.html', 'text/html'],
   ['service-worker.js', 'javascript'],
   ['manifest.webmanifest', 'application/manifest+json'],
+  ['src/app.js', 'javascript'],
   ['src/frame-preload.js', 'javascript'],
   ['src/picture-in-picture.js', 'javascript'],
   ['src/split-view.js', 'javascript'],

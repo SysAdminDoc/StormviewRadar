@@ -2,18 +2,22 @@ import { readFile } from 'node:fs/promises';
 import { transform } from 'esbuild';
 
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-const inlineScripts = [...html.matchAll(/<script(?<attributes>\s[^>]*)?>(?<source>[\s\S]*?)<\/script>/gi)]
-  .map(match => ({
-    module: /\btype\s*=\s*["']module["']/i.test(match.groups.attributes || ''),
-    source: match.groups.source
-  }))
-  .filter(script => script.source.trim());
+const app = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
 
-if (!inlineScripts.length) throw new Error('No inline application script found');
-for (const script of inlineScripts) {
-  if (script.module) await transform(script.source, { loader: 'js', format: 'esm' });
-  else new Function(script.source);
+// The application module is external so the policy can refuse inline script
+// entirely. An inline script reappearing would silently require unsafe-inline.
+const inlineScripts = [...html.matchAll(/<script(?<attributes>\s[^>]*)?>(?<source>[\s\S]*?)<\/script>/gi)]
+  .filter(match => match.groups.source.trim());
+if (inlineScripts.length) {
+  throw new Error(`index.html must contain no inline script; found ${inlineScripts.length}`);
 }
+if (!/<script[^>]+type=["']module["'][^>]+src=["']src\/app\.js["']/.test(html)) {
+  throw new Error('index.html does not load src/app.js as a module');
+}
+if (!/script-src 'self'(?![\w-])/.test(html) || /script-src[^;]*unsafe-inline/.test(html)) {
+  throw new Error("Content Security Policy must keep script-src at 'self' with no unsafe-inline");
+}
+await transform(app, { loader: 'js', format: 'esm' });
 
 const checks = [
   [/<script(?:\s|>)/gi, /<\/script>/gi, 'script'],
@@ -27,9 +31,9 @@ for (const [openPattern, closePattern, label] of checks) {
 
 // Leaflet renders bindPopup and bindTooltip string content as HTML, and
 // CVE-2025-69993 has no upstream fix. safeText only truncates and strips
-// control characters; it sits one line above escapeHTML in index.html and reads
-// as though it sanitises. That resemblance is how three tooltips shipped
-// unescaped, so no Leaflet content boundary may receive its output.
+// control characters; it sits one line above escapeHTML in the application
+// module and reads as though it sanitises. That resemblance is how three
+// tooltips shipped unescaped, so no Leaflet content boundary may receive it.
 function leafletContentArguments(source) {
   const found = [];
   for (const method of ['bindPopup', 'bindTooltip']) {
@@ -80,16 +84,19 @@ function unguardedText(argument) {
   return result.replace(/\.\s*[A-Za-z_$][\w$]*/g, '');
 }
 
+const boundaries = leafletContentArguments(app);
+if (!boundaries.length) throw new Error('No Leaflet content boundaries found; the escaping gate is not running');
+
 const unescapedBindings = [];
-for (const { method, line, argument, before } of leafletContentArguments(html)) {
+for (const { method, line, argument, before } of boundaries) {
   if (/\bsafeText\s*\(/.test(argument)) {
-    unescapedBindings.push(`${method} at line ${line} passes safeText output straight to Leaflet`);
+    unescapedBindings.push(`${method} at src/app.js:${line} passes safeText output straight to Leaflet`);
     continue;
   }
   // The same defect one step removed: a variable built by safeText.
   for (const identifier of new Set(unguardedText(argument).match(/[A-Za-z_$][\w$]*/g) || [])) {
     if (new RegExp(`\\b(?:const|let|var)\\s+${identifier}\\s*=\\s*safeText\\s*\\(`).test(before)) {
-      unescapedBindings.push(`${method} at line ${line} passes ${identifier}, which safeText produced`);
+      unescapedBindings.push(`${method} at src/app.js:${line} passes ${identifier}, which safeText produced`);
     }
   }
 }
@@ -97,4 +104,4 @@ if (unescapedBindings.length) {
   throw new Error('Unescaped Leaflet content:\n  ' + unescapedBindings.join('\n  '));
 }
 
-console.log(`Static checks passed (${inlineScripts.length} inline script, ${leafletContentArguments(html).length} Leaflet content boundaries).`);
+console.log(`Static checks passed (no inline script, ${boundaries.length} Leaflet content boundaries).`);

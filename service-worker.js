@@ -23,6 +23,7 @@ const SHELL_PATHS = [
   './vendor/leaflet/leaflet.js',
   './vendor/topojson/topojson-client.min.js',
   './vendor/cesium/Widgets/widgets.css',
+  './src/app.js',
   './src/providers/registry.js',
   './src/i18n.js',
   './src/frame-preload.js',

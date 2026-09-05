@@ -31,7 +31,9 @@ test('message formatter rejects incomplete catalogs and unknown keys', () => {
 });
 
 test('supported render paths only call catalogued message keys', () => {
-  const source = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  // The application module moved out of index.html so the policy could
+  // refuse inline script; the message catalog moved with it.
+  const source = fs.readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   const englishCatalog = source
     .match(/const MESSAGE_CATALOG = \{\s*en: \{([\s\S]*?)\n\s*\},\s*\n\s*es: \{/u)?.[1];
   assert.ok(englishCatalog, 'English message catalog is readable');
