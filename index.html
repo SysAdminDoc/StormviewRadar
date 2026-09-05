@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#1e1e2e">
     <meta charset="UTF-8">
     <meta name="application-version" content="0.2.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://api.open-meteo.com https://api.openweathermap.org https://api.rainviewer.com https://api.weather.gov https://cdn.jsdelivr.net https://geo.weather.gc.ca https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://services.arcgis.com https://tile.openweathermap.org https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://geo.weather.gc.ca https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://api.open-meteo.com https://api.openweathermap.org https://api.rainviewer.com https://api.weather.gov https://geo.weather.gc.ca https://mapservices.weather.noaa.gov https://mesonet.agron.iastate.edu https://noaa-mrms-pds.s3.amazonaws.com https://nominatim.openstreetmap.org https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://services.arcgis.com https://tile.openweathermap.org https://unidata-nexrad-level2.s3.amazonaws.com https://waterservices.usgs.gov https://www.spc.noaa.gov; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.rainviewer.com https://*.tile.opentopomap.org https://geo.weather.gc.ca https://mesonet.agron.iastate.edu https://nowcoast.noaa.gov https://satellitemaps.nesdis.noaa.gov https://server.arcgisonline.com https://tile.openweathermap.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self' blob:">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StormView Radar 0.2.0</title>
     <link rel="manifest" href="manifest.webmanifest">
@@ -3775,8 +3775,8 @@
 
         const DATA_URLS = {
             // Boundaries
-            states: 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
-            counties: 'https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json',
+            states: 'vendor/us-atlas/states-10m.json',
+            counties: 'vendor/us-atlas/counties-10m.json',
             
             // NWS Alerts
             nwsAlerts: 'https://api.weather.gov/alerts/active?status=actual',

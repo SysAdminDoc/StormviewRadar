@@ -12,7 +12,10 @@ const pairs = [
   ['vendor/nexrad/LICENSE-buffer.txt', 'node_modules/buffer/LICENSE'],
   ['vendor/nexrad/LICENSE-base64-js.txt', 'node_modules/base64-js/LICENSE'],
   ['vendor/nexrad/LICENSE-ieee754.txt', 'node_modules/ieee754/LICENSE'],
-  ['vendor/cesium/LICENSE.md', 'node_modules/cesium/LICENSE.md']
+  ['vendor/cesium/LICENSE.md', 'node_modules/cesium/LICENSE.md'],
+  ['vendor/us-atlas/states-10m.json', 'node_modules/us-atlas/states-10m.json'],
+  ['vendor/us-atlas/counties-10m.json', 'node_modules/us-atlas/counties-10m.json'],
+  ['vendor/us-atlas/LICENSE.txt', 'node_modules/us-atlas/LICENSE']
 ];
 
 const directoryPairs = [
@@ -73,7 +76,7 @@ const [manifest, html, cesiumEngine] = await Promise.all([
   readFile(new URL('../index.html', import.meta.url), 'utf8'),
   readFile(new URL('../vendor/cesium/engine.js', import.meta.url), 'utf8')
 ]);
-for (const dependency of ['buffer', 'cesium', 'leaflet', 'nexrad-level-2-data', 'topojson-client']) {
+for (const dependency of ['buffer', 'cesium', 'leaflet', 'nexrad-level-2-data', 'topojson-client', 'us-atlas']) {
   if (!/^\d+\.\d+\.\d+$/.test(manifest.dependencies?.[dependency] || '')) {
     throw new Error(`${dependency} must use an exact version in package.json`);
   }

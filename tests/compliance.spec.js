@@ -97,6 +97,44 @@ test('runtime assets are local and CSP blocks an unapproved connection origin', 
   expect(unapprovedRequestSucceeded).toBe(false);
 });
 
+test('boundaries load from the repository and no third-party CDN is reachable', async ({ page }) => {
+  const hosts = new Set();
+  page.on('request', request => hosts.add(new URL(request.url()).host));
+
+  // The shared fixture disables boundaries; this test is about them.
+  await page.addInitScript(() => {
+    const stored = JSON.parse(localStorage.getItem('stormview_pro_v3') || '{}');
+    stored.layers = { ...stored.layers, states: true, counties: true };
+    localStorage.setItem('stormview_pro_v3', JSON.stringify(stored));
+  });
+
+  await page.goto('/');
+  await expect.poll(() => page.evaluate(() => performance
+    .getEntriesByType('resource')
+    .filter(entry => entry.name.includes('us-atlas'))
+    .length)).toBe(2);
+
+  const topologies = await page.evaluate(() => performance
+    .getEntriesByType('resource')
+    .filter(entry => entry.name.includes('us-atlas'))
+    .map(entry => new URL(entry.name).host));
+  const origin = new URL(page.url()).host;
+  expect(topologies).toEqual([origin, origin]);
+
+  // The boundary layer uses a canvas renderer, so proving it drew means
+  // sampling pixels rather than counting SVG paths.
+  await expect.poll(() => page.evaluate(() => {
+    const canvas = document.querySelector('.leaflet-boundary-pane canvas');
+    if (!canvas || !canvas.width) return 0;
+    const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    let painted = 0;
+    for (let index = 3; index < data.length; index += 4) if (data[index] > 0) painted += 1;
+    return painted;
+  }), { timeout: 20000 }).toBeGreaterThan(1000);
+
+  expect([...hosts].filter(host => host.includes('jsdelivr'))).toEqual([]);
+});
+
 test('official SPC discussions render without a false PIREP product', async ({ page }) => {
   await page.route('https://www.spc.noaa.gov/products/spcmdrss.xml', route => route.fulfill({
     contentType: 'application/rss+xml',
