@@ -189,8 +189,10 @@ Location searches use the public [Nominatim](https://nominatim.openstreetmap.org
 - Current stable Safari on macOS and iOS
 - Current stable Chrome on Android
 
-Automated release coverage runs the full suite in current Chromium plus a
-startup, radar, keyboard, and ARIA smoke in current Firefox and WebKit.
+The release gate runs the full suite in current Chromium, plus a startup,
+radar, keyboard, and ARIA smoke in current WebKit. The same smoke runs in
+Firefox on Linux, and is skipped on a Windows host because Firefox teardown
+is unstable there.
 
 ## Technology Stack
 
@@ -220,10 +222,21 @@ npm run release:check
 ```
 
 The static checks compare vendored files with the lockfile-installed packages.
-Dependabot checks npm dependencies weekly. GitHub Pages deployment runs only
-after the complete browser suite and advisory check pass for `main`; the deploy
-then verifies the hosted commit, version, social image, lazy modules, worker
-scripts, and representative Cesium runtime asset types.
+Dependency updates are reviewed by hand, so there are no automated dependency
+pull requests. The only workflow in the repository runs the test suite and an
+advisory check. It does not deploy.
+
+Deployment is done from a local clean `main` after `npm run release:check`
+passes. `scripts/create-deployment-manifest.mjs` writes a `deployment.json`
+naming the commit and version, that file and an empty `.nojekyll` are committed
+onto the `gh-pages` branch that Pages serves, and
+`node scripts/check-hosted.mjs <pages-url> <full-commit-sha>` then reads the
+live site back. It refuses to pass unless the hosted `deployment.json` names
+the commit that was pushed, the hosted version matches `package.json`, and
+every required asset answers with the right content type. That list covers the
+page, the service worker, the manifest, the application modules and their lazy
+imports, the Level II and MESH workers, the app icon, the vendored libraries,
+and a sample of the Cesium runtime assets down to one imagery tile.
 
 StormView has no application server, account system, or telemetry endpoint.
 The static browser client requests map/weather data directly from the providers
