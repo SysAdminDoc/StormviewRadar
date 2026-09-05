@@ -44,3 +44,28 @@ export function shortLocationName(displayName, fallback = 'Comparison view') {
   const parts = boundedName(displayName).split(',').map(part => part.trim()).filter(Boolean);
   return parts.slice(0, 2).join(', ') || fallback;
 }
+
+// Products the comparison pane can show on its own. Only MRMS publishes more
+// than one tiled product, so it is the only source where a second pane can
+// carry something different from the primary.
+export const COMPARISON_PRODUCTS = Object.freeze(['reflectivity', 'velocity', 'echoTops', 'precipAccum']);
+
+const MRMS_PRODUCT_TILE_KEYS = Object.freeze({
+  reflectivity: 'n0q',
+  velocity: 'n0v',
+  echoTops: 'net',
+  precipAccum: 'n1p'
+});
+
+export function mrmsProductTileKey(product) {
+  return MRMS_PRODUCT_TILE_KEYS[product] || MRMS_PRODUCT_TILE_KEYS.reflectivity;
+}
+
+// An empty string means "mirror the primary pane", which is the behaviour the
+// two-city view has always had. Anything unrecognised falls back to that
+// rather than silently showing reflectivity as though it were a choice.
+export function normalizeComparisonProduct(value, primaryProduct = '') {
+  if (typeof value !== 'string') return '';
+  if (!COMPARISON_PRODUCTS.includes(value)) return '';
+  return value === primaryProduct ? '' : value;
+}

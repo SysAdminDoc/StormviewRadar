@@ -219,6 +219,13 @@
             gap: 8px;
             padding: 8px;
         }
+        .compare-product-select {
+            flex: 0 0 auto;
+            max-width: 150px;
+            padding: 6px 8px;
+            font-size: 11px;
+        }
+        .compare-product-select[hidden] { display: none; }
         .compare-map-title {
             flex: 0 1 auto;
             max-width: 34%;
@@ -289,6 +296,10 @@
                 display: grid;
                 grid-template-columns: minmax(72px, 0.55fr) minmax(140px, 1.45fr) 32px;
             }
+            .compare-map-title { grid-area: 1 / 1; }
+            .compare-search-wrap { grid-area: 1 / 2; }
+            .compare-map-close { grid-area: 1 / 3; }
+            .compare-product-select { grid-area: 2 / 1 / 2 / 4; max-width: none; }
             .compare-map-title { max-width: none; }
             body.split-view .legend {
                 top: auto;
@@ -2686,6 +2697,7 @@
                 <input class="compare-search-input" id="compareSearchInput" type="search" placeholder="Search comparison city…" aria-label="Search comparison city" role="combobox" aria-autocomplete="list" aria-controls="compareSearchResults" aria-expanded="false">
                 <div class="compare-search-results" id="compareSearchResults" role="listbox" aria-label="Comparison city suggestions"></div>
             </div>
+            <select class="compare-product-select" id="compareProductSelect" aria-label="Comparison pane radar product" hidden></select>
             <button class="compare-map-close" id="compareMapClose" type="button" aria-label="Close two-city view">×</button>
         </div>
     </section>

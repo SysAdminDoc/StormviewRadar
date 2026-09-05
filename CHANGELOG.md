@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- The comparison pane can now carry a second MRMS product instead of a second city, so velocity can sit beside reflectivity over the same ground. Choosing a product locks both panes to the primary view, and the choice is remembered. IEM only archives the reflectivity composite, so scrubbing into the past mirrors the primary rather than pairing a live scan with an old one, and the pane says so.
 - Fixed the radar site and tilt pickers in the mobile sheet, which did nothing when used. The sheet is a copy of the sidebar, and the copy carried the marker that says "already wired" without carrying the listener, so on a phone, where the sidebar is hidden, neither control worked.
 - Choosing a tilt that the next scan does not carry now says so and moves the picker to the cut that actually rendered, instead of leaving the control blank and the stored choice disagreeing with the screen.
 - The Status tab now names the product alongside the Level II cut count, because a split-cut scan carries more reflectivity cuts than velocity cuts, and it clears that reading when a decode fails rather than showing the previous volume as current.

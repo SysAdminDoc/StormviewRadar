@@ -38,7 +38,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Smart Tile Caching** — Optimized loading with rate limit protection
 - **Offline Last View** — A service worker retains the app shell, recent credential-free radar frames, and NWS alert polygons for an explicitly labeled cached fallback
 - **Offline-Ready Installation** — Offer standards-based PWA installation only after the browser is eligible and the service worker verifies a cached app shell plus completed last radar frame
-- **Two-City Comparison** — Split the map into independently pannable desktop or stacked mobile views that share the active radar frame and warning polygons, with a persistent searchable comparison city
+- **Two-City Comparison** — Split the map into independently pannable desktop or stacked mobile views that share the active radar frame and warning polygons, with a persistent searchable comparison city, or point the second pane at another MRMS product so velocity, echo tops, or precipitation sits beside reflectivity over the same view
 - **Mini Radar** — Keep a floating, browser-portable radar overview visible while active-alert details scroll, with synchronized frames, warning polygons, primary-map following, and complete teardown when closed
 - **Attributed PNG Snapshots** — Save the visible primary map and current radar frame at bounded 2× resolution with source/product, provider-valid time, and live map/data credits
 - **GIF / MP4 Animation Export** — Capture up to 24 sampled attributed frames as a portable looping GIF or, when the browser advertises support, an MP4 canvas recording with bounded dimensions and cancellation

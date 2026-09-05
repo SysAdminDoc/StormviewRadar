@@ -2,7 +2,7 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
     import { createMessageFormatter } from './i18n.js';
     import { effectivePreloadWindow, frameWindowIndices, normalizePreloadWindow } from './frame-preload.js';
     import { overviewFromMapView } from './picture-in-picture.js';
-    import { DEFAULT_COMPARISON_LOCATION, normalizeComparisonLocation, normalizeLocationResults, shortLocationName } from './split-view.js';
+    import { COMPARISON_PRODUCTS, DEFAULT_COMPARISON_LOCATION, mrmsProductTileKey, normalizeComparisonLocation, normalizeComparisonProduct, normalizeLocationResults, shortLocationName } from './split-view.js';
     import { alertPaletteDash, meshPaletteStops, normalizeVisualPalette, stormPaletteColor, visualPaletteLabel } from './visual-palette.js';
     import { applyLayerOpacity, normalizeLayerOpacities } from './layer-opacity.js';
     import { LOCAL_OVERLAY_LIMITS, parseLocalOverlay } from './local-overlay.js';
@@ -409,6 +409,11 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
                 splitViewAria: 'Toggle two-city view',
                 closeSplitViewAria: 'Close two-city view',
                 compareSearchEmpty: 'No comparison cities found',
+                compareProductAria: 'Comparison pane radar product',
+                compareSameProduct: 'Same product',
+                compareProductTitle: '{product} comparison',
+                compareProductLocked: 'Both panes follow the primary view while two products are compared',
+                compareProductArchived: '{product} comparison resumes on the live frame',
                 pipTitle: 'Mini radar',
                 pipMapAria: 'Picture-in-picture weather map',
                 pipToggleAria: 'Toggle mini radar',
@@ -632,6 +637,11 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
                 splitViewAria: 'Alternar vista de dos ciudades',
                 closeSplitViewAria: 'Cerrar vista de dos ciudades',
                 compareSearchEmpty: 'No se encontraron ciudades para comparar',
+                compareProductAria: 'Producto de radar del panel comparado',
+                compareSameProduct: 'Mismo producto',
+                compareProductTitle: 'Comparación de {product}',
+                compareProductLocked: 'Ambos paneles siguen la vista principal mientras se comparan dos productos',
+                compareProductArchived: 'La comparación de {product} se reanuda en el cuadro en vivo',
                 pipTitle: 'Radar miniatura',
                 pipMapAria: 'Mapa meteorológico en imagen dentro de imagen',
                 pipToggleAria: 'Alternar radar miniatura',
@@ -1148,6 +1158,7 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
                 compareSearchInput: ['aria-label', 'compareSearchAria'],
                 compareSearchResults: ['aria-label', 'compareResultsAria'],
                 splitViewBtn: ['title', 'splitViewAria'],
+                compareProductSelect: ['aria-label', 'compareProductAria'],
                 compareMapClose: ['aria-label', 'closeSplitViewAria'],
                 pipRadarPanel: ['aria-label', 'pipTitle'],
                 pipMap: ['aria-label', 'pipMapAria'],
@@ -1811,6 +1822,9 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
                 result.level2Site = candidate.level2Site;
             }
             // null means "lowest cut". Anything else must be a real elevation index.
+            if (typeof candidate.compareProduct === 'string') {
+                result.compareProduct = normalizeComparisonProduct(candidate.compareProduct, result.radarProduct);
+            }
             if (candidate.level2Tilt === null) {
                 result.level2Tilt = null;
             } else if (Number.isInteger(candidate.level2Tilt) && candidate.level2Tilt >= 1 && candidate.level2Tilt <= 25) {
@@ -2039,6 +2053,7 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             delay: 600,
             preloadWindow: 4,
             splitView: false,
+            compareProduct: '',
             pipRadar: false,
             compareLocation: { ...DEFAULT_COMPARISON_LOCATION },
             loop: true,
@@ -2477,7 +2492,17 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             const primary = document.getElementById('primaryMapLabel');
             const comparison = document.getElementById('compareMapTitle');
             if (primary) primary.textContent = primaryLocationName || localizedStaticText('Primary view');
-            if (comparison) comparison.textContent = comparisonLocation().name || localizedStaticText('Comparison view');
+            const product = comparisonProduct();
+            const choice = comparisonProductChoice();
+            if (comparison) {
+                if (product) {
+                    comparison.textContent = t('compareProductTitle', { product: radarProductLabel(product) });
+                } else if (choice) {
+                    comparison.textContent = t('compareProductArchived', { product: radarProductLabel(choice) });
+                } else {
+                    comparison.textContent = comparisonLocation().name || localizedStaticText('Comparison view');
+                }
+            }
             const pane = document.getElementById('compareMapPane');
             if (pane) pane.dataset.location = comparisonLocation().name || 'custom view';
         }
@@ -2549,7 +2574,110 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             return null;
         }
 
+        // The comparison pane can either sit over another city or carry another
+        // product over this one. Those cannot both be true, so choosing a product
+        // takes the city search out of reach until it is set back.
+        function syncComparisonProductControl() {
+            const select = document.getElementById('compareProductSelect');
+            if (!select) return;
+            const capability = RADAR_CAPABILITIES[settings.source] || RADAR_CAPABILITIES.mrms;
+            const offered = settings.source === 'mrms'
+                ? COMPARISON_PRODUCTS.filter(product => product !== settings.radarProduct
+                    && capability.products.includes(product))
+                : [];
+            select.hidden = offered.length === 0;
+            const active = comparisonProductChoice();
+            // This runs on every comparison refresh, so the options are only
+            // rebuilt when they actually change; rebuilding under an open list
+            // closes it out from under whoever is reading it.
+            const signature = `${languageCode()}|${offered.join(',')}`;
+            if (select.dataset.options !== signature) {
+                select.dataset.options = signature;
+                select.replaceChildren(new Option(t('compareSameProduct'), ''));
+                offered.forEach(product => select.add(new Option(radarProductLabel(product), product)));
+            }
+            if (select.value !== active) select.value = active;
+            const search = document.getElementById('compareSearchInput');
+            if (search) {
+                search.disabled = Boolean(active);
+                search.title = active ? t('compareProductLocked') : '';
+            }
+            if (wiredSelects.has(select)) return;
+            wiredSelects.add(select);
+            select.addEventListener('change', () => {
+                settings.compareProduct = normalizeComparisonProduct(select.value, settings.radarProduct);
+                saveSettings();
+                compareRadarSignature = null;
+                if (settings.compareProduct) syncComparisonViewToPrimary();
+                else restoreComparisonLocation();
+                refreshComparisonRadar();
+                refreshComparisonAlerts();
+                updateSplitViewLabels();
+            });
+        }
+
+        // Only MRMS publishes more than one tiled product, so a second pane can
+        // only differ from the primary while that source is selected.
+        function comparisonProductChoice() {
+            if (settings.source !== 'mrms') return '';
+            return normalizeComparisonProduct(settings.compareProduct, settings.radarProduct);
+        }
+
+        // The second product comes from the live tile service, which only serves
+        // the current scan. IEM's six-hour archive is reflectivity only, so once
+        // the timeline is scrubbed back there is no matching frame for the other
+        // product and the pane mirrors the primary rather than showing two
+        // different times side by side.
+        function comparisonProductAvailable() {
+            return frames[currentFrame]?.kind !== 'past';
+        }
+
+        function comparisonProduct() {
+            return comparisonProductAvailable() ? comparisonProductChoice() : '';
+        }
+
+        function comparisonProductLayer(product) {
+            const url = RADAR_PRODUCTS[mrmsProductTileKey(product)];
+            if (!url) return null;
+            return L.tileLayer.cached(url, {
+                opacity: settings.opacity,
+                webgl: true,
+                pane: 'radarPane',
+                className: 'radar-layer radar-cached compare-radar-layer',
+                maxNativeZoom: 8,
+                maxZoom: 18,
+                keepBuffer: 2,
+                updateWhenZooming: false,
+                updateWhenIdle: true,
+                attribution: IEM_ATTRIBUTION
+            });
+        }
+
+        // Comparing two products only means anything over the same ground, so the
+        // second pane follows the primary view while a product is being compared.
+        function publishPrimaryView() {
+            const center = map.getCenter();
+            map.getContainer().dataset.latitude = center.lat.toFixed(4);
+            map.getContainer().dataset.longitude = center.lng.toFixed(4);
+        }
+
+        function syncComparisonViewToPrimary() {
+            publishPrimaryView();
+            if (!compareMap || !settings.splitView || !comparisonProductChoice()) return;
+            compareMap.setView(map.getCenter(), map.getZoom(), { animate: false });
+        }
+
+        // Clearing the pairing hands the pane back to whichever city it was
+        // parked over before the two products took the view.
+        function restoreComparisonLocation() {
+            if (!compareMap || !settings.splitView) return;
+            const location = comparisonLocation();
+            if (!location.name) return;
+            compareMap.setView([location.latitude, location.longitude], location.zoom, { animate: false });
+        }
+
         function refreshComparisonRadar() {
+            syncComparisonProductControl();
             if (!compareMap || !settings.splitView || !settings.layers.radar) {
                 removeComparisonRadarLayer();
                 return;
@@ -2565,13 +2693,18 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
                 return;
             }
             removeComparisonRadarLayer();
-            compareRadarLayer = cloneRadarLayer(sourceLayer, 'compare-radar-layer');
+            const secondProduct = comparisonProduct();
+            compareRadarLayer = secondProduct
+                ? comparisonProductLayer(secondProduct)
+                : cloneRadarLayer(sourceLayer, 'compare-radar-layer');
             if (!compareRadarLayer) return;
-            compareRadarSignature = signature;
+            compareRadarSignature = secondProduct ? `${signature}::${secondProduct}` : signature;
             compareRadarLayer.addTo(compareMap);
             compareRadarLayer.setOpacity?.(settings.opacity);
             compareMap.getContainer().dataset.radarFrame = String(currentFrame);
             compareMap.getContainer().dataset.radarSource = settings.source;
+            compareMap.getContainer().dataset.radarProduct = secondProduct || settings.radarProduct;
+            updateSplitViewLabels();
         }
 
         async function refreshComparisonAlerts() {
@@ -2631,6 +2764,7 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
                 const center = compareMap.getCenter();
                 compareMap.getContainer().dataset.latitude = center.lat.toFixed(4);
                 compareMap.getContainer().dataset.longitude = center.lng.toFixed(4);
+                if (comparisonProductChoice()) return;
                 settings.compareLocation = normalizeComparisonLocation({
                     ...settings.compareLocation,
                     latitude: center.lat,
@@ -2662,7 +2796,9 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
                 setTimeout(() => {
                     map.invalidateSize();
                     compareMap.invalidateSize();
-                    if (!comparisonLocation().name) {
+                    if (comparisonProductChoice()) {
+                        syncComparisonViewToPrimary();
+                    } else if (!comparisonLocation().name) {
                         const center = map.getCenter();
                         compareMap.setView([center.lat, center.lng], map.getZoom(), { animate: false });
                         document.getElementById('compareSearchInput').focus();
@@ -8596,6 +8732,7 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             document.querySelectorAll('.source-capability-note').forEach(note => {
                 note.textContent = `${capability.note} Coverage: ${capability.coverage.label}.`;
             });
+            syncComparisonProductControl();
             syncLevel2SiteControls();
             updateCoverageStatus();
             syncAccessibleControlStates();
@@ -9559,6 +9696,8 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
         function initSplitView() {
             document.getElementById('splitViewBtn').addEventListener('click', () => setSplitView(!settings.splitView));
             document.getElementById('compareMapClose').addEventListener('click', () => setSplitView(false));
+            map.on('moveend zoomend', syncComparisonViewToPrimary);
+            publishPrimaryView();
             initComparisonSearch();
             // The banner wraps differently at other widths, so the tip clearance
             // has to be recomputed when the viewport changes.
