@@ -3,7 +3,7 @@ import { build } from 'esbuild';
 const stormViewCesiumPlugin = {
   name: 'stormview-cesium',
   setup(context) {
-    // Cesium 1.143.0 contains a handful of internal package self-imports.
+    // Cesium 1.145.0 contains a handful of internal package self-imports.
     // Resolve only the symbols those modules request so the public barrel does
     // not pull every engine export (including unused worker transcoders).
     context.onResolve({ filter: /^@cesium\/engine$/ }, () => ({

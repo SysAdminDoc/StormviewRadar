@@ -4,6 +4,8 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Upgraded CesiumJS to 1.145.0, which replaces the bundled DOMPurify 3.4.12 in the deployed engine with the patched 3.4.14, and tightened the release gate to fail on moderate advisories so a shipped-code advisory can no longer pass silently.
+
 ## [v0.2.0] - 2026-08-12
 
 - Added Environment and Climate Change Canada's official 1 km North American radar rain-rate source with a three-hour six-minute GeoMet WMS timeline, on-demand single-frame retrieval, Reduced Data capping, truthful mm/h legend, cross-border coverage, and licence-linked attribution.

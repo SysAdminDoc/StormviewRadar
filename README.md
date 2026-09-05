@@ -200,7 +200,7 @@ startup, radar, keyboard, and ARIA smoke in current Firefox and WebKit.
 - **CSS Variables** — Dynamic theming
 - **LocalStorage** — Settings persistence
 
-Leaflet 1.9.4, CesiumJS 1.143.0, TopoJSON Client 3.1.0, and the Level II worker
+Leaflet 1.9.4, CesiumJS 1.145.0, TopoJSON Client 3.1.0, and the Level II worker
 dependencies are vendored or bundled from exact npm package versions. The
 Cesium engine is tree-shaken into a lazy, CSP-safe bundle and uses its local
 Natural Earth imagery. Level II bzip decoding and polar image rendering run off
