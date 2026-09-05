@@ -17,82 +17,82 @@ A modern, feature-rich weather radar visualization application built with vanill
 ## Features
 
 ### Radar & Animation
-- **Six Radar Sources** — Switch between HRRR forecast guidance, RainViewer global history, MRMS US products, NOAA nowCOAST, ECCC GeoMet cross-border rain rate, and native NEXRAD Level II
-- **Canadian Cross-Border Radar** — Animate ECCC's official 1 km North American rain-rate composite across three hours of six-minute frames with source-native units, attribution, and on-demand WMS requests
-- **Six-Hour Radar History** — Scrub five-minute MRMS reflectivity frames with a bounded playhead cache; Reduced Data automatically limits history to one hour
-- **NEXRAD Level II** — Select the nearest or a named CONUS site, pick any elevation cut the volume carries, and render current reflectivity, velocity, ZDR, or correlation coefficient directly from the NOAA/Unidata AWS archive. The site list reports each radar's operating status and how old its last volume is
-- **Rotation Candidates** — Overlay up to 20 clustered, reflectivity-backed velocity couplets with explicit automated-heuristic and not-a-warning labeling
-- **MESH Hail Size** — Decode NOAA's current 2-minute MRMS MESH grid off-thread and overlay color-scaled hail-size estimates with metric/US legends
-- **Satellite Enhancements** — Layer NOAA/NESDIS GeoColor or a GeoColor + enhanced Band 13 IR sandwich alongside visible, infrared, and water-vapor channels
-- **GOES Mesoscale Sectors** — Fetch both current GOES-East M1 and M2 visible sectors as a single high-frequency severe-weather overlay
-- **Hybrid High-Res Mode** — Automatic MRMS enhancement at high zoom levels (US only)
-- **Smooth Animation** — Play, pause, and step through radar frames with customizable speed (0.5x–3x) and a persistent 0–8-frame preload window on each side of the playhead
-- **Model Forecast** — View HRRR reflectivity guidance through 18 hours
-- **RainViewer History** — Animate approximately two hours of past global radar using the provider's Universal Blue palette (native zoom 7)
-- **Historical Event Replay** — Select up to six hours and replay five-minute IEM NEXRAD composites with storm-based warning polygons synchronized to each frame
-- **Annotated Storm Training** — Study three localized archived supercell, bow-echo, and tropical-eyewall examples with numbered map cues, timeline playback, official-warning separation, and persistent not-live labeling
-- **Provider-Time Timeline** — Show model initialization, valid time, forecast lead, data age, timezone, and source coverage without substituting the client clock
-- **Accessible Controls** — Keyboard-operable layers and timeline, labeled search suggestions, focus-managed dialogs, and reduced-motion/forced-colors support
-- **Accessible Visual Palettes** — Persist standard, high-contrast, or color-blind-safe styling across provider/native radar, alerts, hail analysis, storm tracks, 3D markers, legends, and interface colors
-- **Adjustable Opacity** — Fine-tune radar transparency for optimal map visibility
-- **Smart Tile Caching** — Optimized loading with rate limit protection
-- **Offline Last View** — A service worker retains the app shell, recent credential-free radar frames, and NWS alert polygons for an explicitly labeled cached fallback
-- **Offline-Ready Installation** — Offer standards-based PWA installation only after the browser is eligible and the service worker verifies a cached app shell plus completed last radar frame
-- **Two-City Comparison** — Split the map into independently pannable desktop or stacked mobile views that share the active radar frame and warning polygons, with a persistent searchable comparison city, or point the second pane at another MRMS product so velocity, echo tops, or precipitation sits beside reflectivity over the same view
-- **Mini Radar** — Keep a floating, browser-portable radar overview visible while active-alert details scroll, with synchronized frames, warning polygons, primary-map following, and complete teardown when closed
-- **Attributed PNG Snapshots** — Save the visible primary map and current radar frame at bounded 2× resolution with source/product, provider-valid time, and live map/data credits
-- **GIF / MP4 Animation Export** — Capture up to 24 sampled attributed frames as a portable looping GIF or, when the browser advertises support, an MP4 canvas recording with bounded dimensions and cancellation
-- **Iframe Embed Mode** — Publish a deterministic, attributed radar map with URL-configurable view, source, product, overlays, appearance, localization, controls, and playback without changing viewer settings
+- **Six Radar Sources.** Switch between HRRR forecast guidance, RainViewer global history, MRMS US products, NOAA nowCOAST, ECCC GeoMet cross-border rain rate, and native NEXRAD Level II
+- **Canadian Cross-Border Radar.** Animate ECCC's official 1 km North American rain-rate composite across three hours of six-minute frames with source-native units, attribution, and on-demand WMS requests
+- **Six-Hour Radar History.** Scrub five-minute MRMS reflectivity frames with a bounded playhead cache. Reduced Data limits history to one hour
+- **NEXRAD Level II.** Select the nearest or a named CONUS site, pick any elevation cut the volume carries, and render current reflectivity, velocity, ZDR, or correlation coefficient directly from the NOAA/Unidata AWS archive. The site list reports each radar's operating status and how old its last volume is
+- **Rotation Candidates.** Overlay up to 20 clustered, reflectivity-backed velocity couplets with explicit automated-heuristic and not-a-warning labeling
+- **MESH Hail Size.** Decode NOAA's current 2-minute MRMS MESH grid off-thread and overlay color-scaled hail-size estimates with metric/US legends
+- **Satellite Enhancements.** Layer NOAA/NESDIS GeoColor or a GeoColor + enhanced Band 13 IR sandwich alongside visible, infrared, and water-vapor channels
+- **GOES Mesoscale Sectors.** Fetch both current GOES-East M1 and M2 visible sectors as a single high-frequency severe-weather overlay
+- **Hybrid High-Res Mode.** Automatic MRMS enhancement at high zoom levels (US only)
+- **Smooth Animation.** Play, pause, and step through radar frames with customizable speed from 0.5x to 3x and a preload window of up to eight frames on each side of the playhead
+- **Model Forecast.** View HRRR reflectivity guidance through 18 hours
+- **RainViewer History.** Animate approximately two hours of past global radar using the provider's Universal Blue palette (native zoom 7)
+- **Historical Event Replay.** Select up to six hours and replay five-minute IEM NEXRAD composites with storm-based warning polygons synchronized to each frame
+- **Annotated Storm Training.** Study three localized archived supercell, bow-echo, and tropical-eyewall examples with numbered map cues, timeline playback, official-warning separation, and persistent not-live labeling
+- **Provider-Time Timeline.** Show model initialization, valid time, forecast lead, data age, timezone, and source coverage without substituting the client clock
+- **Accessible Controls.** Keyboard-operable layers and timeline, labeled search suggestions, focus-managed dialogs, and reduced-motion/forced-colors support
+- **Accessible Visual Palettes.** Persist standard, high-contrast, or color-blind-safe styling across provider/native radar, alerts, hail analysis, storm tracks, 3D markers, legends, and interface colors
+- **Adjustable Opacity.** Fine-tune radar transparency for optimal map visibility
+- **Smart Tile Caching.** Optimized loading with rate limit protection
+- **Offline Last View.** A service worker retains the app shell, recent credential-free radar frames, and NWS alert polygons for an explicitly labeled cached fallback
+- **Offline-Ready Installation.** Offer standards-based PWA installation only after the browser is eligible and the service worker verifies a cached app shell plus completed last radar frame
+- **Two-City Comparison.** Split the map into independently pannable desktop or stacked mobile views that share the active radar frame and warning polygons, with a persistent searchable comparison city, or point the second pane at another MRMS product so velocity, echo tops, or precipitation sits beside reflectivity over the same view
+- **Mini Radar.** Keep a floating, browser-portable radar overview visible while active-alert details scroll, with synchronized frames, warning polygons, primary-map following, and complete teardown when closed
+- **Attributed PNG Snapshots.** Save the visible primary map and current radar frame at bounded 2× resolution with source/product, provider-valid time, and live map/data credits
+- **GIF / MP4 Animation Export.** Capture up to 24 sampled attributed frames as a portable looping GIF or, when the browser advertises support, an MP4 canvas recording with bounded dimensions and cancellation
+- **Iframe Embed Mode.** Publish a deterministic, attributed radar map with URL-configurable view, source, product, overlays, appearance, localization, controls, and playback without changing viewer settings
 
 ### Weather Layers
-- **NWS Alerts** — Real-time watches, warnings, and advisories with hazard-colored borders and warning fills that fade by time since issuance
-- **Alert Sounds** — Opt in to synthesized tones for newly issued alerts, filtered by NWS severity, event type, and distance from the map center
-- **Private Geofences** — Save up to 20 named local alert radii at the map center, display them as optional overlays, and match alert sounds against their polygon intersections
-- **SPC Outlooks** — Storm Prediction Center convective outlooks
-- **SPC Mesoscale Discussions** — Active official SPC discussions with their valid polygons, affected areas, and summaries
-- **Storm Reports** — Cluster the latest IEM tornado, hail, wind, and flood reports at overview zooms, then expand to individual report pins at zoom 9+
-- **Storm Tracks** — Plot current NEXRAD storm cells with an hour of observed positions, 30/60-minute motion projections, and TVS, mesocyclone, hail, VIL, and echo-top details
-- **3D Storm Tops** — Toggle a Cesium globe that extrudes current IEM NEXRAD echo-top estimates, prioritizes threat cells, labels measured heights, and discloses its zoom-dependent display scale
-- **Lightning** — Near real-time lightning strike data
-- **Satellite** — GOES satellite imagery overlay
-- **River Gauges** — USGS water level monitoring stations
-- **Surface Observations** — METAR station data display
-- **Aviation Hazards** — Browser-safe NWS SIGMET and AIRMET alert polygons; pilot reports are intentionally omitted because the official PIREP API disallows direct browser access
+- **NWS Alerts.** Real-time watches, warnings, and advisories with hazard-colored borders and warning fills that fade by time since issuance
+- **Alert Sounds.** Opt in to synthesized tones for newly issued alerts, filtered by NWS severity, event type, and distance from the map center
+- **Private Geofences.** Save up to 20 named local alert radii at the map center, display them as optional overlays, and match alert sounds against their polygon intersections
+- **SPC Outlooks.** Storm Prediction Center convective outlooks
+- **SPC Mesoscale Discussions.** Active official SPC discussions with their valid polygons, affected areas, and summaries
+- **Storm Reports.** Cluster the latest IEM tornado, hail, wind, and flood reports at overview zooms, then expand to individual report pins at zoom 9+
+- **Storm Tracks.** Plot current NEXRAD storm cells with an hour of observed positions, 30/60-minute motion projections, and TVS, mesocyclone, hail, VIL, and echo-top details
+- **3D Storm Tops.** Toggle a Cesium globe that extrudes current IEM NEXRAD echo-top estimates, prioritizes threat cells, labels measured heights, and discloses its zoom-dependent display scale
+- **Lightning.** Near real-time lightning strike data
+- **Satellite.** GOES satellite imagery overlay
+- **River Gauges.** USGS water level monitoring stations
+- **Surface Observations.** METAR station data display
+- **Aviation Hazards.** Browser-safe NWS SIGMET and AIRMET alert polygons. Pilot reports are left out because the official PIREP API disallows direct browser access
 
 ### Additional Overlays (API Required)
-- **Temperature** — OpenWeatherMap temperature layer
-- **Wind** — Wind speed and direction visualization
-- **Clouds** — Cloud cover overlay
-- **Pressure** — Atmospheric pressure visualization
+- **Temperature.** Draws the OpenWeatherMap temperature field over the map
+- **Wind.** Shows wind speed with direction
+- **Clouds.** Cloud cover, drawn as a single translucent layer
+- **Pressure.** Atmospheric pressure, for reading a front before it arrives
 
 ### Map Customization
-- **5 Basemap Styles** — Dark, light, terrain, satellite, and streets
-- **State & County Borders** — Toggleable political boundaries
-- **City Labels** — Optional place name labels
-- **Iowa Road Events** — Show credential-free Iowa 511 closures, lane closures, restrictions, and work zones with visible-map queries, provider freshness, source links, and explicit Iowa-only coverage
+- **5 Basemap Styles.** Dark, light, terrain, satellite, and streets
+- **State & County Borders.** Toggleable political boundaries
+- **City Labels.** Optional place name labels
+- **Iowa Road Events.** Show credential-free Iowa 511 closures, lane closures, restrictions, and work zones with visible-map queries, provider freshness, source links, and explicit Iowa-only coverage
 
 ### User Experience
-- **Dark/Light Theme** — Full theme support with smooth transitions
-- **Location Search** — Find any location with OpenStreetMap geocoding
-- **Geolocation** — Jump to your current position with one click
-- **Chasecaster Field Mode** — Follow high-accuracy mobile GPS with compass-assisted orientation, course fallback, speed/accuracy telemetry, and an always-visible driving-safety reminder
-- **Mobile Optimized** — Responsive design with bottom sheet navigation on mobile
-- **Keyboard Shortcuts** — Quick controls for power users
-- **Versioned Settings** — Validated preferences migrate forward in browser storage
-- **Import/Export** — Backup and restore configuration without exporting API keys
-- **Session-Only Map Files** — Load bounded GeoJSON or KML overlays locally, hide or remove them, and keep their contents out of settings, diagnostics, and network requests
-- **Redacted Diagnostics** — Inspect provider freshness, fallback, coverage, resource counts, retry state, and request results without copying secrets or precise coordinates
-- **Reduced Data Mode** — Limit radar frames and pause data-heavy optional overlays on constrained connections
-- **Language & Units** — Persist English or Spanish UI plus US customary or metric weather units, with locale-aware dates and safe English fallback
-- **Quiet-by-Default Audio** — The first alert load is silent; a user gesture unlocks audio and only unseen matching alerts can sound
-- **Local-Only Alert Areas** — Geofences remain in the current browser profile and are not sent to StormView or included in settings exports
-- **Mobile Alert Banner** — Prioritize alerts intersecting the visible map with dismissible, 44px actions and reduced-motion support
+- **Dark/Light Theme.** Full theme support with smooth transitions
+- **Location Search.** Find any location with OpenStreetMap geocoding
+- **Geolocation.** Jump to your current position with one click
+- **Chasecaster Field Mode.** Follow high-accuracy mobile GPS with compass-assisted orientation, course fallback, speed/accuracy telemetry, and an always-visible driving-safety reminder
+- **Mobile Optimized.** Responsive design with bottom sheet navigation on mobile
+- **Keyboard Shortcuts.** Quick controls for power users
+- **Versioned Settings.** Validated preferences migrate forward in browser storage
+- **Import/Export.** Backup and restore configuration without exporting API keys
+- **Session-Only Map Files.** Load bounded GeoJSON or KML overlays locally, hide or remove them, and keep their contents out of settings, diagnostics, and network requests
+- **Redacted Diagnostics.** Inspect provider freshness, fallback, coverage, resource counts, retry state, and request results without copying secrets or precise coordinates
+- **Reduced Data Mode.** Limit radar frames and pause data-heavy optional overlays on constrained connections
+- **Language & Units.** Persist English or Spanish UI plus US customary or metric weather units, with locale-aware dates and safe English fallback
+- **Quiet-by-Default Audio.** The first alert load is silent. A user gesture turns audio on, and only unseen matching alerts can sound after that
+- **Local-Only Alert Areas.** Geofences remain in the current browser profile and are not sent to StormView or included in settings exports
+- **Mobile Alert Banner.** Prioritize alerts intersecting the visible map with dismissible, 44px actions and reduced-motion support
 
 ## Quick Start
 
 1. **Download** or clone the repository
 2. **Serve** the repository with any static HTTP server
-3. **Open** the local URL — runtime dependencies are bundled; no build step is required
+3. **Open** the local URL. Every runtime dependency is bundled, so there is no build step
 
 ```bash
 git clone https://github.com/sysadmindoc/StormviewRadar.git
@@ -105,7 +105,7 @@ python -m http.server 8000
 
 ## Embed Mode
 
-Add `embed=1` to load a streamlined iframe-safe map. Embed parameters replace the in-memory presentation for that visit only; they do not read local geofences/API keys into the view or overwrite the viewer's saved settings. Data attribution and the **Open full StormView Radar map** link always remain visible.
+Add `embed=1` to load a stripped-down iframe-safe map. Embed parameters replace the in-memory presentation for that visit and nothing more. They do not read local geofences or API keys into the view, and they do not overwrite the viewer's saved settings. Data attribution and the **Open full StormView Radar map** link always remain visible.
 
 ```html
 <iframe
@@ -196,13 +196,13 @@ is unstable there.
 
 ## Technology Stack
 
-- **Leaflet** — Interactive mapping
-- **CesiumJS Engine** — On-demand 3D storm-top globe rendered from bundled assets
-- **TopoJSON Client** — Bundled boundary conversion
-- **OpenStreetMap** — Base map tiles and geocoding
-- **Vanilla JS** — No runtime framework or server component
-- **CSS Variables** — Dynamic theming
-- **LocalStorage** — Settings persistence
+- **Leaflet.** Interactive mapping
+- **CesiumJS Engine.** On-demand 3D storm-top globe rendered from bundled assets
+- **TopoJSON Client.** Bundled boundary conversion
+- **OpenStreetMap.** Base map tiles and geocoding
+- **Vanilla JS.** No runtime framework or server component
+- **CSS Variables.** Dynamic theming
+- **LocalStorage.** Settings persistence
 
 Leaflet 1.9.4, CesiumJS 1.145.0, TopoJSON Client 3.1.0, US Atlas 3.0.1, and the
 Level II worker dependencies are vendored or bundled from exact npm package
@@ -241,10 +241,10 @@ and a sample of the Cesium runtime assets down to one imagery tile.
 StormView has no application server, account system, or telemetry endpoint.
 The static browser client requests map/weather data directly from the providers
 listed above. Settings, saved locations, geofences, and optional API keys remain
-in the current browser profile; exports omit API keys and diagnostics redact
+in the current browser profile. Exports omit API keys, and diagnostics redact
 keys and precise coordinates. Provider image tiles are cached in bounded
-IndexedDB storage in the same browser profile; URLs containing credential query
-parameters are excluded. Provider coverage is not uniform: Level II,
+IndexedDB storage in the same browser profile, with URLs containing credential
+query parameters excluded. Provider coverage is not uniform: Level II,
 MRMS, IEM reports, and most severe-weather analysis are US-focused, RainViewer
 supplies global past radar, and a transparent or stale layer can reflect an
 upstream outage rather than an all-clear.
@@ -269,13 +269,13 @@ strings.
 
 StormView includes several optimizations for smooth performance:
 
-- **Batched Frame Loading** — Radar frames load in small batches to avoid rate limiting
-- **Persistent Tile Cache** — IndexedDB-backed Leaflet tiles use recency updates and LRU eviction, capped at 1,200 entries / 96 MB, with direct-image fallback when storage or CORS is unavailable
-- **WebGL Radar Compositing** — Visible HRRR, MRMS, and RainViewer tile frames use linearly filtered GPU compositing with DOM-tile fallback and context release between frames
-- **Seamless Zoom** — Tiles remain visible during zoom, new tiles load in background
-- **Memory Management** — Only nearby frames kept in memory during animation
-- **Bounded Overlays** — River requests follow the visible map area; report and observation markers are spatially sampled with hard limits
-- **Graceful Error Handling** — Failed tiles display transparently without broken image icons
+- **Batched Frame Loading.** Radar frames load in small batches to avoid rate limiting
+- **Persistent Tile Cache.** IndexedDB-backed Leaflet tiles use recency updates and LRU eviction, capped at 1,200 entries / 96 MB, with direct-image fallback when storage or CORS is unavailable
+- **WebGL Radar Compositing.** Visible HRRR, MRMS, and RainViewer tile frames use linearly filtered GPU compositing with DOM-tile fallback and context release between frames
+- **Zoom Without Blanking.** Tiles stay on screen through a zoom while the new ones load behind them
+- **Memory Management.** Only nearby frames kept in memory during animation
+- **Bounded Overlays.** River requests follow the visible map area, and report and observation markers are spatially sampled under hard limits
+- **Graceful Error Handling.** Failed tiles display transparently without broken image icons
 
 ## Configuration Options
 
@@ -287,14 +287,14 @@ Access the settings panel (⚙️) to customize:
 - Units (US customary/metric)
 - Show legend
 - Border widths and opacity
-- Independent overlay visibility (10%–100% per layer)
+- Independent overlay visibility, 10% to 100% per layer
 
 **Radar**
-- Opacity (30%–100%)
+- Opacity, 30% to 100%
 - High-res mode (MRMS enhancement)
 - Smooth interpolation
 - Snow color mode
-- Frame delay (200ms–1200ms)
+- Frame delay, 200ms to 1200ms
 - Auto-refresh (5 min interval)
 - Loop animation
 
@@ -334,7 +334,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
@@ -352,7 +352,7 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 <div align="center">
 
-**StormView Radar** — Track storms like a pro. ⛈️
+**StormView Radar.** Track storms like a pro. ⛈️
 
 [![GitHub Pages](https://img.shields.io/badge/Hosted_on-GitHub_Pages-222?style=flat-square&logo=github)](https://sysadmindoc.github.io/StormviewRadar/)
 
