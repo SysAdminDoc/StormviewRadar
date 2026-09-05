@@ -57,6 +57,59 @@ test('desktop controls pass automated accessibility checks', async ({ page }) =>
   expect(forcedColorsResults.violations).toEqual([]);
 });
 
+const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'];
+
+async function violations(page) {
+  const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
+  return results.violations.map(violation => `${violation.id}: ${violation.nodes.map(node => node.target.join(' ')).join(', ')}`);
+}
+
+// The desktop sweep above missed a mobile-only defect because responsive CSS
+// can change names, contrast, and target sizes inside a breakpoint the test
+// never enters. Sweep the narrow layout in both themes and every palette.
+for (const theme of ['dark', 'light']) {
+  for (const palette of ['standard', 'highContrast', 'colorblind']) {
+    test(`narrow ${theme} layout passes accessibility checks with the ${palette} palette`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.addInitScript(([themeValue, paletteValue]) => {
+        const stored = JSON.parse(localStorage.getItem('stormview_pro_v3') || '{}');
+        stored.theme = themeValue;
+        stored.visualPalette = paletteValue;
+        localStorage.setItem('stormview_pro_v3', JSON.stringify(stored));
+      }, [theme, palette]);
+
+      await page.goto('/');
+      await expect(page.locator('#dataStatusText')).toHaveText('HRRR: current');
+      await expect(page.locator('body')).toHaveAttribute('data-visual-palette', palette);
+      expect(await violations(page)).toEqual([]);
+    });
+  }
+}
+
+test('the quick toolbar stays identifiable when its labels collapse', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.locator('#dataStatusText')).toHaveText('HRRR: current');
+
+  const buttons = page.locator('#quickToolbar .qt-btn');
+  const count = await buttons.count();
+  expect(count).toBeGreaterThan(6);
+
+  const shapes = new Set();
+  for (let index = 0; index < count; index += 1) {
+    const button = buttons.nth(index);
+    // The visible label is hidden below 768px, so the name has to survive on
+    // its own and the icon has to carry the identity.
+    await expect(button.locator('.qt-label')).toBeHidden();
+    const name = await button.getAttribute('aria-label');
+    expect(name?.trim()).toBeTruthy();
+    const icon = button.locator('svg').first();
+    await expect(icon).toBeVisible();
+    shapes.add(await icon.innerHTML());
+  }
+  expect(shapes.size).toBe(count);
+});
+
 test('custom switches and dialogs support keyboard state and focus return', async ({ page }) => {
   await page.goto('/');
   const opener = page.locator('#settingsBtn');
