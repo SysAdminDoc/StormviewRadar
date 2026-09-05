@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { detectVelocityCoupletsFromSweep } from '../src/level2-analysis.js';
+import { chooseSweepIndex, detectVelocityCoupletsFromSweep } from '../src/level2-analysis.js';
 
 function radarMoment(value, reflectivity) {
   const velocityData = Array(30).fill(0);
@@ -55,4 +55,30 @@ test('velocity couplet detector requires compact opposite flow in precipitation'
     radial(10, -22, 10),
     radial(10.5, 24, 10)
   ]), []);
+});
+
+test('sweep selection prefers the requested elevation and falls back to the lowest cut', () => {
+  const candidates = [
+    { elevation: 1, angle: 0.5 },
+    { elevation: 3, angle: 1.5 },
+    { elevation: 5, angle: 2.4 }
+  ];
+
+  // No request, or a non-integer request, means the lowest cut.
+  assert.equal(chooseSweepIndex(candidates, null), 0);
+  assert.equal(chooseSweepIndex(candidates, undefined), 0);
+  assert.equal(chooseSweepIndex(candidates, 1.5), 0);
+  assert.equal(chooseSweepIndex(candidates, 'three'), 0);
+
+  // A requested elevation is matched by its index in the volume, not its angle.
+  assert.equal(chooseSweepIndex(candidates, 1), 0);
+  assert.equal(chooseSweepIndex(candidates, 3), 1);
+  assert.equal(chooseSweepIndex(candidates, 5), 2);
+
+  // An elevation this volume does not carry degrades to the lowest cut.
+  assert.equal(chooseSweepIndex(candidates, 4), 0);
+  assert.equal(chooseSweepIndex(candidates, 99), 0);
+
+  assert.equal(chooseSweepIndex([], 3), -1);
+  assert.equal(chooseSweepIndex(null, 3), -1);
 });

@@ -50,11 +50,15 @@ export function parseEmbedConfig(search = '') {
   const latitude = boundedNumber(params.get('lat'), -90, 90, 39);
   const longitude = boundedNumber(params.get('lon'), -180, 180, -96);
   const level2Site = /^[A-Z][A-Z0-9]{3}$/.test(params.get('site') || '') ? params.get('site') : '';
+  // Elevation index within the volume. Absent means the lowest cut.
+  const tiltValue = Number(params.get('tilt'));
+  const level2Tilt = Number.isInteger(tiltValue) && tiltValue >= 1 && tiltValue <= 25 ? tiltValue : null;
 
   return Object.freeze({
     source,
     product,
     level2Site,
+    level2Tilt,
     basemap: enumValue(params.get('basemap'), BASEMAPS, 'dark'),
     theme: enumValue(params.get('theme'), ['dark', 'light'], 'dark'),
     palette: enumValue(params.get('palette'), PALETTES, 'standard'),
@@ -79,6 +83,7 @@ export function applyEmbedConfiguration(settings, config) {
   settings.source = config.source;
   settings.radarProduct = config.product;
   settings.level2Site = config.level2Site;
+  settings.level2Tilt = config.level2Tilt;
   settings.basemap = config.basemap;
   settings.theme = config.theme;
   settings.visualPalette = config.palette;

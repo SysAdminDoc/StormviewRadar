@@ -462,3 +462,149 @@ test('the site picker reports operating, offline, and stale radars', async ({ pa
   await expect(health).toHaveAttribute('data-site-state', 'operating');
   await expect(health).toContainText(/operating/);
 });
+
+// A volume carries one sweep per elevation cut. Rendering only the lowest one
+// means the app cannot look above the first tilt at all.
+test('the tilt picker lists the volume elevations and renders the chosen cut', async ({ page }) => {
+  await page.addInitScript(() => {
+    // This runs on every navigation. Seeding unconditionally would rewrite
+    // storage on reload and erase the choice the test is checking survives.
+    if (!localStorage.getItem('stormview_settings')) {
+      localStorage.setItem('stormview_settings', JSON.stringify({
+        schemaVersion: 9,
+        settings: {
+          source: 'level2',
+          radarProduct: 'reflectivity',
+          level2Site: 'KTWX',
+          level2Tilt: null,
+          autoRefresh: false,
+          layers: { radar: true, alerts: false, spcOutlook: false, states: false, counties: false, labels: false }
+        }
+      }));
+    }
+    localStorage.setItem('stormview_welcomed', '1');
+    window.__level2Renders = [];
+
+    const TILTS = [
+      { elevation: 1, angle: 0.5 },
+      { elevation: 3, angle: 1.5 },
+      { elevation: 5, angle: 2.4 }
+    ];
+
+    class FakeLevel2Worker {
+      listeners = new Map();
+      addEventListener(type, listener) { this.listeners.set(type, listener); }
+      postMessage(message) {
+        queueMicrotask(() => {
+          if (message.type === 'load') {
+            this.listeners.get('message')?.({ data: { id: message.id, type: 'loaded', site: 'KTWX' } });
+            return;
+          }
+          window.__level2Renders.push(message.elevation ?? null);
+          // Mirror the worker: an unknown elevation degrades to the lowest cut.
+          const chosen = TILTS.find(tilt => tilt.elevation === message.elevation) || TILTS[0];
+          const canvas = new OffscreenCanvas(8, 8);
+          const context = canvas.getContext('2d');
+          context.fillStyle = '#00c800';
+          context.fillRect(0, 0, 8, 8);
+          this.listeners.get('message')?.({
+            data: {
+              id: message.id,
+              type: 'rendered',
+              bitmap: canvas.transferToImageBitmap(),
+              latitude: 38.997,
+              longitude: -96.232,
+              maxRangeKm: 230,
+              elevationAngle: chosen.angle,
+              elevation: chosen.elevation,
+              tilts: TILTS,
+              site: 'KTWX',
+              hasGaps: false,
+              isTruncated: false,
+              couplets: []
+            }
+          });
+        });
+      }
+      terminate() {}
+    }
+    window.Worker = FakeLevel2Worker;
+  });
+  await routeLevel2Data(page);
+
+  await page.goto('/');
+  // The sidebar is mirrored into the mobile sheet, so this control exists twice.
+  const tilt = page.locator('.level2-tilt-select').first();
+  const row = page.locator('.level2-tilt-row').first();
+  await expect(row).toHaveClass(/visible/);
+
+  const options = await tilt.locator('option').evaluateAll(items => items.map(item => item.textContent));
+  expect(options).toEqual(['Lowest', '0.5°', '1.5°', '2.4°']);
+
+  // The first render asks for no particular elevation.
+  await expect.poll(() => page.evaluate(() => window.__level2Renders)).toEqual([null]);
+  await expect(page.locator('#fiFrame')).toContainText('0.5°');
+
+  await tilt.selectOption('5');
+  await expect.poll(() => page.evaluate(() => window.__level2Renders.at(-1))).toBe(5);
+  await expect(page.locator('#fiFrame')).toContainText('2.4°');
+  await expect(tilt).toHaveValue('5');
+
+  // The choice persists across a reload and is asked for on the next render.
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('stormview_settings')).settings.level2Tilt);
+  expect(stored).toBe(5);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => window.__level2Renders.at(-1))).toBe(5);
+  await expect(page.locator('.level2-tilt-select').first()).toHaveValue('5');
+});
+
+test('an embedded tilt renders that cut without touching stored settings', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__level2Renders = [];
+    const TILTS = [
+      { elevation: 1, angle: 0.5 },
+      { elevation: 3, angle: 1.5 },
+      { elevation: 5, angle: 2.4 }
+    ];
+    class FakeLevel2Worker {
+      listeners = new Map();
+      addEventListener(type, listener) { this.listeners.set(type, listener); }
+      postMessage(message) {
+        queueMicrotask(() => {
+          if (message.type === 'load') {
+            this.listeners.get('message')?.({ data: { id: message.id, type: 'loaded', site: 'KTWX' } });
+            return;
+          }
+          window.__level2Renders.push(message.elevation ?? null);
+          const chosen = TILTS.find(tilt => tilt.elevation === message.elevation) || TILTS[0];
+          const canvas = new OffscreenCanvas(8, 8);
+          canvas.getContext('2d').fillRect(0, 0, 8, 8);
+          this.listeners.get('message')?.({
+            data: {
+              id: message.id,
+              type: 'rendered',
+              bitmap: canvas.transferToImageBitmap(),
+              latitude: 38.997,
+              longitude: -96.232,
+              maxRangeKm: 230,
+              elevationAngle: chosen.angle,
+              elevation: chosen.elevation,
+              tilts: TILTS,
+              site: 'KTWX',
+              hasGaps: false,
+              isTruncated: false,
+              couplets: []
+            }
+          });
+        });
+      }
+      terminate() {}
+    }
+    window.Worker = FakeLevel2Worker;
+  });
+  await routeLevel2Data(page);
+
+  await page.goto('/?embed=1&source=level2&site=KTWX&tilt=3');
+  await expect.poll(() => page.evaluate(() => window.__level2Renders.at(-1))).toBe(3);
+  expect(await page.evaluate(() => localStorage.getItem('stormview_settings'))).toBeNull();
+});

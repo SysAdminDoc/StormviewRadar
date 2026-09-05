@@ -123,3 +123,14 @@ export function detectVelocityCoupletsFromSweep(records) {
         bearing: Math.round(candidate.bearing)
     }));
 }
+
+// Sweep candidates arrive sorted by elevation angle. An elevation the volume
+// does not carry falls back to the lowest cut rather than failing, because
+// which cuts exist changes between volumes and between products.
+export function chooseSweepIndex(candidates, requestedElevation) {
+  if (!Array.isArray(candidates) || !candidates.length) return -1;
+  const requested = Number(requestedElevation);
+  if (!Number.isInteger(requested)) return 0;
+  const index = candidates.findIndex(candidate => Number(candidate?.elevation) === requested);
+  return index === -1 ? 0 : index;
+}

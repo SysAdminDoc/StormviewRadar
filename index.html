@@ -1226,6 +1226,19 @@
             font-size: 10px;
             font-weight: 600;
         }
+        .level2-tilt-row {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+        .level2-tilt-row.visible { display: flex; }
+        .level2-tilt-select {
+            min-width: 0;
+            flex: 1;
+        }
         .level2-site-row.visible { display: flex; }
         .level2-site-health {
             display: none;
@@ -2802,6 +2815,12 @@
                 </select>
             </label>
             <div class="level2-site-health" data-site-state="unknown" role="status" aria-live="polite">Site status unavailable</div>
+            <label class="level2-tilt-row">
+                Tilt
+                <select class="level2-tilt-select" aria-label="NEXRAD Level II elevation angle">
+                    <option value="">Lowest</option>
+                </select>
+            </label>
             <div class="source-capability-note" id="sourceCapabilityNote"></div>
         </div>
         
@@ -3964,6 +3983,7 @@
         let level2LoadedKey = null;
         let level2Sites = [];
         let level2SiteHealth = new Map();
+        let level2Tilts = [];
         let level2Couplets = [];
         let meshWorker = null;
         let meshWorkerSequence = 0;
@@ -4243,6 +4263,7 @@
                 roadEventsOutside: 'Outside Iowa DOT road-event coverage',
                 roadEventsUnavailable: 'Iowa road events unavailable: {message}',
                 level2SiteHealthUnknown: 'Site status unavailable',
+                level2TiltLowest: 'Lowest',
                 roadClosure: 'Road closure',
                 laneClosure: 'Lane closure',
                 roadRestriction: 'Road restriction',
@@ -4464,6 +4485,7 @@
                 roadEventsOutside: 'Fuera de la cobertura de eventos viales del DOT de Iowa',
                 roadEventsUnavailable: 'Eventos viales de Iowa no disponibles: {message}',
                 level2SiteHealthUnknown: 'Estado del sitio no disponible',
+                level2TiltLowest: 'Más bajo',
                 roadClosure: 'Carretera cerrada',
                 laneClosure: 'Carril cerrado',
                 roadRestriction: 'Restricción vial',
@@ -5533,6 +5555,12 @@
             if (typeof candidate.level2Site === 'string' && /^(?:|[A-Z]{4})$/.test(candidate.level2Site)) {
                 result.level2Site = candidate.level2Site;
             }
+            // null means "lowest cut". Anything else must be a real elevation index.
+            if (candidate.level2Tilt === null) {
+                result.level2Tilt = null;
+            } else if (Number.isInteger(candidate.level2Tilt) && candidate.level2Tilt >= 1 && candidate.level2Tilt <= 25) {
+                result.level2Tilt = candidate.level2Tilt;
+            }
 
             if (candidate.layers && typeof candidate.layers === 'object' && !Array.isArray(candidate.layers)) {
                 Object.keys(result.layers).forEach(key => {
@@ -5749,6 +5777,7 @@
             language: 'en',
             units: 'us',
             level2Site: '',
+            level2Tilt: null,
             opacity: 0.85,
             smooth: 1,
             snowColor: 1,
@@ -7616,6 +7645,7 @@
             document.querySelectorAll('.level2-site-row').forEach(row => {
                 row.classList.toggle('visible', settings.source === 'level2');
             });
+            syncLevel2TiltControls();
             document.querySelectorAll('.level2-site-select').forEach(select => {
                 const previousValue = settings.level2Site;
                 select.replaceChildren(new Option('Nearest to map center', ''));
@@ -7639,6 +7669,30 @@
                 });
             });
             renderLevel2SiteHealth();
+        }
+
+        function syncLevel2TiltControls(activeElevation = settings.level2Tilt) {
+            document.querySelectorAll('.level2-tilt-row').forEach(row => {
+                row.classList.toggle('visible', settings.source === 'level2' && level2Tilts.length > 1);
+            });
+            document.querySelectorAll('.level2-tilt-select').forEach(select => {
+                select.replaceChildren(new Option(t('level2TiltLowest'), ''));
+                level2Tilts.forEach(tilt => {
+                    select.add(new Option(`${tilt.angle.toFixed(1)}°`, String(tilt.elevation)));
+                });
+                select.value = activeElevation === null || activeElevation === undefined ? '' : String(activeElevation);
+                if (select.dataset.wired === 'true') return;
+                select.dataset.wired = 'true';
+                select.addEventListener('change', () => {
+                    const value = select.value;
+                    settings.level2Tilt = value === '' ? null : Number(value);
+                    document.querySelectorAll('.level2-tilt-select').forEach(other => {
+                        other.value = value;
+                    });
+                    saveSettings();
+                    if (settings.source === 'level2') loadRadarData();
+                });
+            });
         }
 
         function level2SiteBadge(health) {
@@ -7839,7 +7893,8 @@
             updateLoadProgress(75);
             const rendered = await requestLevel2Worker('render', {
                 product: settings.radarProduct,
-                palette: settings.visualPalette
+                palette: settings.visualPalette,
+                elevation: settings.level2Tilt
             }, [], signal);
             ensureCurrentRadarLoad(generation, signal);
             const imageUrl = await imageBitmapToUrl(rendered.bitmap);
@@ -7874,6 +7929,10 @@
                 }
                 throw error;
             }
+            // The available cuts change between volumes and between products,
+            // so the picker is rebuilt from whatever this render actually saw.
+            level2Tilts = Array.isArray(rendered.tilts) ? rendered.tilts : [];
+            syncLevel2TiltControls(rendered.elevation);
             level2Couplets = Array.isArray(rendered.couplets) ? rendered.couplets : [];
             renderLevel2Couplets();
             frames = [{

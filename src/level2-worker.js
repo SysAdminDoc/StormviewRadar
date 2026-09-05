@@ -1,6 +1,6 @@
 import { Buffer } from 'buffer';
 import level2Data from 'nexrad-level-2-data';
-import { detectVelocityCoupletsFromSweep } from './level2-analysis.js';
+import { chooseSweepIndex, detectVelocityCoupletsFromSweep } from './level2-analysis.js';
 import { level2PaletteStops, normalizeVisualPalette } from './visual-palette.js';
 
 globalThis.Buffer = Buffer;
@@ -53,9 +53,11 @@ function productColor(product, value, stops) {
     return value < 0.65 || value > 1.05 ? [0, 0, 0, 0] : interpolateColor(stops, value);
 }
 
-function selectSweep(product) {
+// A volume carries one sweep per elevation cut, and which cuts hold a given
+// moment differs between products, so the list is built per product.
+function sweepCandidates(product) {
     const field = PRODUCT_FIELDS[product];
-    const candidates = radar.listElevations()
+    return radar.listElevations()
         .map(elevation => {
             const records = radar.data[elevation]?.map(item => item.record) || [];
             const productRecords = records.filter(record => record[field]?.moment_data?.length);
@@ -65,15 +67,19 @@ function selectSweep(product) {
         })
         .filter(Boolean)
         .sort((left, right) => left.angle - right.angle);
+}
+
+function selectSweep(product, requestedElevation = null) {
+    const candidates = sweepCandidates(product);
     if (!candidates.length) throw new Error(`This volume does not contain ${product}`);
-    return candidates[0];
+    return { sweep: candidates[chooseSweepIndex(candidates, requestedElevation)], candidates };
 }
 
 function detectVelocityCouplets() {
     if (coupletCache) return coupletCache;
     let sweep;
     try {
-        sweep = selectSweep('velocity');
+        sweep = selectSweep('velocity').sweep;
     } catch {
         coupletCache = [];
         return coupletCache;
@@ -82,12 +88,12 @@ function detectVelocityCouplets() {
     return coupletCache;
 }
 
-function renderProduct(product, requestedPalette = 'standard') {
+function renderProduct(product, requestedPalette = 'standard', requestedElevation = null) {
     const palette = normalizeVisualPalette(requestedPalette);
     if (!radar) throw new Error('No Level II volume is loaded');
     const field = PRODUCT_FIELDS[product];
     if (!field) throw new Error(`Unsupported Level II product: ${product}`);
-    const sweep = selectSweep(product);
+    const { sweep, candidates } = selectSweep(product, requestedElevation);
     const firstRecord = sweep.records[0];
     const volume = firstRecord.volume;
     const moments = sweep.records.map(record => record[field]);
@@ -144,6 +150,8 @@ function renderProduct(product, requestedPalette = 'standard') {
         longitude: Number(volume.longitude),
         maxRangeKm,
         elevationAngle: sweep.angle,
+        elevation: sweep.elevation,
+        tilts: candidates.map(candidate => ({ elevation: candidate.elevation, angle: candidate.angle })),
         site: radar.header.ICAO,
         hasGaps: radar.hasGaps,
         isTruncated: radar.isTruncated,
@@ -153,7 +161,7 @@ function renderProduct(product, requestedPalette = 'standard') {
 }
 
 self.addEventListener('message', event => {
-    const { id, type, buffer, product, palette } = event.data || {};
+    const { id, type, buffer, product, palette, elevation } = event.data || {};
     try {
         if (type === 'load') {
             radar = new Level2Radar(Buffer.from(buffer), { logger: false });
@@ -162,7 +170,7 @@ self.addEventListener('message', event => {
             return;
         }
         if (type === 'render') {
-            const result = renderProduct(product, palette);
+            const result = renderProduct(product, palette, elevation);
             self.postMessage({ id, type: 'rendered', ...result }, [result.bitmap]);
             return;
         }

@@ -14,6 +14,7 @@ test('embed URL parameters produce a bounded deterministic configuration', () =>
     source: 'mrms',
     product: 'echoTops',
     level2Site: '',
+    level2Tilt: null,
     basemap: 'light',
     theme: 'light',
     palette: 'colorblind',
@@ -68,4 +69,15 @@ test('embed configuration replaces persisted presentation without enabling local
   assert.equal(settings.pipRadar, false);
   assert.equal(settings.alertAudioEnabled, false);
   assert.deepEqual(settings.layers, { radar: true, alerts: true, temp: false, geofences: false, labels: true });
+});
+
+test('the embed tilt parameter accepts a real elevation index and rejects the rest', () => {
+  assert.equal(parseEmbedConfig('?embed=1&source=level2&site=KDMX&tilt=3').level2Tilt, 3);
+  assert.equal(parseEmbedConfig('?embed=1&source=level2&site=KDMX&tilt=1').level2Tilt, 1);
+  // Out of range, fractional, and non-numeric all fall back to the lowest cut.
+  assert.equal(parseEmbedConfig('?embed=1&source=level2&tilt=0').level2Tilt, null);
+  assert.equal(parseEmbedConfig('?embed=1&source=level2&tilt=26').level2Tilt, null);
+  assert.equal(parseEmbedConfig('?embed=1&source=level2&tilt=2.5').level2Tilt, null);
+  assert.equal(parseEmbedConfig('?embed=1&source=level2&tilt=low').level2Tilt, null);
+  assert.equal(parseEmbedConfig('?embed=1&source=level2').level2Tilt, null);
 });

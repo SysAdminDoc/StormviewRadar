@@ -70,7 +70,10 @@ test('embed URL owns presentation without persisting over viewer settings', asyn
   await expect(page.locator('.leaflet-control-zoom')).toHaveCount(0);
   await expect(page.locator('#embedBrand')).toBeVisible();
   await expect(page.locator('#embedBrand')).toHaveAttribute('aria-label', 'Abrir el mapa completo de StormView Radar');
-  await expect(page.locator('#embedBrand')).toHaveAttribute('href', 'http://127.0.0.1:4173/');
+  const fullMapHref = new URL('/', page.url()).href;
+  await expect(page.locator('#embedBrand')).toHaveAttribute('href', fullMapHref);
+  // The escape link must drop the embed query, not merely point at the host.
+  expect(fullMapHref).not.toContain('embed=');
   await expect(page.locator('.leaflet-control-attribution')).toBeVisible();
   await expect(page.locator('#playIcon polygon')).toHaveCount(1);
   await expect.poll(() => page.evaluate(() => localStorage.getItem('stormview_settings'))).toBe(persistedRecord);

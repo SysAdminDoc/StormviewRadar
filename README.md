@@ -20,7 +20,7 @@ A modern, feature-rich weather radar visualization application built with vanill
 - **Six Radar Sources** — Switch between HRRR forecast guidance, RainViewer global history, MRMS US products, NOAA nowCOAST, ECCC GeoMet cross-border rain rate, and native NEXRAD Level II
 - **Canadian Cross-Border Radar** — Animate ECCC's official 1 km North American rain-rate composite across three hours of six-minute frames with source-native units, attribution, and on-demand WMS requests
 - **Six-Hour Radar History** — Scrub five-minute MRMS reflectivity frames with a bounded playhead cache; Reduced Data automatically limits history to one hour
-- **NEXRAD Level II** — Select the nearest or a named CONUS site and render current 0.5° reflectivity, velocity, ZDR, or correlation coefficient directly from the NOAA/Unidata AWS archive
+- **NEXRAD Level II** — Select the nearest or a named CONUS site, pick any elevation cut the volume carries, and render current reflectivity, velocity, ZDR, or correlation coefficient directly from the NOAA/Unidata AWS archive. The site list reports each radar's operating status and how old its last volume is
 - **Rotation Candidates** — Overlay up to 20 clustered, reflectivity-backed velocity couplets with explicit automated-heuristic and not-a-warning labeling
 - **MESH Hail Size** — Decode NOAA's current 2-minute MRMS MESH grid off-thread and overlay color-scaled hail-size estimates with metric/US legends
 - **Satellite Enhancements** — Layer NOAA/NESDIS GeoColor or a GeoColor + enhanced Band 13 IR sandwich alongside visible, infrared, and water-vapor channels
@@ -124,6 +124,7 @@ Add `embed=1` to load a streamlined iframe-safe map. Embed parameters replace th
 | `source` | `hrrr`, `rainviewer`, `mrms`, `nowcoast`, `eccc`, `level2` | `hrrr` |
 | `product` | Source-supported product: `reflectivity`, `velocity`, `echoTops`, `precipAccum`, `precipRate`, `differentialReflectivity`, or `correlationCoefficient` | `reflectivity` |
 | `site` | Four-character Level II site such as `KDMX` | Nearest site |
+| `tilt` | Level II elevation index within the volume, `1`..`25` | Lowest cut |
 | `basemap` | `dark`, `light`, `satellite`, `terrain`, `clean` | `dark` |
 | `layers` | Comma-separated credential-free layer IDs, `none`, or up to 16 IDs | `radar,alerts,states,labels` |
 | `theme`, `palette` | Theme: `dark`/`light`; palette: `standard`, `highContrast`, `colorblind` | `dark`, `standard` |
