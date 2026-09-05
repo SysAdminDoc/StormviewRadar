@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Map tooltips now escape the text they are given. Leaflet renders tooltip content as HTML and has no fix for CVE-2025-69993, and four tooltips passed alert names, storm cell identifiers, and saved geofence names through without escaping them. The release gate now refuses any Leaflet popup or tooltip fed by the truncate-only helper.
 - NEXRAD Level II can now render any elevation cut in the volume rather than only the lowest one. The tilt list is built from whatever the decoded volume actually contains for the selected product, the choice persists, and an embed URL can pin it with `tilt=`.
 - The NEXRAD Level II site picker now reports each radar's health. Sites in maintenance, sites that are not operating, and sites whose last volume is more than twenty minutes old are marked in the list, and the selected site shows its status and the age of its last volume instead of silently displaying an old scan.
 - The first-visit tip now measures the alert banner instead of assuming its height, so it no longer covers a live warning when the event name wraps to two lines on a narrow screen.

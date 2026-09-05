@@ -5990,7 +5990,7 @@
                     fillColor: '#38bdf8',
                     fillOpacity: 0.08
                 });
-                circle.bindTooltip(geofence.name, { direction: 'top' });
+                circle.bindTooltip(escapeHTML(geofence.name, 80), { direction: 'top' });
                 circle.bindPopup(`
                     <div class="popup-content">
                         <h4>${escapeHTML(geofence.name, 80)}</h4>
@@ -6335,7 +6335,7 @@
                     pane: 'alertPane',
                     style: feature => alertPolygonPresentation(feature, tools, referenceTime).style,
                     onEachFeature: (feature, layer) => {
-                        layer.bindTooltip(safeText(feature.properties?.event || feature.properties?.ps || 'Weather alert', 120));
+                        layer.bindTooltip(escapeHTML(feature.properties?.event || feature.properties?.ps || 'Weather alert', 120));
                     }
                 }).addTo(compareMap);
             } catch (error) {
@@ -6524,7 +6524,7 @@
                     pane: 'alertPane',
                     style: feature => alertPolygonPresentation(feature, tools, referenceTime).style,
                     onEachFeature: (feature, layer) => {
-                        layer.bindTooltip(safeText(feature.properties?.event || feature.properties?.ps || 'Weather alert', 120));
+                        layer.bindTooltip(escapeHTML(feature.properties?.event || feature.properties?.ps || 'Weather alert', 120));
                     }
                 }).addTo(pipMap);
                 pipMap.getContainer().dataset.alertFeatures = String(pipAlertLayer.getLayers().length);
@@ -10388,7 +10388,7 @@
                     fillOpacity: 0.9,
                     renderer
                 });
-                marker.bindTooltip(`${cell.radar}-${cell.id}`, { direction: 'top' });
+                marker.bindTooltip(`${escapeHTML(cell.radar, 4)}-${escapeHTML(cell.id, 8)}`, { direction: 'top' });
                 marker.bindPopup(`
                     <div class="popup-content">
                         <h4>Storm ${escapeHTML(cell.radar, 4)}-${escapeHTML(cell.id, 8)}</h4>
