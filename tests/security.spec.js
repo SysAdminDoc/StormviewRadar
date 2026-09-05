@@ -28,8 +28,17 @@ test.beforeEach(async ({ page }) => {
   await page.route('https://mesonet.agron.iastate.edu/data/gis/images/4326/hrrr/refd_1080.json', route => route.fulfill({
     json: { model_init_utc: '2026-07-25T12:00:00Z' }
   }));
+  await page.route('https://mesonet.agron.iastate.edu/data/gis/images/4326/USCOMP/n0q_0.json', route => route.fulfill({
+    json: { meta: { valid: '2026-07-25T20:55:00Z', product: 'N0Q' } }
+  }));
   await page.route('https://mesonet.agron.iastate.edu/cache/tile.py/**', route => route.fulfill({
     status: 200,
+    contentType: 'image/png',
+    body: transparentPng
+  }));
+  await page.route('https://mesonet.agron.iastate.edu/archive/data/**', route => route.fulfill({
+    status: 200,
+    headers: { 'access-control-allow-origin': '*' },
     contentType: 'image/png',
     body: transparentPng
   }));
@@ -59,8 +68,8 @@ test('hostile provider, bookmark, and search strings render only as text', async
   }));
 
   await page.goto('/');
-  await expect(page.locator('#dataStatusText')).toHaveText('HRRR: current');
-  await expect(page.locator('.sidebar .source-tab.active')).toHaveText('HRRR');
+  await expect(page.locator('#dataStatusText')).toHaveText('MRMS: current');
+  await expect(page.locator('.sidebar .source-tab.active')).toHaveText('MRMS');
 
   await page.locator('#bookmarksBtn').click();
   await expect(page.locator('.bm-item-name')).toHaveText(hostile);
@@ -81,6 +90,6 @@ test('oversized and unknown settings are rejected without breaking startup', asy
   });
   await page.goto('/');
   await expect(page.locator('#map .leaflet-container, #map.leaflet-container')).toHaveCount(1);
-  await expect(page.locator('.sidebar .source-tab.active')).toHaveText('HRRR');
-  await expect(page.locator('#dataStatusText')).toHaveText('HRRR: current');
+  await expect(page.locator('.sidebar .source-tab.active')).toHaveText('MRMS');
+  await expect(page.locator('#dataStatusText')).toHaveText('MRMS: current');
 });

@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- A first visit now opens on observed MRMS reflectivity over the dark basemap instead of HRRR forecast guidance over satellite imagery, so the opening view shows what is happening now and the radar ramp reads against a low-chroma ground. Saved profiles keep whatever source and basemap they already had.
 - Fixed the tropical cyclone overlay, which drew nothing outside the Atlantic. Its East Pacific source pointed at a host that no longer resolves, and the four layer ids it queried on the Atlantic service are group layers that answer with an error rather than features. It now reads Atlantic, East Pacific, and Central Pacific storms from the one live NHC service, probing forecast-point counts first so an empty basin costs a single small response.
 - Upgraded CesiumJS to 1.145.0, which replaces the bundled DOMPurify 3.4.12 in the deployed engine with the patched 3.4.14, and tightened the release gate to fail on moderate advisories so a shipped-code advisory can no longer pass silently.
 

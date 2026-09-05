@@ -92,3 +92,39 @@ test('future imports and browser quota failures are visible and recoverable', as
   await expect(page.locator('.toast').last()).toContainText('Settings could not be saved');
   await expect(page.locator('#map')).toBeVisible();
 });
+
+test('a first visit opens on observed radar over the dark basemap', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.removeItem('stormview_pro_v3');
+    localStorage.removeItem('stormview_welcomed_v5');
+    localStorage.setItem('stormview_welcomed', '1');
+  });
+  await page.goto('/');
+
+  await expect(page.locator('.sidebar [data-basemap="dark"]')).toHaveClass(/active/);
+  await expect(page.locator('.sidebar [data-source="mrms"]')).toHaveClass(/active/);
+});
+
+test('a stored profile keeps its own source and basemap', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.removeItem('stormview_pro_v3');
+    localStorage.removeItem('stormview_welcomed_v5');
+    localStorage.setItem('stormview_welcomed', '1');
+    localStorage.setItem('stormview_settings', JSON.stringify({
+      schemaVersion: 9,
+      settings: {
+        source: 'hrrr',
+        basemap: 'satellite',
+        autoRefresh: false,
+        layers: { radar: true, alerts: false, spcOutlook: false, states: false, counties: false, labels: false }
+      }
+    }));
+  });
+  await page.goto('/');
+
+  await expect(page.locator('.sidebar [data-basemap="satellite"]')).toHaveClass(/active/);
+  await expect(page.locator('.sidebar [data-source="hrrr"]')).toHaveClass(/active/);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('stormview_settings')).settings);
+  expect(stored.source).toBe('hrrr');
+  expect(stored.basemap).toBe('satellite');
+});

@@ -5683,9 +5683,12 @@
         let hrrrFrames = [];
 
         const settings = {
-            source: 'hrrr',
+            // Observed radar on a dark basemap. A first visit should show what
+            // is happening now, not model guidance, and radar colours need a
+            // low-chroma ground to read against.
+            source: 'mrms',
             radarProduct: 'reflectivity', // reflectivity, velocity, echoTops, precipAccum
-            basemap: 'satellite',
+            basemap: 'dark',
             theme: 'dark',
             visualPalette: 'standard',
             language: 'en',
