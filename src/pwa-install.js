@@ -12,6 +12,26 @@ export function normalizeOfflineAvailability(message) {
   };
 }
 
+export const STORAGE_PERSISTENCE_STATES = Object.freeze([
+  'unknown', 'unsupported', 'granted', 'denied'
+]);
+
+// Offline data the app advertises is worthless if the browser evicts it, so
+// the outcome of the persistence request is reported rather than assumed.
+export function normalizeStoragePersistence(value) {
+  return STORAGE_PERSISTENCE_STATES.includes(value) ? value : 'unknown';
+}
+
+export function storagePersistenceLabel(value) {
+  const labels = {
+    unknown: 'not requested',
+    unsupported: 'not supported by this browser',
+    granted: 'granted',
+    denied: 'denied, cached data can be evicted'
+  };
+  return labels[normalizeStoragePersistence(value)];
+}
+
 export function installPromptDismissed(dismissedAt, now = Date.now()) {
   const timestamp = Number(dismissedAt);
   return Number.isFinite(timestamp)

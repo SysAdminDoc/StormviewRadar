@@ -103,3 +103,55 @@ test('offline readiness may arrive before install eligibility and dismissal supp
   await page.evaluate(() => window.__dispatchInstallEvent('accepted'));
   await expect(page.locator('#pwaInstallPrompt')).toBeHidden();
 });
+
+// The app must say what the browser actually decided, because an evicted
+// cache silently breaks the offline mode the install prompt advertises.
+for (const [outcome, granted, pattern] of [['granted', true, /granted/], ['denied', false, /evicted/]]) {
+  test(`persistent storage is requested at the offline readiness boundary and reported as ${outcome}`, async ({ page }) => {
+    await page.addInitScript(([grantedValue]) => {
+      window.__persistCalls = 0;
+      Object.defineProperty(navigator, 'storage', {
+        configurable: true,
+        value: {
+          persisted: async () => false,
+          persist: async () => { window.__persistCalls += 1; return grantedValue; }
+        }
+      });
+    }, [granted]);
+    await prepareInstallPage(page);
+    await page.goto('/');
+    await expect(page.locator('#dataStatus')).toHaveAttribute('data-state', 'current');
+
+    // Nothing is requested before the app has offline data worth keeping.
+    expect(await page.evaluate(() => window.__persistCalls)).toBe(0);
+    await page.evaluate(() => window.__dispatchOfflineAvailability(0));
+    expect(await page.evaluate(() => window.__persistCalls)).toBe(0);
+
+    await page.evaluate(() => window.__dispatchOfflineAvailability(6));
+    await expect.poll(() => page.evaluate(() => window.__persistCalls)).toBe(1);
+
+    await page.locator('#settingsBtn').click();
+    await page.locator('.settings-tab[data-tab="diagnostics"]').click();
+    const row = page.locator('#diagStoragePersistence');
+    await expect(row).toHaveAttribute('data-state', outcome);
+    await expect(row).toContainText(pattern);
+
+    // Repeated readiness messages must not re-prompt the browser.
+    await page.evaluate(() => window.__dispatchOfflineAvailability(9));
+    await expect.poll(() => page.evaluate(() => window.__persistCalls)).toBe(1);
+  });
+}
+
+test('a browser without the storage API is reported as unsupported, not granted', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'storage', { configurable: true, value: undefined });
+  });
+  await prepareInstallPage(page);
+  await page.goto('/');
+  await expect(page.locator('#dataStatus')).toHaveAttribute('data-state', 'current');
+  await page.evaluate(() => window.__dispatchOfflineAvailability(6));
+
+  await page.locator('#settingsBtn').click();
+  await page.locator('.settings-tab[data-tab="diagnostics"]').click();
+  await expect(page.locator('#diagStoragePersistence')).toHaveAttribute('data-state', 'unsupported');
+});

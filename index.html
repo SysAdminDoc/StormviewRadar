@@ -3660,6 +3660,7 @@
                         <div class="diagnostic-row"><dt>Overlay loads</dt><dd id="diagOverlays">None</dd></div>
                         <div class="diagnostic-row"><dt>Retry / backoff</dt><dd id="diagRetry">Loading…</dd></div>
                         <div class="diagnostic-row"><dt>Tile providers</dt><dd id="diagTileBackoff">Loading…</dd></div>
+                        <div class="diagnostic-row"><dt>Offline storage</dt><dd id="diagStoragePersistence">Loading…</dd></div>
                     </dl>
                 </div>
                 <div class="settings-section">
@@ -3728,7 +3729,7 @@
     import { applyEmbedConfiguration, parseEmbedConfig } from './src/embed-mode.js';
     import { cardinalDirection, normalizeChasePosition, orientationHeading, smoothHeading } from './src/chasecaster.js';
     import { getTrainingScenario, trainingFeatureCollection, trainingScenarioCatalog } from './src/training-overlays.js';
-    import { normalizeOfflineAvailability, shouldOfferInstall } from './src/pwa-install.js';
+    import { normalizeOfflineAvailability, normalizeStoragePersistence, shouldOfferInstall, storagePersistenceLabel } from './src/pwa-install.js';
     import { animationDimensions, animationFilename, encodeAnimatedGif, recordCanvasMp4, rgbaToGifIndices, sampledFrameIndices, supportedMp4MimeType } from './src/animation-export.js';
     import { buildRadarHistoryFrames, radarHistoryHours, radarHistoryTickIndices } from './src/radar-history.js';
     import { buildGeometRadarFrames, GEOMET_RADAR_ENDPOINT, GEOMET_RADAR_LAYER, GEOMET_RADAR_STYLE, geometCapabilitiesUrl } from './src/geomet-radar.js';
@@ -3888,6 +3889,7 @@
         let trainingSuspendedViews = null;
         let deferredInstallPrompt = null;
         let offlineInstallAvailability = { shell: false, radarFrame: false, radarEntries: 0, ready: false };
+        let storagePersistence = 'unknown';
         let offlineFrameMarkPending = false;
         let initialLoadComplete = false;
         let animationExportController = null;
@@ -4741,6 +4743,24 @@
                 : t('offlineUnavailable');
         }
 
+        async function requestPersistentStorage() {
+            if (storagePersistence !== 'unknown') return storagePersistence;
+            if (!navigator.storage?.persist) {
+                storagePersistence = 'unsupported';
+                renderDiagnostics();
+                return storagePersistence;
+            }
+            try {
+                const already = await navigator.storage.persisted?.();
+                storagePersistence = (already || await navigator.storage.persist()) ? 'granted' : 'denied';
+            } catch (error) {
+                console.warn('Persistent storage could not be requested:', error);
+                storagePersistence = 'denied';
+            }
+            renderDiagnostics();
+            return storagePersistence;
+        }
+
         async function initOfflineFallback() {
             window.addEventListener('offline', updateOfflineStatus);
             window.addEventListener('online', () => {
@@ -4757,6 +4777,9 @@
                 }
                 if (event.data?.type === 'stormview-offline-availability') {
                     offlineInstallAvailability = normalizeOfflineAvailability(event.data);
+                    // Ask for durable storage at the same moment the app decides
+                    // it has something worth keeping offline.
+                    if (offlineInstallAvailability.ready) requestPersistentStorage();
                     updatePwaInstallPrompt();
                 }
             });
@@ -5017,7 +5040,8 @@
                         name,
                         { ...value }
                     ])),
-                    tileBackoff: rateLimiter.snapshot()
+                    tileBackoff: rateLimiter.snapshot(),
+                    storagePersistence: normalizeStoragePersistence(storagePersistence)
                 },
                 requests: diagnosticsState.requests.map(request => ({ ...request }))
             };
@@ -5052,6 +5076,9 @@
                     .map(provider => `${provider.provider} paused until ${formatLocalizedDate(provider.pauseUntil, { timeStyle: 'medium' })}`)
                     .join(' · ')
                 : t('diagnosticNoTilePause');
+            document.getElementById('diagStoragePersistence').dataset.state = report.resources.storagePersistence;
+            document.getElementById('diagStoragePersistence').textContent =
+                localizedStaticText(storagePersistenceLabel(report.resources.storagePersistence));
 
             const requestList = document.getElementById('diagRequests');
             requestList.replaceChildren();

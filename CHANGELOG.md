@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- The app now asks the browser for durable storage at the moment it decides it has offline data worth keeping, and the Status tab reports what the browser actually answered. Cached radar frames and tiles previously sat in best-effort storage that a browser may evict at any time, while the install prompt advertised them as available offline.
 - State and county boundaries now ship with the app instead of loading from a third-party CDN at runtime. They were the last remote asset, so the content security policy no longer allows any CDN origin at all, and the boundary files are covered by the same lockfile integrity check as every other vendored asset.
 - Made the radar legend readable. Its tick labels were laid out in an 18-pixel column, so "75+ dBZ" and "5 dBZ" wrapped one character per line and the scale was unreadable at every screen size. The legend now sizes to its labels and keeps clear of the middle of the map.
 - Moved the first-visit tip clear of the map chrome. It is a toast, and the toast container sat at the same height as the quick toolbar, so on a narrow screen the tip covered ten of the eleven layer buttons and the active-alert banner, and on a wide screen it covered the last button.

@@ -5,7 +5,9 @@ import {
   INSTALL_DISMISSAL_MS,
   installPromptDismissed,
   normalizeOfflineAvailability,
-  shouldOfferInstall
+  normalizeStoragePersistence,
+  shouldOfferInstall,
+  storagePersistenceLabel
 } from '../src/pwa-install.js';
 
 test('offline install readiness requires a cached shell and a non-empty completed radar frame', () => {
@@ -36,4 +38,19 @@ test('web app manifest exposes standalone identity and install-sized local icons
   assert.equal(manifest.scope, './');
   assert.deepEqual(manifest.icons.map(icon => icon.sizes), ['192x192', '512x512']);
   assert.ok(manifest.icons.every(icon => icon.src.startsWith('logo/') && icon.type === 'image/png'));
+});
+
+test('storage persistence states normalize and describe themselves', () => {
+  assert.equal(normalizeStoragePersistence('granted'), 'granted');
+  assert.equal(normalizeStoragePersistence('denied'), 'denied');
+  assert.equal(normalizeStoragePersistence('unsupported'), 'unsupported');
+  // Anything unrecognised must read as not requested, never as granted.
+  assert.equal(normalizeStoragePersistence('yes'), 'unknown');
+  assert.equal(normalizeStoragePersistence(undefined), 'unknown');
+  assert.equal(normalizeStoragePersistence(true), 'unknown');
+
+  assert.match(storagePersistenceLabel('granted'), /granted/);
+  assert.match(storagePersistenceLabel('denied'), /evicted/);
+  assert.match(storagePersistenceLabel('unsupported'), /not supported/);
+  assert.match(storagePersistenceLabel('nonsense'), /not requested/);
 });
