@@ -370,3 +370,95 @@ test('failed Level II refresh restores a live object URL and revokes it once aft
     window.__revokedRadarUrls.filter(value => value === url).length
   ), originalUrl)).toBe(1);
 });
+
+// The site inventory carries no health at all, so picking a radar in
+// maintenance used to show an old volume with nothing to explain it.
+test('the site picker reports operating, offline, and stale radars', async ({ page }) => {
+  const now = Date.now();
+  const station = (id, status, operability, minutes) => ({
+    properties: {
+      id,
+      latency: { levelTwoLastReceivedTime: new Date(now - minutes * 60000).toISOString() },
+      rda: { properties: { status, operabilityStatus: operability, alarmSummary: 'Tower/Utilities' } }
+    }
+  });
+
+  await page.addInitScript(() => {
+    localStorage.setItem('stormview_welcomed', '1');
+    localStorage.setItem('stormview_settings', JSON.stringify({
+      schemaVersion: 9,
+      settings: {
+        source: 'hrrr',
+        basemap: 'dark',
+        autoRefresh: false,
+        layers: { radar: true, alerts: false, spcOutlook: false, states: false, counties: false, labels: false }
+      }
+    }));
+  });
+  await page.route('https://mesonet.agron.iastate.edu/data/gis/images/4326/hrrr/refd_1080.json', route => route.fulfill({
+    json: { model_init_utc: '2026-08-12T12:00:00Z', forecast_minute: 180 }
+  }));
+  await page.route('https://mesonet.agron.iastate.edu/cache/tile.py/**', route => route.fulfill({
+    status: 200, contentType: 'image/png', body: transparentPng
+  }));
+  await page.route('https://mesonet.agron.iastate.edu/geojson/network/NEXRAD.geojson', route => route.fulfill({
+    json: {
+      type: 'FeatureCollection',
+      features: [
+        { id: 'DMX', properties: { sid: 'DMX', sname: 'Des Moines', state: 'IA', online: true }, geometry: { type: 'Point', coordinates: [-93.72, 41.73] } },
+        { id: 'TLX', properties: { sid: 'TLX', sname: 'Oklahoma City', state: 'OK', online: true }, geometry: { type: 'Point', coordinates: [-97.28, 35.33] } },
+        { id: 'OAX', properties: { sid: 'OAX', sname: 'Omaha', state: 'NE', online: true }, geometry: { type: 'Point', coordinates: [-96.37, 41.32] } },
+        { id: 'FWS', properties: { sid: 'FWS', sname: 'Fort Worth', state: 'TX', online: true }, geometry: { type: 'Point', coordinates: [-97.30, 32.57] } }
+      ]
+    }
+  }));
+  await page.route('https://api.weather.gov/radar/stations**', route => route.fulfill({
+    json: {
+      type: 'FeatureCollection',
+      features: [
+        station('KDMX', 'Operate', 'RDA - On-line', 2),
+        station('KTLX', 'Operate', 'RDA - Maintenance Action Mandatory', 3),
+        station('KOAX', 'Operate', 'RDA - On-line', 45),
+        station('KFWS', 'Start-Up', 'RDA - On-line', 1)
+      ]
+    }
+  }));
+
+  await page.goto('/');
+  await page.locator('.sidebar [data-source="level2"]').evaluate(element => element.click());
+  const select = page.locator('.level2-site-select').first();
+  await expect(select.locator('option[value="KDMX"]')).toHaveCount(1);
+
+  // The badge in the option text is what a user sees before choosing.
+  const options = await select.locator('option').evaluateAll(items => items.map(item => ({
+    value: item.value,
+    text: item.textContent,
+    state: item.dataset.siteState
+  })));
+  const byValue = Object.fromEntries(options.filter(option => option.value).map(option => [option.value, option]));
+  expect(byValue.KDMX.state).toBe('operating');
+  expect(byValue.KDMX.text).not.toMatch(/\(/);
+  expect(byValue.KTLX.state).toBe('degraded');
+  expect(byValue.KTLX.text).toMatch(/maintenance/);
+  expect(byValue.KOAX.state).toBe('stale');
+  expect(byValue.KOAX.text).toMatch(/no recent data/);
+  expect(byValue.KFWS.state).toBe('down');
+  expect(byValue.KFWS.text).toMatch(/offline/);
+
+  // Selecting one explains itself rather than silently showing an old scan.
+  // The sidebar is mirrored into the mobile sheet, so this control exists twice.
+  const health = page.locator('.level2-site-health').first();
+  await select.selectOption('KFWS');
+  await expect(health).toHaveAttribute('data-site-state', 'down');
+  await expect(health).toContainText(/KFWS/);
+  await expect(health).toContainText(/offline \(Start-Up\)/);
+
+  await select.selectOption('KOAX');
+  await expect(health).toHaveAttribute('data-site-state', 'stale');
+  await expect(health).toContainText(/no recent Level II volume/);
+  await expect(health).toContainText(/last volume 45 min ago/);
+
+  await select.selectOption('KDMX');
+  await expect(health).toHaveAttribute('data-site-state', 'operating');
+  await expect(health).toContainText(/operating/);
+});

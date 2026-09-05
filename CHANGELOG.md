@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- The NEXRAD Level II site picker now reports each radar's health. Sites in maintenance, sites that are not operating, and sites whose last volume is more than twenty minutes old are marked in the list, and the selected site shows its status and the age of its last volume instead of silently displaying an old scan.
 - The first-visit tip now measures the alert banner instead of assuming its height, so it no longer covers a live warning when the event name wraps to two lines on a narrow screen.
 - The radar legend keeps clear of the middle of the map down to a 320-pixel viewport, where the wider readable panel had started to overlap it.
 - Layer icons in the quick toolbar are drawn in the system palette under Windows High Contrast. Their author colours previously survived forced-colors mode on SVG, leaving the yellow and cyan icons close to invisible on a light high-contrast theme.

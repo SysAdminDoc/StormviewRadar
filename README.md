@@ -167,6 +167,7 @@ API keys are stored unencrypted in the current browser profile and sent directly
 | NOAA radar mosaic | [nowCOAST](https://nowcoast.noaa.gov/) | Provider dependent |
 | North American radar rain rate | [ECCC MSC GeoMet](https://eccc-msc.github.io/open-data/msc-data/obs_radar/readme_radar_geomet_en/) | 6-minute frames |
 | NEXRAD Level II | [NOAA / NSF Unidata on AWS](https://registry.opendata.aws/noaa-nexrad/) | Per volume scan |
+| Radar site health | [NWS API](https://www.weather.gov/documentation/services-web-api) | Per volume scan |
 | Historical radar and warnings | [Iowa State Mesonet](https://mesonet.agron.iastate.edu/GIS/rasters.php?rid=2) | 5-minute frames |
 | Alerts | [NWS API](https://www.weather.gov/documentation/services-web-api) | Real-time |
 | SPC Outlook | [SPC](https://www.spc.noaa.gov/) | Daily |

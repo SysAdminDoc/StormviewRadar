@@ -1227,6 +1227,17 @@
             font-weight: 600;
         }
         .level2-site-row.visible { display: flex; }
+        .level2-site-health {
+            display: none;
+            margin-top: 5px;
+            font-size: 10px;
+            line-height: 1.35;
+            color: var(--text-muted);
+        }
+        .level2-site-row.visible + .level2-site-health { display: block; }
+        .level2-site-health[data-site-state="degraded"] { color: var(--warning); }
+        .level2-site-health[data-site-state="stale"] { color: var(--warning); }
+        .level2-site-health[data-site-state="down"] { color: var(--danger); }
         .level2-site-select {
             min-width: 0;
             flex: 1;
@@ -2790,6 +2801,7 @@
                     <option value="">Nearest to map center</option>
                 </select>
             </label>
+            <div class="level2-site-health" data-site-state="unknown" role="status" aria-live="polite">Site status unavailable</div>
             <div class="source-capability-note" id="sourceCapabilityNote"></div>
         </div>
         
@@ -3828,6 +3840,7 @@
             nowcoastCapabilities: 'https://nowcoast.noaa.gov/geoserver/observations/weather_radar/ows?service=WMS&version=1.3.0&request=GetCapabilities',
             geometCapabilities: geometCapabilitiesUrl('en'),
             nexradSites: 'https://mesonet.agron.iastate.edu/geojson/network/NEXRAD.geojson',
+            radarStations: 'https://api.weather.gov/radar/stations?stationType=WSR-88D',
             
             // Browser-safe aviation hazards. AviationWeather PIREPs forbid CORS.
             sigmets: 'https://api.weather.gov/alerts/active?event=SIGMET,Convective%20SIGMET,AIRMET'
@@ -3950,6 +3963,7 @@
         let level2WorkerSequence = 0;
         let level2LoadedKey = null;
         let level2Sites = [];
+        let level2SiteHealth = new Map();
         let level2Couplets = [];
         let meshWorker = null;
         let meshWorkerSequence = 0;
@@ -4228,6 +4242,7 @@
                 roadEventsEmpty: 'No Iowa DOT road events in this view · Iowa only',
                 roadEventsOutside: 'Outside Iowa DOT road-event coverage',
                 roadEventsUnavailable: 'Iowa road events unavailable: {message}',
+                level2SiteHealthUnknown: 'Site status unavailable',
                 roadClosure: 'Road closure',
                 laneClosure: 'Lane closure',
                 roadRestriction: 'Road restriction',
@@ -4448,6 +4463,7 @@
                 roadEventsEmpty: 'No hay eventos viales del DOT de Iowa en esta vista · solo Iowa',
                 roadEventsOutside: 'Fuera de la cobertura de eventos viales del DOT de Iowa',
                 roadEventsUnavailable: 'Eventos viales de Iowa no disponibles: {message}',
+                level2SiteHealthUnknown: 'Estado del sitio no disponible',
                 roadClosure: 'Carretera cerrada',
                 laneClosure: 'Carril cerrado',
                 roadRestriction: 'Restricción vial',
@@ -7562,8 +7578,26 @@
                 console.warn('NEXRAD site inventory unavailable; using fallback sites:', error);
                 level2Sites = LEVEL2_FALLBACK_SITES.map(site => ({ ...site }));
             }
+            await loadLevel2SiteHealth(signal);
             syncLevel2SiteControls();
             return level2Sites;
+        }
+
+        // A site can answer and still be publishing nothing, so the picker
+        // reports the RDA status and the age of the last Level II volume.
+        async function loadLevel2SiteHealth(signal) {
+            if (level2SiteHealth.size) return level2SiteHealth;
+            try {
+                const response = await fetchWithTimeout(DATA_URLS.radarStations, { signal });
+                const payload = await response.json();
+                const tools = await import('./src/radar-sites.js');
+                level2SiteHealth = tools.normalizeRadarSiteHealthIndex(payload, { now: Date.now() });
+            } catch (error) {
+                if (signal?.aborted) throw error;
+                console.warn('Radar site health unavailable:', error);
+                level2SiteHealth = new Map();
+            }
+            return level2SiteHealth;
         }
 
         function nearestLevel2Site() {
@@ -7585,7 +7619,12 @@
             document.querySelectorAll('.level2-site-select').forEach(select => {
                 const previousValue = settings.level2Site;
                 select.replaceChildren(new Option('Nearest to map center', ''));
-                level2Sites.forEach(site => select.add(new Option(`${site.id} — ${site.name}`, site.id)));
+                level2Sites.forEach(site => {
+                    const health = level2SiteHealth.get(site.id);
+                    const option = new Option(`${site.id} — ${site.name}${level2SiteBadge(health)}`, site.id);
+                    option.dataset.siteState = health?.state || 'unknown';
+                    select.add(option);
+                });
                 select.value = previousValue;
                 if (select.dataset.wired === 'true') return;
                 select.dataset.wired = 'true';
@@ -7595,9 +7634,47 @@
                         other.value = settings.level2Site;
                     });
                     saveSettings();
+                    renderLevel2SiteHealth();
                     if (settings.source === 'level2') loadRadarData();
                 });
             });
+            renderLevel2SiteHealth();
+        }
+
+        function level2SiteBadge(health) {
+            if (!health || health.state === 'operating' || health.state === 'unknown') return '';
+            const badges = {
+                degraded: ' (maintenance)',
+                stale: ' (no recent data)',
+                down: ' (offline)'
+            };
+            return badges[health.state] || '';
+        }
+
+        function renderLevel2SiteHealth() {
+            const site = level2Sites.length ? selectedLevel2Site() : null;
+            const health = site ? level2SiteHealth.get(site.id) : null;
+            document.querySelectorAll('.level2-site-health').forEach(element => {
+                element.dataset.siteState = health?.state || 'unknown';
+                element.textContent = health
+                    ? `${site.id}: ${level2SiteHealthText(health)}`
+                    : t('level2SiteHealthUnknown');
+            });
+        }
+
+        function level2SiteHealthText(health) {
+            const parts = [];
+            if (health.state === 'down') parts.push(`offline (${health.status})`);
+            else if (health.state === 'stale') parts.push('no recent Level II volume');
+            else if (health.state === 'degraded') parts.push(health.operability || 'maintenance flagged');
+            else parts.push('operating');
+            if (health.alarm && health.state !== 'operating') parts.push(health.alarm);
+            if (health.ageMinutes !== null) {
+                parts.push(health.ageMinutes < 1
+                    ? 'last volume under a minute ago'
+                    : `last volume ${health.ageMinutes} min ago`);
+            }
+            return parts.join(' · ');
         }
 
         function level2DatePrefix(date, siteId) {
