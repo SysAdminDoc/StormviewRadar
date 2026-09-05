@@ -71,7 +71,7 @@ const OVERLAY_DEFINITIONS = Object.freeze({
   spcTornado: ['SPC tornado probability', 'hazards', 'CONUS'],
   spcWind: ['SPC wind probability', 'hazards', 'CONUS'],
   spcHail: ['SPC hail probability', 'hazards', 'CONUS'],
-  tropical: ['Tropical systems', 'hazards', 'Atlantic and eastern Pacific'],
+  tropical: ['Tropical systems', 'hazards', 'Atlantic, eastern Pacific, and central Pacific'],
   sigmets: ['Aviation hazards', 'hazards', 'United States'],
   temp: ['Temperature', 'weather', 'current map view'],
   wind: ['Wind', 'weather', 'current map view'],

@@ -3853,17 +3853,17 @@
         // query with an error object rather than features, so only the four
         // drawable offsets below are ever requested.
         const NHC_TROPICAL_SERVICE = 'https://mapservices.weather.noaa.gov/tropical/rest/services/tropical/NHC_tropical_weather/MapServer';
-        const NHC_SLOT_BASE_LAYER = 4;
-        const NHC_SLOT_STRIDE = 26;
         const NHC_SLOT_IDS = [
             'AT1', 'AT2', 'AT3', 'AT4', 'AT5',
             'EP1', 'EP2', 'EP3', 'EP4', 'EP5',
             'CP1', 'CP2', 'CP3', 'CP4', 'CP5'
         ];
-        // Offsets within a slot: forecast points, forecast track, forecast
-        // cone, and watch/warning. getTropicalStyle() is keyed by the offset.
-        const NHC_SLOT_OFFSETS = [2, 3, 4, 5];
-        const NHC_SLOT_POINTS_OFFSET = 2;
+        // Per-storm products, in draw order. The first is also the layer
+        // probed to decide whether a slot holds a storm at all.
+        const NHC_SLOT_PRODUCTS = ['Forecast Points', 'Forecast Track', 'Forecast Cone', 'Watch-Warning'];
+        // Basin-agnostic outlook layers, drawn whether or not a numbered
+        // storm exists. These carry the seven-day development areas.
+        const NHC_OUTLOOK_LAYERS = ['Seven-Day: Current Location', 'Seven-Day: Potential Development Region'];
 
         // ==================== STATE ====================
         let map, baseLayer, locationMarker;
@@ -8369,26 +8369,29 @@
             layerRefs.tropical = L.layerGroup().addTo(map);
             
             try {
-                // Probing forecast-point counts first keeps an empty basin to
-                // one 11-byte response instead of four full geometry queries.
-                const activeSlots = await activeTropicalSlots(controller.signal);
+                const catalog = await tropicalLayerIds(controller.signal);
+                if (controller.signal.aborted || !settings.layers.tropical) return;
+                const probes = await activeTropicalSlots(catalog.slots, controller.signal);
                 if (controller.signal.aborted || !settings.layers.tropical) return;
 
-                const layers = activeSlots.flatMap(slotIndex =>
-                    NHC_SLOT_OFFSETS.map(offset => ({ slotIndex, offset }))
-                );
+                // The outlook areas are drawn whether or not a numbered storm
+                // exists; most of a season has development areas and no storm.
+                const layers = [
+                    ...catalog.outlook,
+                    ...probes.active.flatMap(slot => slot.products)
+                ];
                 let featureCount = 0;
+                let failedLayers = probes.failures;
 
-                for (const { slotIndex, offset } of layers) {
+                for (const { id: layerId, name, kind } of layers) {
                     try {
-                        const layerId = tropicalSlotLayerId(slotIndex, offset);
                         const resp = await fetchWithTimeout(`${NHC_TROPICAL_SERVICE}/${layerId}/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson`, { signal: controller.signal });
                         const data = await resp.json();
                         if (controller.signal.aborted || !settings.layers.tropical) return;
                         const features = featureList(data, MAX_POINT_FEATURES);
                         if (features.length > 0) {
                             const layer = L.geoJSON({ type: 'FeatureCollection', features }, {
-                                style: getTropicalStyle(offset),
+                                style: getTropicalStyle(kind),
                                 pointToLayer: (feature, latlng) => {
                                     return L.circleMarker(latlng, getTropicalPointStyle(feature));
                                 },
@@ -8413,12 +8416,16 @@
                         }
                     } catch(e) {
                         if (e?.name === 'AbortError') return;
-                        console.warn(`Failed to load tropical layer ${NHC_SLOT_IDS[slotIndex]}+${offset}:`, e);
+                        failedLayers += 1;
+                        console.warn(`Failed to load tropical layer ${name}:`, e);
                     }
                 }
                 
                 setLayerFeatureCount('tropical', featureCount);
-                showDataStatus('Tropical data loaded');
+                // A failed request must never read as an all-clear basin.
+                showDataStatus(failedLayers > 0
+                    ? `Tropical data incomplete: ${failedLayers} request(s) failed`
+                    : 'Tropical data loaded');
             } catch(e) {
                 if (e?.name === 'AbortError') return;
                 console.error('Tropical load error:', e);
@@ -8427,35 +8434,67 @@
             }
         }
         
-        function tropicalSlotLayerId(slotIndex, offset) {
-            return NHC_SLOT_BASE_LAYER + slotIndex * NHC_SLOT_STRIDE + offset;
+        // The service publishes 400 layers and has already been re-published
+        // with ids appended out of order, so ids are resolved by name from the
+        // service description rather than computed. A layer that owns
+        // subLayerIds is a group and answers a query with an error body.
+        async function tropicalLayerIds(signal) {
+            const resp = await fetchWithTimeout(`${NHC_TROPICAL_SERVICE}?f=json`, { signal });
+            const data = await resp.json();
+            const leaves = new Map();
+            for (const layer of Array.isArray(data?.layers) ? data.layers : []) {
+                const id = Number(layer?.id);
+                const name = String(layer?.name || '');
+                if (!Number.isInteger(id) || !name) continue;
+                if (Array.isArray(layer?.subLayerIds) && layer.subLayerIds.length > 0) continue;
+                leaves.set(name, id);
+            }
+            return {
+                outlook: NHC_OUTLOOK_LAYERS
+                    .map(name => ({ name, kind: name, id: leaves.get(name) }))
+                    .filter(entry => Number.isInteger(entry.id)),
+                slots: NHC_SLOT_IDS.map(slotId => ({
+                    slotId,
+                    products: NHC_SLOT_PRODUCTS
+                        .map(kind => ({ name: `${slotId} ${kind}`, kind, id: leaves.get(`${slotId} ${kind}`) }))
+                        .filter(entry => Number.isInteger(entry.id))
+                })).filter(slot => slot.products.length > 0)
+            };
         }
 
-        // Returns the indexes of the storm slots that currently hold a forecast
-        // point, so only basins with a live cyclone are drawn.
-        async function activeTropicalSlots(signal) {
-            const probes = await Promise.all(NHC_SLOT_IDS.map(async (slotId, slotIndex) => {
-                const layerId = tropicalSlotLayerId(slotIndex, NHC_SLOT_POINTS_OFFSET);
+        // Returns the slots that currently hold a forecast point, so a basin
+        // with no storm costs one 11-byte response instead of four geometry
+        // queries. A probe that fails is reported, never treated as empty.
+        async function activeTropicalSlots(slots, signal) {
+            const probes = await Promise.all(slots.map(async slot => {
+                const probe = slot.products[0];
                 try {
-                    const resp = await fetchWithTimeout(`${NHC_TROPICAL_SERVICE}/${layerId}/query?where=1%3D1&returnCountOnly=true&f=json`, { signal });
+                    const resp = await fetchWithTimeout(`${NHC_TROPICAL_SERVICE}/${probe.id}/query?where=1%3D1&returnCountOnly=true&f=json`, { signal });
                     const data = await resp.json();
-                    return Number(data?.count) > 0 ? slotIndex : null;
+                    if (!Number.isFinite(Number(data?.count))) throw new Error(`${probe.name} did not return a count`);
+                    return { slot, active: Number(data.count) > 0, failed: false };
                 } catch(e) {
-                    if (e?.name !== 'AbortError') console.warn(`Failed to probe tropical slot ${slotId}:`, e);
-                    return null;
+                    if (e?.name === 'AbortError') return { slot, active: false, failed: false };
+                    console.warn(`Failed to probe tropical slot ${slot.slotId}:`, e);
+                    return { slot, active: false, failed: true };
                 }
             }));
-            return probes.filter(slotIndex => slotIndex !== null);
+            return {
+                active: probes.filter(probe => probe.active).map(probe => probe.slot),
+                failures: probes.filter(probe => probe.failed).length
+            };
         }
 
-        function getTropicalStyle(offset) {
+        function getTropicalStyle(kind) {
             const styles = {
-                2: { color: '#ffffff', weight: 2, opacity: 0.8 }, // Forecast points
-                3: { color: '#00ffff', weight: 3, opacity: 0.9 }, // Forecast track
-                4: { color: '#ffffff', weight: 2, fillColor: '#ff6b6b', fillOpacity: 0.2 }, // Cone
-                5: { color: '#ff0000', weight: 3, opacity: 1 }, // Watch/Warning
+                'Seven-Day: Current Location': { color: '#ffffff', weight: 2, opacity: 0.8 },
+                'Seven-Day: Potential Development Region': { color: '#00ffff', weight: 3, opacity: 0.9 },
+                'Forecast Points': { color: '#ffffff', weight: 2, opacity: 0.8 },
+                'Forecast Track': { color: '#00ffff', weight: 3, opacity: 0.9 },
+                'Forecast Cone': { color: '#ffffff', weight: 2, fillColor: '#ff6b6b', fillOpacity: 0.2 },
+                'Watch-Warning': { color: '#ff0000', weight: 3, opacity: 1 }
             };
-            return styles[offset] || { color: '#ffffff', weight: 1 };
+            return styles[kind] || { color: '#ffffff', weight: 1 };
         }
         
         function getTropicalPointStyle(feature) {

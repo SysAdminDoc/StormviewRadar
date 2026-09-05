@@ -37,6 +37,17 @@ test.beforeEach(async ({ page }) => {
     contentType: 'image/png',
     body: transparentPng
   }));
+  // MRMS is the default source, so a profile with no stored settings lands
+  // here rather than on HRRR.
+  await page.route('https://mesonet.agron.iastate.edu/data/gis/images/4326/USCOMP/n0q_0.json', route => route.fulfill({
+    json: { meta: { valid: '2026-07-25T20:55:00Z', product: 'N0Q' } }
+  }));
+  await page.route('https://mesonet.agron.iastate.edu/archive/data/**', route => route.fulfill({
+    status: 200,
+    headers: { 'access-control-allow-origin': '*' },
+    contentType: 'image/png',
+    body: transparentPng
+  }));
 });
 
 test('legacy settings migrate once into the versioned schema', async ({ page }) => {
@@ -101,6 +112,9 @@ test('a first visit opens on observed radar over the dark basemap', async ({ pag
   });
   await page.goto('/');
 
+  // The source has to actually load, not merely be selected in the sidebar.
+  await expect(page.locator('#dataStatusText')).toHaveText('MRMS: current');
+  await expect(page.locator('#timestampBox')).toHaveAttribute('data-source', 'mrms');
   await expect(page.locator('.sidebar [data-basemap="dark"]')).toHaveClass(/active/);
   await expect(page.locator('.sidebar [data-source="mrms"]')).toHaveClass(/active/);
 });
