@@ -2694,8 +2694,9 @@
         <div class="compare-map-controls glass">
             <strong class="compare-map-title" id="compareMapTitle">Comparison view</strong>
             <div class="compare-search-wrap">
-                <input class="compare-search-input" id="compareSearchInput" type="search" placeholder="Search comparison city…" aria-label="Search comparison city" role="combobox" aria-autocomplete="list" aria-controls="compareSearchResults" aria-expanded="false">
+                <input class="compare-search-input" id="compareSearchInput" type="search" placeholder="Search comparison city…" aria-label="Search comparison city" role="combobox" aria-autocomplete="list" aria-controls="compareSearchResults" aria-expanded="false" aria-describedby="compareSearchLock">
                 <div class="compare-search-results" id="compareSearchResults" role="listbox" aria-label="Comparison city suggestions"></div>
+                <span class="sr-only" id="compareSearchLock" role="status"></span>
             </div>
             <select class="compare-product-select" id="compareProductSelect" aria-label="Comparison pane radar product" hidden></select>
             <button class="compare-map-close" id="compareMapClose" type="button" aria-label="Close two-city view">×</button>

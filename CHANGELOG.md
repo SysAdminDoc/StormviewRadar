@@ -4,6 +4,11 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Changing the primary product to the one the comparison pane was showing, or moving to a source that has no second product, now hands that pane back to its comparison city. It used to stay over the primary view while the title named a city it was not over, and the next drag saved the primary coordinates under that name.
+- A product comparison holds while the timeline is parked on the live frame. Playback used to flip the pane to the second product for a single frame per loop, because only the newest MRMS frame is live and the six-hour archive is reflectivity only.
+- The comparison pane no longer tears down and rebuilds its radar layer on every refresh while two products are paired.
+- The comparison search stays reachable by keyboard while a pairing holds the view, and says why it cannot be used, instead of being disabled with an explanation nobody could get to.
+- Echo Tops and Precipitation are translated in the Spanish interface.
 - The syntax check now walks `src/` and `scripts/` instead of running from a list of filenames kept by hand in package.json. The list had fallen behind by two modules, so `src/level2-analysis.js` and `src/zlib-browser-shim.js` were not being checked at all. Forty-eight files are covered now against thirty-one before.
 - The comparison pane can now carry a second MRMS product instead of a second city, so velocity can sit beside reflectivity over the same ground. Choosing a product locks both panes to the primary view, and the choice is remembered. IEM only archives the reflectivity composite, so scrubbing into the past mirrors the primary rather than pairing a live scan with an old one, and the pane says so.
 - Fixed the radar site and tilt pickers in the mobile sheet, which did nothing when used. The sheet is a copy of the sidebar, and the copy carried the marker that says "already wired" without carrying the listener, so on a phone, where the sidebar is hidden, neither control worked.

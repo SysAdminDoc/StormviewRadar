@@ -230,6 +230,8 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
         // The mobile sheet is built with cloneNode, which copies a data-* marker
         // but not the listener, so wiring has to be tracked per element object.
         const wiredSelects = new WeakSet();
+        let comparisonPairingActive = false;
+        let restoringComparisonLocation = false;
         let level2Couplets = [];
         let meshWorker = null;
         let meshWorkerSequence = 0;
@@ -823,6 +825,8 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             'Nearest to map center': 'Más cercano al centro del mapa',
             'Reflectivity': 'Reflectividad',
             'Velocity': 'Velocidad',
+            'Echo Tops': 'Topes de eco',
+            'Precipitation': 'Precipitación',
             'Rain Rate': 'Tasa de lluvia',
             'Correlation': 'Correlación',
             'Rotation Candidates': 'Candidatos de rotación',
@@ -1821,10 +1825,10 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             if (typeof candidate.level2Site === 'string' && /^(?:|[A-Z]{4})$/.test(candidate.level2Site)) {
                 result.level2Site = candidate.level2Site;
             }
-            // null means "lowest cut". Anything else must be a real elevation index.
             if (typeof candidate.compareProduct === 'string') {
-                result.compareProduct = normalizeComparisonProduct(candidate.compareProduct, result.radarProduct);
+                result.compareProduct = normalizeComparisonProduct(candidate.compareProduct, '');
             }
+            // null means "lowest cut". Anything else must be a real elevation index.
             if (candidate.level2Tilt === null) {
                 result.level2Tilt = null;
             } else if (Number.isInteger(candidate.level2Tilt) && candidate.level2Tilt >= 1 && candidate.level2Tilt <= 25) {
@@ -2529,6 +2533,7 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             if (container) {
                 container.dataset.radarFrame = '';
                 container.dataset.radarSource = '';
+                container.dataset.radarProduct = '';
             }
         }
 
@@ -2577,7 +2582,20 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
         // The comparison pane can either sit over another city or carry another
         // product over this one. Those cannot both be true, so choosing a product
         // takes the city search out of reach until it is set back.
+        // A pairing can end without anyone touching the select: changing the
+        // primary product to the compared one, or moving to a source that has no
+        // second product. The pane is over the primary view at that moment, so it
+        // has to be handed back to the comparison city, or the title names a city
+        // the pane is not over and the next drag saves the primary’s coordinates
+        // under that name.
+        function syncComparisonPairing() {
+            const active = Boolean(comparisonProductChoice());
+            if (comparisonPairingActive && !active) restoreComparisonLocation();
+            comparisonPairingActive = active;
+        }
+
         function syncComparisonProductControl() {
+            syncComparisonPairing();
             const select = document.getElementById('compareProductSelect');
             if (!select) return;
             const capability = RADAR_CAPABILITIES[settings.source] || RADAR_CAPABILITIES.mrms;
@@ -2598,9 +2616,15 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             }
             if (select.value !== active) select.value = active;
             const search = document.getElementById('compareSearchInput');
-            if (search) {
-                search.disabled = Boolean(active);
-                search.title = active ? t('compareProductLocked') : '';
+            const lockNote = document.getElementById('compareSearchLock');
+            if (search && lockNote) {
+                // A disabled input cannot be focused, so a screen reader never
+                // reaches the reason it is unusable. Read-only keeps it in the tab
+                // order with the explanation attached.
+                search.readOnly = Boolean(active);
+                search.setAttribute('aria-disabled', String(Boolean(active)));
+                lockNote.textContent = active ? t('compareProductLocked') : '';
+                if (active) search.value = '';
             }
             if (wiredSelects.has(select)) return;
             wiredSelects.add(select);
@@ -2608,8 +2632,15 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
                 settings.compareProduct = normalizeComparisonProduct(select.value, settings.radarProduct);
                 saveSettings();
                 compareRadarSignature = null;
-                if (settings.compareProduct) syncComparisonViewToPrimary();
-                else restoreComparisonLocation();
+                if (settings.compareProduct) {
+                    // The pairing only holds on the live frame, so land there
+                    // rather than showing a mirrored pane and an explanation.
+                    if (isPlaying) pause();
+                    if (framesReady && frames.length) showPreloadedFrame(frames.length - 1);
+                    syncComparisonViewToPrimary();
+                } else {
+                    restoreComparisonLocation();
+                }
                 refreshComparisonRadar();
                 refreshComparisonAlerts();
                 updateSplitViewLabels();
@@ -2629,6 +2660,11 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
         // product and the pane mirrors the primary rather than showing two
         // different times side by side.
         function comparisonProductAvailable() {
+            // Only the newest MRMS frame is live, so during playback the pairing
+            // could hold for one frame in seventy-three. Flashing the second
+            // product once per loop is worse than not showing it, so a pairing
+            // holds only while the timeline is parked on the live frame.
+            if (isPlaying) return false;
             return frames[currentFrame]?.kind !== 'past';
         }
 
@@ -2655,14 +2691,7 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
 
         // Comparing two products only means anything over the same ground, so the
         // second pane follows the primary view while a product is being compared.
-        function publishPrimaryView() {
-            const center = map.getCenter();
-            map.getContainer().dataset.latitude = center.lat.toFixed(4);
-            map.getContainer().dataset.longitude = center.lng.toFixed(4);
-        }
-
         function syncComparisonViewToPrimary() {
-            publishPrimaryView();
             if (!compareMap || !settings.splitView || !comparisonProductChoice()) return;
             compareMap.setView(map.getCenter(), map.getZoom(), { animate: false });
         }
@@ -2673,7 +2702,15 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             if (!compareMap || !settings.splitView) return;
             const location = comparisonLocation();
             if (!location.name) return;
-            compareMap.setView([location.latitude, location.longitude], location.zoom, { animate: false });
+            // Leaflet snaps the view it is given to the nearest pixel, so writing
+            // the result back would move the saved city a few metres every time a
+            // pairing ends. This move is not the user choosing a location.
+            restoringComparisonLocation = true;
+            try {
+                compareMap.setView([location.latitude, location.longitude], location.zoom, { animate: false });
+            } finally {
+                restoringComparisonLocation = false;
+            }
         }
 
         function refreshComparisonRadar() {
@@ -2688,17 +2725,22 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
                 removeComparisonRadarLayer();
                 return;
             }
-            if (signature === compareRadarSignature && compareRadarLayer) {
+            const secondProduct = comparisonProduct();
+            // Both sides of this comparison have to be built the same way. Adding
+            // the product to the stored key but not the computed one meant the
+            // paired pane never took the cache path and rebuilt its layer on every
+            // refresh.
+            const layerKey = secondProduct ? `${signature}::${secondProduct}` : signature;
+            if (layerKey === compareRadarSignature && compareRadarLayer) {
                 compareRadarLayer.setOpacity?.(settings.opacity);
                 return;
             }
             removeComparisonRadarLayer();
-            const secondProduct = comparisonProduct();
             compareRadarLayer = secondProduct
                 ? comparisonProductLayer(secondProduct)
                 : cloneRadarLayer(sourceLayer, 'compare-radar-layer');
             if (!compareRadarLayer) return;
-            compareRadarSignature = secondProduct ? `${signature}::${secondProduct}` : signature;
+            compareRadarSignature = layerKey;
             compareRadarLayer.addTo(compareMap);
             compareRadarLayer.setOpacity?.(settings.opacity);
             compareMap.getContainer().dataset.radarFrame = String(currentFrame);
@@ -2764,7 +2806,7 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
                 const center = compareMap.getCenter();
                 compareMap.getContainer().dataset.latitude = center.lat.toFixed(4);
                 compareMap.getContainer().dataset.longitude = center.lng.toFixed(4);
-                if (comparisonProductChoice()) return;
+                if (restoringComparisonLocation || comparisonProductChoice()) return;
                 settings.compareLocation = normalizeComparisonLocation({
                     ...settings.compareLocation,
                     latitude: center.lat,
@@ -5657,6 +5699,7 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             document.getElementById('playIcon').innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
             lastFrameTime = performance.now();
             applyFramePreloadWindow(currentFrame);
+            refreshComparisonRadar();
             animationLoop();
         }
 
@@ -5744,6 +5787,7 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
                 cancelAnimationFrame(animationId);
                 animationId = null;
             }
+            refreshComparisonRadar();
         }
 
         function togglePlay() {
@@ -9697,7 +9741,6 @@ import { createProviderRegistry, RADAR_CAPABILITIES } from './providers/registry
             document.getElementById('splitViewBtn').addEventListener('click', () => setSplitView(!settings.splitView));
             document.getElementById('compareMapClose').addEventListener('click', () => setSplitView(false));
             map.on('moveend zoomend', syncComparisonViewToPrimary);
-            publishPrimaryView();
             initComparisonSearch();
             // The banner wraps differently at other widths, so the tip clearance
             // has to be recomputed when the viewport changes.
