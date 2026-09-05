@@ -3701,6 +3701,7 @@
                         <div class="diagnostic-row"><dt>Retry / backoff</dt><dd id="diagRetry">Loading…</dd></div>
                         <div class="diagnostic-row"><dt>Tile providers</dt><dd id="diagTileBackoff">Loading…</dd></div>
                         <div class="diagnostic-row"><dt>Offline storage</dt><dd id="diagStoragePersistence">Loading…</dd></div>
+                        <div class="diagnostic-row"><dt>Level II decode</dt><dd id="diagLevel2Integrity">Not used</dd></div>
                     </dl>
                 </div>
                 <div class="settings-section">
@@ -3984,6 +3985,7 @@
         let level2Sites = [];
         let level2SiteHealth = new Map();
         let level2Tilts = [];
+        let level2Integrity = null;
         let level2Couplets = [];
         let meshWorker = null;
         let meshWorkerSequence = 0;
@@ -4264,6 +4266,7 @@
                 roadEventsUnavailable: 'Iowa road events unavailable: {message}',
                 level2SiteHealthUnknown: 'Site status unavailable',
                 level2TiltLowest: 'Lowest',
+                diagnosticLevel2Unused: 'Not used this session',
                 roadClosure: 'Road closure',
                 laneClosure: 'Lane closure',
                 roadRestriction: 'Road restriction',
@@ -4486,6 +4489,7 @@
                 roadEventsUnavailable: 'Eventos viales de Iowa no disponibles: {message}',
                 level2SiteHealthUnknown: 'Estado del sitio no disponible',
                 level2TiltLowest: 'Más bajo',
+                diagnosticLevel2Unused: 'No usado en esta sesión',
                 roadClosure: 'Carretera cerrada',
                 laneClosure: 'Carril cerrado',
                 roadRestriction: 'Restricción vial',
@@ -5088,7 +5092,8 @@
                         { ...value }
                     ])),
                     tileBackoff: rateLimiter.snapshot(),
-                    storagePersistence: normalizeStoragePersistence(storagePersistence)
+                    storagePersistence: normalizeStoragePersistence(storagePersistence),
+                    level2Integrity: level2Integrity ? { ...level2Integrity } : null
                 },
                 requests: diagnosticsState.requests.map(request => ({ ...request }))
             };
@@ -5126,6 +5131,12 @@
             document.getElementById('diagStoragePersistence').dataset.state = report.resources.storagePersistence;
             document.getElementById('diagStoragePersistence').textContent =
                 localizedStaticText(storagePersistenceLabel(report.resources.storagePersistence));
+            const integrity = report.resources.level2Integrity;
+            const integrityElement = document.getElementById('diagLevel2Integrity');
+            integrityElement.dataset.state = integrity ? (integrity.truncated ? 'truncated' : 'complete') : 'unused';
+            integrityElement.textContent = integrity
+                ? `${integrity.site}: ${integrity.sweeps} sweep(s), ${integrity.truncated ? 'volume truncated during decode' : 'volume complete'}`
+                : t('diagnosticLevel2Unused');
 
             const requestList = document.getElementById('diagRequests');
             requestList.replaceChildren();
@@ -7932,6 +7943,11 @@
             // The available cuts change between volumes and between products,
             // so the picker is rebuilt from whatever this render actually saw.
             level2Tilts = Array.isArray(rendered.tilts) ? rendered.tilts : [];
+            level2Integrity = {
+                site: rendered.site,
+                truncated: rendered.isTruncated === true,
+                sweeps: level2Tilts.length
+            };
             syncLevel2TiltControls(rendered.elevation);
             level2Couplets = Array.isArray(rendered.couplets) ? rendered.couplets : [];
             renderLevel2Couplets();
@@ -7961,7 +7977,7 @@
             updateLegend();
             updateCoverageStatus();
             if (!map.getBounds().intersects(bounds)) map.fitBounds(bounds, { maxZoom: 7 });
-            if (rendered.hasGaps || rendered.isTruncated) {
+            if (rendered.isTruncated) {
                 showToast(`${rendered.site} volume decoded with missing radials`, 'warn', 5000);
             }
             hideLoadProgress();

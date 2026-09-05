@@ -4,6 +4,8 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- The "volume decoded with missing radials" warning no longer fires on every Level II render. It was triggered by a decoder flag that is set for any volume containing a message 31, which is every modern volume, so the warning carried no information and trained itself away. It now appears only when the volume was genuinely truncated.
+- The Status tab reports Level II decode integrity: the site, how many sweeps came back, and whether the volume was truncated.
 - Map tooltips now escape the text they are given. Leaflet renders tooltip content as HTML and has no fix for CVE-2025-69993, and four tooltips passed alert names, storm cell identifiers, and saved geofence names through without escaping them. The release gate now refuses any Leaflet popup or tooltip fed by the truncate-only helper.
 - NEXRAD Level II can now render any elevation cut in the volume rather than only the lowest one. The tilt list is built from whatever the decoded volume actually contains for the selected product, the choice persists, and an embed URL can pin it with `tilt=`.
 - The NEXRAD Level II site picker now reports each radar's health. Sites in maintenance, sites that are not operating, and sites whose last volume is more than twenty minutes old are marked in the list, and the selected site shows its status and the age of its last volume instead of silently displaying an old scan.

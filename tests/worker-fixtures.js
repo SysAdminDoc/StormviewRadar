@@ -57,6 +57,23 @@ export function syntheticLevel2Volume() {
   return buffer;
 }
 
+// NWS SCN26-54 adds an hourly LTR message to the Level II stream from RPG
+// build 25.0. A decoder that chokes on a message type it does not know would
+// lose every sweep behind it, so the volume is built with an unprocessed
+// record sitting in front of real radial data.
+export function volumeWithUnknownMessageType(messageType = 20) {
+  const base = syntheticLevel2Volume();
+  const headerLength = 24;
+  const unknown = Buffer.from(base.subarray(headerLength));
+  // Byte 3 of the message header, which follows the 12-byte legacy CTM block.
+  unknown[12 + 3] = messageType;
+  return Buffer.concat([
+    base.subarray(0, headerLength),
+    unknown,
+    Buffer.from(base.subarray(headerLength))
+  ]);
+}
+
 function section(number, length) {
   const bytes = Buffer.alloc(length);
   bytes.writeUInt32BE(length, 0);
