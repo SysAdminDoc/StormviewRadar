@@ -221,7 +221,7 @@ npx playwright install chromium firefox webkit
 npm run release:check
 ```
 
-The static checks compare vendored files with the lockfile-installed packages.
+The static checks parse every file under `src/` and `scripts/`, and compare vendored files with the lockfile-installed packages.
 Dependency updates are reviewed by hand, so there are no automated dependency
 pull requests. The only workflow in the repository runs the test suite and an
 advisory check. It does not deploy.

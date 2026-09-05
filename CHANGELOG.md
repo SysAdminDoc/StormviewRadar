@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- The syntax check now walks `src/` and `scripts/` instead of running from a list of filenames kept by hand in package.json. The list had fallen behind by two modules, so `src/level2-analysis.js` and `src/zlib-browser-shim.js` were not being checked at all. Forty-eight files are covered now against thirty-one before.
 - The comparison pane can now carry a second MRMS product instead of a second city, so velocity can sit beside reflectivity over the same ground. Choosing a product locks both panes to the primary view, and the choice is remembered. IEM only archives the reflectivity composite, so scrubbing into the past mirrors the primary rather than pairing a live scan with an old one, and the pane says so.
 - Fixed the radar site and tilt pickers in the mobile sheet, which did nothing when used. The sheet is a copy of the sidebar, and the copy carried the marker that says "already wired" without carrying the listener, so on a phone, where the sidebar is hidden, neither control worked.
 - Choosing a tilt that the next scan does not carry now says so and moves the picker to the cut that actually rendered, instead of leaving the control blank and the stored choice disagreeing with the screen.
