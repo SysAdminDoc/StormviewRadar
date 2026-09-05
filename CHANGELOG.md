@@ -4,6 +4,7 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- Moved the first-visit tip clear of the map chrome. It is a toast, and the toast container sat at the same height as the quick toolbar, so on a narrow screen the tip covered ten of the eleven layer buttons and the active-alert banner, and on a wide screen it covered the last button.
 - Gave the radar, alerts, lightning, satellite, SPC, and reports buttons in the quick toolbar their own coloured icons. Below 768px the toolbar hides its text labels, and those six previously collapsed into identical seven-pixel dots that nothing distinguished.
 - A first visit now opens on observed MRMS reflectivity over the dark basemap instead of HRRR forecast guidance over satellite imagery, so the opening view shows what is happening now and the radar ramp reads against a low-chroma ground. Saved profiles keep whatever source and basemap they already had.
 - Fixed the tropical cyclone overlay, which drew nothing outside the Atlantic. Its East Pacific source pointed at a host that no longer resolves, and the four layer ids it queried on the Atlantic service are group layers that answer with an error rather than features. It now reads Atlantic, East Pacific, and Central Pacific storms from the one live NHC service, probing forecast-point counts first so an empty basin costs a single small response.

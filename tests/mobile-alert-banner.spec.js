@@ -26,6 +26,72 @@ function alertFeature(id, event, severity, coordinates, sent) {
   };
 }
 
+function intersects(a, b) {
+  if (!a || !b) return false;
+  return !(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y);
+}
+
+// The first-visit tip is a toast, and the toast container used to be anchored
+// at y=80, right on top of the quick toolbar and the alert banner.
+for (const [label, width, height] of [['narrow', 390, 844], ['wide', 1440, 900]]) {
+  test(`the first-visit tip clears the toolbar and the alert banner on a ${label} viewport`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.addInitScript(() => {
+      localStorage.setItem('stormview_settings', JSON.stringify({
+        schemaVersion: 4,
+        settings: {
+          source: 'hrrr',
+          autoRefresh: false,
+          layers: { radar: true, alerts: true, spcOutlook: false, states: false, counties: false, labels: false }
+        }
+      }));
+    });
+    await page.route('https://api.weather.gov/alerts/active?status=actual', route => route.fulfill({
+      json: {
+        type: 'FeatureCollection',
+        features: [alertFeature(
+          'tip-overlap',
+          'Severe Thunderstorm Warning',
+          'Severe',
+          [[-97, 38], [-95, 38], [-95, 40], [-97, 40], [-97, 38]],
+          new Date().toISOString()
+        )]
+      }
+    }));
+    await page.route('https://mesonet.agron.iastate.edu/data/gis/images/4326/hrrr/refd_1080.json', route => route.fulfill({
+      json: { model_init_utc: '2026-07-25T12:00:00Z', forecast_minute: 120, model_forecast_utc: '2026-07-25T14:00:00Z' }
+    }));
+    await page.route('https://mesonet.agron.iastate.edu/cache/tile.py/**', route => route.fulfill({
+      status: 200, contentType: 'image/png', body: transparentPng
+    }));
+
+    await page.goto('/');
+    // The tip fires 2.5s after a first visit, so wait for the real toast.
+    const toast = page.locator('#toastContainer .toast').first();
+    await expect(toast).toBeVisible({ timeout: 15000 });
+    await expect(toast).toContainText('Tip:');
+
+    const toastBox = await toast.boundingBox();
+    const banner = page.locator('#mobileAlertBanner');
+    if (await banner.isVisible()) {
+      const bannerBox = await banner.boundingBox();
+      expect(intersects(toastBox, bannerBox)).toBe(false);
+    }
+
+    const buttons = page.locator('#quickToolbar .qt-btn');
+    const count = await buttons.count();
+    for (let index = 0; index < count; index += 1) {
+      const button = buttons.nth(index);
+      expect(intersects(toastBox, await button.boundingBox())).toBe(false);
+      // Geometry alone is not proof the control is reachable.
+      await expect(button).toBeEnabled();
+    }
+    await expect(page.locator('#quickToolbar [data-qt="lightning"]')).toHaveAttribute('aria-checked', 'false');
+    await page.locator('#quickToolbar [data-qt="lightning"]').click({ timeout: 5000 });
+    await expect(page.locator('#quickToolbar [data-qt="lightning"]')).toHaveAttribute('aria-checked', 'true');
+  });
+}
+
 test('mobile alert banner prioritizes visible threats, dismisses, and focuses the map without motion', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });

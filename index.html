@@ -2074,6 +2074,8 @@
             .quick-toolbar::-webkit-scrollbar { display: none; }
             .qt-btn { padding: 5px 8px; font-size: 10px; }
             .qt-btn span.qt-label { display: none; }
+            .toast-container { top: 116px; }
+            body:has(.mobile-alert-banner:not([hidden])) .toast-container { top: 188px; }
         }
 
         /* ==================== IMPROVED MOBILE SHEET ==================== */
@@ -2464,7 +2466,8 @@
         /* Toast notification system */
         .toast-container {
             position: fixed;
-            top: 80px;
+            /* Clears the quick toolbar, which ends at y=116 on desktop. */
+            top: 128px;
             right: 16px;
             z-index: 3000;
             display: flex;
