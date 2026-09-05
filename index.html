@@ -1772,6 +1772,10 @@
             }
             .active, .toggle.on { outline: 2px solid Highlight; }
             .dot { forced-color-adjust: none; }
+            /* The layer icons are tinted with an inline colour, which survives
+               forced colors on SVG. Hand them back to the system palette. */
+            .qt-btn .qt-icon { color: CanvasText !important; opacity: 1 !important; }
+            .qt-btn.active .qt-icon { color: Highlight !important; }
             .radar-layer { filter: none !important; }
         }
 
@@ -2079,8 +2083,7 @@
             .quick-toolbar::-webkit-scrollbar { display: none; }
             .qt-btn { padding: 5px 8px; font-size: 10px; }
             .qt-btn span.qt-label { display: none; }
-            .toast-container { top: 116px; }
-            body:has(.mobile-alert-banner:not([hidden])) .toast-container { top: 188px; }
+            body:has(.mobile-alert-banner:not([hidden])) .toast-container { top: var(--banner-clearance, 188px); }
         }
 
         /* ==================== IMPROVED MOBILE SHEET ==================== */
@@ -2313,6 +2316,12 @@
             .search-box { max-width: 180px; }
             .timestamp-box { display: none; }
             .legend { right: 8px; }
+            @media (max-width: 360px) {
+                /* Keeps the panel clear of the middle of a 320px map. */
+                .legend { padding: 6px; gap: 5px; }
+                .legend-gradient { width: 10px; }
+                .legend-labels { font-size: 9px; }
+            }
             .settings-panel { width: 100%; }
             .mobile-timestamp {
                 display: flex;
@@ -9743,6 +9752,26 @@
             };
         }
 
+        // The first-visit tip sits below the alert banner, whose height depends
+        // on how far the event name wraps, so the clearance has to be measured.
+        let bannerClearanceObserver = null;
+
+        function publishBannerClearance() {
+            const banner = document.getElementById('mobileAlertBanner');
+            if (!banner) return;
+            // The banner's height depends on how far the event name wraps, and it
+            // can reflow after it is shown, so observe it rather than sampling once.
+            if (!bannerClearanceObserver && typeof ResizeObserver === 'function') {
+                bannerClearanceObserver = new ResizeObserver(() => publishBannerClearance());
+                bannerClearanceObserver.observe(banner);
+            }
+            const clearance = banner.hidden ? 0 : Math.round(banner.getBoundingClientRect().bottom) + 12;
+            document.documentElement.style.setProperty(
+                '--banner-clearance',
+                clearance > 0 ? `${clearance}px` : ''
+            );
+        }
+
         async function updateMobileAlertBanner(features = currentAlertFeatures) {
             const banner = document.getElementById('mobileAlertBanner');
             if (!banner || !map) return;
@@ -9754,6 +9783,7 @@
                     : null;
                 if (!selection.feature) {
                     banner.hidden = true;
+                    publishBannerClearance();
                     return;
                 }
                 const properties = selection.feature.properties || {};
@@ -9769,9 +9799,11 @@
                 document.getElementById('mobileAlertView').textContent = t('viewAlert');
                 document.getElementById('mobileAlertDismiss').setAttribute('aria-label', t('dismissAlert'));
                 banner.hidden = false;
+                publishBannerClearance();
             } catch (error) {
                 console.warn('Mobile alert banner unavailable:', error);
                 banner.hidden = true;
+                publishBannerClearance();
             }
         }
 
@@ -13115,6 +13147,9 @@
             document.getElementById('splitViewBtn').addEventListener('click', () => setSplitView(!settings.splitView));
             document.getElementById('compareMapClose').addEventListener('click', () => setSplitView(false));
             initComparisonSearch();
+            // The banner wraps differently at other widths, so the tip clearance
+            // has to be recomputed when the viewport changes.
+            window.addEventListener('resize', publishBannerClearance);
             window.addEventListener('resize', () => {
                 if (!settings.splitView) return;
                 map.invalidateSize();

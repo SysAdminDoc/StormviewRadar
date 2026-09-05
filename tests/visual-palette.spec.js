@@ -104,8 +104,11 @@ test('visual palettes persist and restyle provider radar, alerts, legends, and U
   expect(highContrast.legend).toContain('rgb(255, 23, 68)');
 });
 
-test('the legend reads at 390px and stays clear of the middle of the map', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+// 320px is the WCAG 1.4.10 reflow reference width, and the legend is right
+// anchored, so a wider panel is what pushes it into the middle of the map.
+for (const width of [320, 390]) {
+  test(`the legend reads at ${width}px and stays clear of the middle of the map`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
   await page.addInitScript(() => {
     localStorage.setItem('stormview_welcomed', '1');
     localStorage.setItem('stormview_settings', JSON.stringify({
@@ -169,4 +172,5 @@ test('the legend reads at 390px and stays clear of the middle of the map', async
   await page.locator('#legendToggle').click();
   await expect(page.locator('#legend')).toBeVisible();
   expect(await page.locator('#legend').evaluate(el => getComputedStyle(el).display)).toBe('flex');
-});
+  });
+}

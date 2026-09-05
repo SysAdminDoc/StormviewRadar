@@ -67,24 +67,51 @@ async function violations(page) {
 // The desktop sweep above missed a mobile-only defect because responsive CSS
 // can change names, contrast, and target sizes inside a breakpoint the test
 // never enters. Sweep the narrow layout in both themes and every palette.
-for (const theme of ['dark', 'light']) {
-  for (const palette of ['standard', 'highContrast', 'colorblind']) {
-    test(`narrow ${theme} layout passes accessibility checks with the ${palette} palette`, async ({ page }) => {
-      await page.setViewportSize({ width: 390, height: 844 });
-      await page.addInitScript(([themeValue, paletteValue]) => {
-        const stored = JSON.parse(localStorage.getItem('stormview_pro_v3') || '{}');
-        stored.theme = themeValue;
-        stored.visualPalette = paletteValue;
-        localStorage.setItem('stormview_pro_v3', JSON.stringify(stored));
-      }, [theme, palette]);
+for (const [layout, width, height] of [['narrow', 390, 844], ['wide', 1280, 800]]) {
+  for (const theme of ['dark', 'light']) {
+    for (const palette of ['standard', 'highContrast', 'colorblind']) {
+      test(`${layout} ${theme} layout passes accessibility checks with the ${palette} palette`, async ({ page }) => {
+        await page.setViewportSize({ width, height });
+        await page.addInitScript(([themeValue, paletteValue]) => {
+          const stored = JSON.parse(localStorage.getItem('stormview_pro_v3') || '{}');
+          stored.theme = themeValue;
+          stored.visualPalette = paletteValue;
+          localStorage.setItem('stormview_pro_v3', JSON.stringify(stored));
+        }, [theme, palette]);
 
-      await page.goto('/');
-      await expect(page.locator('#dataStatusText')).toHaveText('HRRR: current');
-      await expect(page.locator('body')).toHaveAttribute('data-visual-palette', palette);
-      expect(await violations(page)).toEqual([]);
-    });
+        await page.goto('/');
+        await expect(page.locator('#dataStatusText')).toHaveText('HRRR: current');
+        await expect(page.locator('body')).toHaveAttribute('data-visual-palette', palette);
+        expect(await violations(page)).toEqual([]);
+      });
+    }
   }
 }
+
+test('toolbar icons hand themselves back to the system palette in forced colors', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.locator('#dataStatusText')).toHaveText('HRRR: current');
+
+  // A light high-contrast theme paints Canvas white. The layer icons are
+  // tinted with an inline colour, and forced colors preserves the parent
+  // colour on SVG, so yellow and cyan strokes used to disappear entirely.
+  await page.emulateMedia({ forcedColors: 'active', colorScheme: 'light' });
+
+  const icons = await page.locator('#quickToolbar .qt-btn svg').evaluateAll(elements => elements.map(el => {
+    const style = getComputedStyle(el);
+    return { stroke: style.stroke, opacity: style.opacity };
+  }));
+  expect(icons.length).toBeGreaterThan(6);
+
+  // Nothing may render at partial alpha in forced colors.
+  expect([...new Set(icons.map(icon => icon.opacity))]).toEqual(['1']);
+
+  // Six authored tints must collapse onto the system palette, so the whole
+  // toolbar can only show the system text colour and the active highlight.
+  const strokes = [...new Set(icons.map(icon => icon.stroke))];
+  expect(strokes.length).toBeLessThanOrEqual(2);
+});
 
 test('the quick toolbar stays identifiable when its labels collapse', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

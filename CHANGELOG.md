@@ -4,6 +4,9 @@ All notable changes to StormviewRadar will be documented in this file.
 
 ## [Unreleased]
 
+- The first-visit tip now measures the alert banner instead of assuming its height, so it no longer covers a live warning when the event name wraps to two lines on a narrow screen.
+- The radar legend keeps clear of the middle of the map down to a 320-pixel viewport, where the wider readable panel had started to overlap it.
+- Layer icons in the quick toolbar are drawn in the system palette under Windows High Contrast. Their author colours previously survived forced-colors mode on SVG, leaving the yellow and cyan icons close to invisible on a light high-contrast theme.
 - The app now asks the browser for durable storage at the moment it decides it has offline data worth keeping, and the Status tab reports what the browser actually answered. Cached radar frames and tiles previously sat in best-effort storage that a browser may evict at any time, while the install prompt advertised them as available offline.
 - State and county boundaries now ship with the app instead of loading from a third-party CDN at runtime. They were the last remote asset, so the content security policy no longer allows any CDN origin at all, and the boundary files are covered by the same lockfile integrity check as every other vendored asset.
 - Made the radar legend readable. Its tick labels were laid out in an 18-pixel column, so "75+ dBZ" and "5 dBZ" wrapped one character per line and the scale was unreadable at every screen size. The legend now sizes to its labels and keeps clear of the middle of the map.
